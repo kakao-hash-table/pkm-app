@@ -1,14 +1,14 @@
 /* 저장소 — 파일 지도({경로: 마크다운})를 어디에 두는지만 다룬다. 형식은 pkm-md.js.
    server : 로컬 서버(npm start·scripts/serve.sh)로 열었을 때. 데이터 폴더의 <프로필>/ 파일에 바로 쓴다(storage: github 이면 서버가 git 커밋·푸시).
-   device : 서버 없이 열었을 때 이 브라우저(localStorage)에.
-   github : 서버 없이 열었을 때 내 저장소의 프로필 폴더(<프로필>/ 또는 data/<프로필>/)에 GitHub API로 직접. 토큰은 이 브라우저에만. */
+   github : 서버 없이(정적 웹으로) 열었을 때. 내 저장소의 프로필 폴더(<프로필>/ 또는 data/<프로필>/)에 GitHub API로 직접. 토큰은 이 브라우저에만.
+   노트를 브라우저에 저장하는 방식은 두지 않는다 — 기기마다 갈라지고 지우면 사라지기 때문. */
 (function (root) {
   'use strict';
   const LS = {
     get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
   };
-  const K = { profiles:'pkm:v1:profiles', files:p => `pkm:v1:files:${p}`, gh:'pkm:v1:github', shas:p => `pkm:v1:gh-sha:${p}`, prefix:p => `pkm:v1:gh-prefix:${p}` };
+  const K = { gh:'pkm:v1:github', repo:'pkm:v1:gh-repo', shas:p => `pkm:v1:gh-sha:${p}`, prefix:p => `pkm:v1:gh-prefix:${p}` };
   const err = (msg, extra) => Object.assign(new Error(msg), extra || {});
 
   /* ---------- 로컬 서버 ---------- */
@@ -28,41 +28,31 @@
     async syncNow(p){ return this.json(`/api/profile/${encodeURIComponent(p)}/sync`, { method:'POST' }); }
   };
 
-  /* ---------- 이 브라우저 ---------- */
-  const device = {
-    kind:'device',
-    async profiles(){ return LS.get(K.profiles, []); },
-    async load(p){ return { files:LS.get(K.files(p), {}), version:'local' }; },
-    async version(){ return { version:'local' }; },
-    async save(p, { writes = {}, deletes = [] }){
-      const f = LS.get(K.files(p), {});
-      Object.assign(f, writes); deletes.forEach(d => delete f[d]);
-      if (!LS.set(K.files(p), f)) throw err('이 브라우저의 저장 공간이 가득 찼어요. 내보내기로 백업한 뒤 GitHub 저장으로 옮겨 주세요');
-      return { version:'local' };
-    },
-    async create(name, files){
-      const list = LS.get(K.profiles, []);
-      if (list.some(x => x.name === name)) throw err('이미 있는 프로필이에요', { status:409 });
-      list.push({ name, storage:'device' }); LS.set(K.profiles, list); LS.set(K.files(name), files || {});
-    },
-    setStorage(name, storage, repo){
-      const list = LS.get(K.profiles, []), x = list.find(y => y.name === name); if (!x) return;
-      x.storage = storage; x.repo = repo || ''; LS.set(K.profiles, list);
-    }
-  };
-
   /* ---------- GitHub (브라우저에서 직접) ---------- */
   const b64e = s => btoa(unescape(encodeURIComponent(s)));
   const b64d = s => decodeURIComponent(escape(atob(String(s).replace(/\n/g, ''))));
   const github = {
     kind:'github',
     auth(){ return LS.get(K.gh, null); },                       // { token, login }
+    repo(){ return LS.get(K.repo, ''); },
+    setRepo(r){ LS.set(K.repo, r); },
+    ready(){ return !!(this.auth() && this.repo()); },
     async connect(token){
       const r = await fetch('https://api.github.com/user', { headers:{ authorization:`Bearer ${token}`, accept:'application/vnd.github+json' } });
       if (!r.ok) throw err(r.status === 401 ? '토큰이 맞지 않거나 만료됐어요' : `GitHub에 연결하지 못했어요(${r.status})`);
       const u = await r.json(); LS.set(K.gh, { token, login:u.login }); return u.login;
     },
-    disconnect(){ try { localStorage.removeItem(K.gh); } catch (e) {} },
+    disconnect(){ try { localStorage.removeItem(K.gh); localStorage.removeItem(K.repo); } catch (e) {} },
+    async branch(repo){ return (await this.call(`/repos/${repo}`)).default_branch; },
+    // 저장소에서 프로필 폴더를 찾는다: <이름>/_설정.md 또는 data/<이름>/_설정.md
+    async profiles(){
+      const repo = this.repo(), tree = await this.call(`/repos/${repo}/git/trees/${encodeURIComponent(await this.branch(repo))}?recursive=1`);
+      const names = new Set();
+      for (const x of tree.tree){ const m = x.type === 'blob' && x.path.match(/^(?:data\/)?([^/]+)\/_설정\.md$/); if (m && !/^[_.]/.test(m[1])) names.add(m[1]); }
+      return [...names].sort().map(name => ({ name, storage:'github', repo }));
+    },
+    async version(){ const repo = this.repo(); return { version:(await this.call(`/repos/${repo}/git/trees/${encodeURIComponent(await this.branch(repo))}`)).sha }; },
+    async create(name, files){ LS.set(K.prefix(name), `${name}/`); LS.set(K.shas(name), {}); await this.save(name, { writes:files, deletes:[] }); },
     async call(path, opt = {}){
       const a = this.auth(); if (!a) throw err('GitHub에 연결돼 있지 않아요');
       const r = await fetch(`https://api.github.com${path}`, { ...opt, headers:{ authorization:`Bearer ${a.token}`, accept:'application/vnd.github+json', 'content-type':'application/json', ...(opt.headers || {}) } });
@@ -71,8 +61,8 @@
       return r.status === 204 ? {} : r.json();
     },
     async repos(){ return (await this.call('/user/repos?per_page=100&sort=updated')).map(x => ({ full:x.full_name, private:x.private })); },
-    async load(p, repo){
-      const info = await this.call(`/repos/${repo}`), branch = info.default_branch;
+    async load(p, repo = this.repo()){
+      const branch = await this.branch(repo);
       const tree = await this.call(`/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
       // 로컬 서버와 같은 저장소를 쓸 수 있게, 프로필 폴더가 저장소 바로 아래(<프로필>/)인지 data/<프로필>/인지 찾는다. 없으면 바로 아래에 만든다.
       const has = pre => tree.tree.some(x => x.path === `${pre}_설정.md`);
@@ -88,8 +78,8 @@
       LS.set(K.shas(p), shas);
       return { files, version:tree.sha, branch };
     },
-    async save(p, repo, { writes = {}, deletes = [] }){
-      const shas = LS.get(K.shas(p), {}), branch = (await this.call(`/repos/${repo}`)).default_branch, pre = LS.get(K.prefix(p), `${p}/`);
+    async save(p, { writes = {}, deletes = [] }, repo = this.repo()){
+      const shas = LS.get(K.shas(p), {}), branch = await this.branch(repo), pre = LS.get(K.prefix(p), `${p}/`);
       for (const [rel, text] of Object.entries(writes)){
         const r = await this.call(`/repos/${repo}/contents/${encodeURI(`${pre}${rel}`)}`, { method:'PUT', body:JSON.stringify({ message:`pkm(${p}): ${rel}`, content:b64e(text), branch, ...(shas[rel] ? { sha:shas[rel].sha } : {}) }) });
         shas[rel] = { sha:r.content.sha, text };
@@ -100,13 +90,13 @@
         delete shas[rel];
       }
       LS.set(K.shas(p), shas);
-      return { version:'github' };
+      return this.version();
     }
   };
 
   async function detect(){
-    if (document.documentElement.dataset.server !== '1') return device;
-    try { await server.profiles(); return server; } catch (e) { return device; }
+    if (document.documentElement.dataset.server !== '1') return github;
+    try { await server.profiles(); return server; } catch (e) { return github; }
   }
 
   /* ---------- zip 내보내기(압축 없이 저장만 — 의존성 없이) ---------- */
@@ -130,5 +120,5 @@
     return new Blob([...parts, ...central, end], { type:'application/zip' });
   }
 
-  root.PKMStore = { server, device, github, detect, zip, LS };
+  root.PKMStore = { server, github, detect, zip, LS };
 })(typeof self !== 'undefined' ? self : this);

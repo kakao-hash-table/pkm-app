@@ -699,16 +699,13 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
     <div><h2 id="st2-title">데이터를 어디에 둘까요</h2><p class="faint" style="margin:4px 0 0">프로필마다 따로 정해요. 나중에 바꿀 수 있고, 바꾸면 데이터를 옮겨 드려요.</p></div>
     <fieldset class="choice">
       <legend class="sr-only">저장 위치</legend>
-      <label><input type="radio" name="mode" value="device"><span><b>내 기기에만 저장</b><small>계정 없이 바로 써요. 이 브라우저에만 있어서 다른 기기에서는 안 보여요. 브라우저 데이터를 지우면 함께 지워지니 가끔 내보내기로 백업해 주세요.</small></span></label>
+      <label><input type="radio" name="mode" value="device"><span><b>이 컴퓨터에 저장</b><small></small></span></label>
       <label><input type="radio" name="mode" value="github"><span><b>GitHub에 저장</b><small>어느 기기에서든 GitHub로 로그인하면 같은 데이터가 열려요. 내 비공개 저장소에 마크다운으로 저장돼서 Obsidian과 함께 쓸 수 있어요. GitHub도 내용을 볼 수 있으니 회사 데이터는 회사 정책을 먼저 확인해 주세요.</small></span></label>
     </fieldset>
-    <div data-extra="device" class="st-extra">
-      <label class="check opt"><input type="checkbox" name="folder"><span>이 컴퓨터의 폴더와 연결하기 — 그 폴더를 Obsidian 볼트로 함께 써요 <span class="faint">(PC의 크롬·엣지에서만)</span></span></label>
-      <div class="t-acts" style="justify-content:flex-start"><button class="btn btn-ghost btn-sm" type="button" data-act="st-export">내보내기(.zip)</button><button class="btn btn-ghost btn-sm" type="button" data-act="st-import">가져오기</button></div>
-    </div>
     <div data-extra="github" class="st-extra">
       <div id="st-gh"></div>
     </div>
+    <div class="t-acts" style="justify-content:flex-start"><button class="btn btn-ghost btn-sm" type="button" data-act="st-export">내보내기(.zip)</button><button class="btn btn-ghost btn-sm" type="button" data-act="st-import">가져오기</button></div>
     <p class="err" id="st-err" hidden></p>
     <div class="dlg-actions">
       <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
@@ -808,11 +805,12 @@ const DEF_SET = () => ({ storage:'device', week_start:1, day_start:'09:00', day_
 const PSET = {};
 const pset = () => PSET[S.profile] || (PSET[S.profile] = DEF_SET());
 const GH = { login:null, repos:[] };   // 서버 없이 GitHub에 저장할 때만(토큰)
-const pstore = n => { const s = PSET[n] || (PLIST.find(x => x.name === n) || {}); return { mode:(s.storage || 'device') === 'github' ? 'github' : 'device', repo:s.repo || '' }; };
+// 서버로 열면 프로필마다 이 컴퓨터(device) 또는 GitHub 자동 동기화, 서버 없이 열면 언제나 GitHub 저장소
+const pstore = n => { if (STORE && STORE.kind === 'github') return { mode:'github', repo:PKMStore.github.repo() }; const s = PSET[n] || (PLIST.find(x => x.name === n) || {}); return { mode:s.storage === 'github' ? 'github' : 'device', repo:'' }; };
 const SAVE = { state:'idle', at:null, error:null }, SYNCST = {};
 const storeText = n => {
   const st = pstore(n), srv = STORE && STORE.kind === 'server', sy = SYNCST[n];
-  const where = st.mode === 'github' ? (srv ? `GitHub 자동 동기화${sy && sy.state === 'error' ? ' · 실패' : sy && sy.at ? ` · ${new Date(sy.at).toTimeString().slice(0, 5)}` : ''}` : `GitHub · ${st.repo}`) : srv ? `이 컴퓨터 · data/${n}` : '이 브라우저에만';
+  const where = !srv ? `GitHub · ${st.repo}` : st.mode === 'github' ? `GitHub 자동 동기화${sy && sy.state === 'error' ? ' · 실패' : sy && sy.at ? ` · ${new Date(sy.at).toTimeString().slice(0, 5)}` : ''}` : `이 컴퓨터 · ${n} 폴더`;
   const save = n !== S.profile ? '' : SAVE.state === 'saving' ? ' · 저장 중' : SAVE.state === 'error' ? ' · 저장 못 함' : SAVE.at ? ` · ${SAVE.at} 저장` : '';
   return where + save;
 };
@@ -826,7 +824,7 @@ const db = () => PROFILES[S.profile] || EMPTY;
 let STORE = null;
 const LAST = {}, VER = {}, IDX = {}, MOVES = {};   // 마지막 저장본 · 서버 버전 · id→경로 · 바뀐 경로(정규 경로 → 디스크 경로)
 let saveTimer = null, saving = false, again = false;
-const storeFor = n => STORE.kind === 'server' ? STORE : pstore(n).mode === 'github' ? PKMStore.github : PKMStore.device;
+const storeFor = () => STORE;
 const profileFiles = n => PKMMD.serialize({ db:PROFILES[n], settings:PSET[n] });
 function setSave(state, error){
   Object.assign(SAVE, { state, error:error || null }); if (state === 'ok') SAVE.at = nowHM();
@@ -848,7 +846,7 @@ async function saveNow(){
   ch.deletes = ch.deletes.filter(p => !(p in ch.writes));
   saving = true; setSave('saving');
   try {
-    const r = await (STORE.kind !== 'server' && pstore(n).mode === 'github' ? PKMStore.github.save(n, pstore(n).repo, ch) : storeFor(n).save(n, ch));
+    const r = await STORE.save(n, ch);
     LAST[n] = next; if (r && r.version) VER[n] = r.version; setSave('ok');
   } catch (e) {
     setSave('error', e.message);
@@ -873,8 +871,7 @@ function adopt(n, files, version){
   for (const [id, p] of Object.entries(norm.index)) if (P.paths[id] && P.paths[id] !== p) MOVES[n][p] = P.paths[id];
 }
 async function loadProfile(n){
-  const st = storeFor(n);
-  const r = STORE.kind !== 'server' && pstore(n).mode === 'github' ? await PKMStore.github.load(n, pstore(n).repo) : await st.load(n);
+  const r = await STORE.load(n);
   adopt(n, r.files, r.version);
 }
 async function openProfile(n){
@@ -891,20 +888,25 @@ async function createProfileIn(name){
   if (STORE.kind === 'server') await STORE.create(name);
   else {
     const empty = PKMMD.emptyDb(); empty.kinds = emptyDB().kinds;
-    await PKMStore.device.create(name, PKMMD.serialize({ db:empty, settings:{ storage:'device', onboarded:false } }));
+    await STORE.create(name, PKMMD.serialize({ db:empty, settings:{ storage:'github', onboarded:false } }));
   }
   PLIST = await STORE.profiles();
 }
 async function boot(){
+  STORE = await PKMStore.detect();
+  if (STORE.kind === 'github' && !STORE.ready()){ S.mode = 'connect'; buildNav(); render(); booted = true; startTimers(); return; }
+  await openData();
+  buildNav(); render(); booted = true; startTimers();
+}
+let timersOn = false;
+function startTimers(){ if (timersOn) return; timersOn = true; setInterval(tick, 30000); setInterval(poll, 15000); }
+async function openData(){
   try {
-    STORE = await PKMStore.detect();
     PLIST = await STORE.profiles();
     if (!PLIST.length){ await createProfileIn('개인'); }
     const last = LS.get('pkm:v1:last', ''), pick = PLIST.find(x => x.name === last) ? last : PLIST[0].name;
     S.profile = pick; await loadProfile(pick); S.mode = 'data';
   } catch (e) { S.mode = 'error'; S.error = e.message; }
-  buildNav(); render(); booted = true;
-  setInterval(tick, 30000); setInterval(poll, 15000);
 }
 /* 시계 — 30초마다. 날짜가 바뀌거나 오늘 화면이면 다시 그린다(입력 중·대화상자 열림이면 기다린다) */
 function tick(){
@@ -913,8 +915,10 @@ function tick(){
   if (!busy && S.mode === 'data' && (prev !== TODAY || /^#\/today|^#?$/.test(location.hash))) render();
 }
 /* 바깥(Obsidian·다른 기기)에서 바뀌었는지 — 로컬 서버일 때만 */
+let lastGhPoll = 0;
 async function poll(){
-  if (!STORE || STORE.kind !== 'server' || document.visibilityState !== 'visible' || S.mode !== 'data' || saving || saveTimer) return;
+  if (!STORE || document.visibilityState !== 'visible' || S.mode !== 'data' || saving || saveTimer) return;
+  if (STORE.kind === 'github'){ if (Date.now() - lastGhPoll < 60000) return; lastGhPoll = Date.now(); }
   const n = S.profile;
   try {
     const v = await STORE.version(n);
@@ -1321,36 +1325,30 @@ function inlineEdit(col, x){
 function openStorage(){
   const f = $('#dlg-storage form'), st = pstore(S.profile), srv = STORE.kind === 'server';
   f.reset(); f.querySelector(`input[name=mode][value=${st.mode}]`).checked = true;
-  $('#st2-title').textContent = `${S.profile} 데이터를 어디에 둘까요`;
+  $('#st2-title').textContent = srv ? `${S.profile} 데이터를 어디에 둘까요` : `${S.profile} 데이터 위치`;
+  f.querySelector('.choice').hidden = !srv;   // 서버 없이 열면 GitHub 저장소뿐이라 고를 게 없다
+  $('#st2-submit').hidden = !srv;
   const [dl, gl] = f.querySelectorAll('.choice label');
-  dl.querySelector('b').textContent = srv ? '이 컴퓨터에 저장' : '이 브라우저에만 저장';
-  dl.querySelector('small').textContent = srv ? `data/${S.profile} 폴더의 마크다운 파일에 바로 저장돼요. Obsidian에서 이 폴더를 볼트로 열면 같이 써요.` : '계정 없이 바로 써요. 이 브라우저에만 있어서 다른 기기에서는 안 보여요. 브라우저 데이터를 지우면 함께 지워지니 가끔 내보내기로 백업해 주세요.';
-  gl.querySelector('b').textContent = srv ? 'GitHub에 자동 동기화' : 'GitHub에 저장';
-  gl.querySelector('small').textContent = srv ? `위 파일을 저장할 때마다 이 폴더의 git 저장소에 자동으로 커밋·푸시하고, 2분마다 다른 기기에서 올린 것을 받아 와요. 비공개 저장소에만 쓰세요. GitHub도 내용을 볼 수 있으니 회사 데이터는 회사 정책을 먼저 확인해 주세요.` : '내 비공개 저장소의 프로필 폴더에 마크다운으로 저장돼서 어느 기기에서든 열려요. 개인 토큰으로 연결해요(서버를 거치지 않아요). GitHub도 내용을 볼 수 있으니 회사 데이터는 회사 정책을 먼저 확인해 주세요.';
-  f.folder.closest('label').hidden = true;   // 폴더 연결은 로컬 서버가 대신한다
-  syncStorage(); openDlg('dlg-storage'); f.querySelector('input[name=mode]:checked').focus();
-  if (!srv && PKMStore.github.auth() && !GH.repos.length) PKMStore.github.repos().then(r => { GH.login = PKMStore.github.auth().login; GH.repos = r.map(x => x.full); syncStorage(); }).catch(e => toast(e.message));
+  dl.querySelector('small').textContent = `${S.profile} 폴더의 마크다운 파일에 바로 저장돼요. Obsidian에서 이 폴더를 볼트로 열면 같이 써요.`;
+  gl.querySelector('b').textContent = 'GitHub에 자동 동기화';
+  gl.querySelector('small').textContent = '위 파일을 저장할 때마다 데이터 폴더의 git 저장소에 자동으로 커밋·푸시하고, 2분마다 다른 기기에서 올린 것을 받아 와요. 비공개 저장소에만 쓰세요. GitHub도 내용을 볼 수 있으니 회사 데이터는 회사 정책을 먼저 확인해 주세요.';
+  syncStorage(); openDlg('dlg-storage'); (srv ? f.querySelector('input[name=mode]:checked') : f.querySelector('button')).focus();
 }
 function syncStorage(){
   const f = $('#dlg-storage form'), mode = f.mode.value, st = pstore(S.profile), srv = STORE.kind === 'server', sy = SYNCST[S.profile] || {};
   f.querySelectorAll('[data-extra]').forEach(x => x.hidden = x.dataset.extra !== mode);
   $('#st-err').hidden = true;
-  const auth = PKMStore.github.auth(); if (auth) GH.login = auth.login;
-  if (mode === 'github') $('#st-gh').innerHTML = srv
-    ? `<p style="margin:0">${st.mode === 'github' ? `동기화 상태: <b>${sy.state === 'error' ? '실패' : sy.state === 'syncing' || sy.state === 'pending' ? '진행 중' : sy.at ? `${new Date(sy.at).toLocaleString('ko-KR', { hour12:false })}에 맞춤` : '아직 안 함'}</b>${sy.error ? `<br><span class="faint">${esc(sy.error)}</span>` : ''}` : '켜면 저장할 때마다 자동으로 커밋·푸시해요.'}</p>
-       ${st.mode === 'github' ? `<button class="btn btn-ghost btn-sm" type="button" data-act="sync-now" style="align-self:flex-start">지금 동기화</button>` : ''}`
-    : !GH.login
-    ? `<p class="faint" style="margin:0">GitHub › Settings › Developer settings › Fine-grained tokens에서 <b>저장소 하나</b>, Contents <b>읽기·쓰기</b>만 주고 만료일을 정해 만든 토큰을 붙여 넣어요. 토큰은 이 브라우저에만 저장돼요.</p>
-      <div id="gh-token" class="st-extra" style="margin-top:8px">
-        <label class="field"><span>개인 토큰</span><input type="password" id="gh-token-input" autocomplete="off" spellcheck="false" aria-describedby="gh-token-err"></label>
-        <p class="err" id="gh-token-err" hidden>토큰을 붙여 넣어 주세요</p>
-        <button class="btn btn-ghost btn-sm" type="button" data-act="gh-token" style="align-self:flex-start">토큰으로 연결하기</button>
-      </div>`
-    : `<p style="margin:0"><b>${esc(GH.login)}</b>로 연결했어요 <button class="btn btn-text btn-sm" type="button" data-act="gh-logout">연결 끊기</button></p><fieldset class="choice" style="margin-top:8px"><legend>어느 저장소에 둘까요</legend>
-        ${GH.repos.length ? GH.repos.map(r => `<label><input type="radio" name="repo" value="${esc(r)}" ${st.repo === r ? 'checked' : ''}><span><b>${esc(r)}</b><small>${esc(S.profile)} 폴더에 저장해요(이미 data/${esc(S.profile)}가 있으면 그곳에)</small></span></label>`).join('') : '<p class="faint">저장소 목록을 불러오는 중이에요…</p>'}</fieldset>`;
+  if (!srv){
+    const a = PKMStore.github.auth() || {};
+    $('#st-gh').innerHTML = `<p style="margin:0">GitHub 저장소 <b>${esc(st.repo)}</b>의 ${esc(S.profile)} 폴더에 저장해요. ${esc(a.login || '')}로 연결했어요.</p>
+      <p class="faint" style="margin:0">Obsidian에서 함께 쓰려면 Obsidian Git으로 같은 저장소를 받아 열어 주세요.</p>
+      <button class="btn btn-text btn-sm" type="button" data-act="gh-logout" style="align-self:flex-start">연결 끊기</button>`;
+    return;
+  }
+  if (mode === 'github') $('#st-gh').innerHTML = `<p style="margin:0">${st.mode === 'github' ? `동기화 상태: <b>${sy.state === 'error' ? '실패' : sy.state === 'syncing' || sy.state === 'pending' ? '진행 중' : sy.at ? `${new Date(sy.at).toLocaleString('ko-KR', { hour12:false })}에 맞춤` : '아직 안 함'}</b>${sy.error ? `<br><span class="faint">${esc(sy.error)}</span>` : ''}` : '켜면 저장할 때마다 자동으로 커밋·푸시해요.'}</p>
+       ${st.mode === 'github' ? `<button class="btn btn-ghost btn-sm" type="button" data-act="sync-now" style="align-self:flex-start">지금 동기화</button>` : ''}`;
   const cur = st.mode === mode;
-  $('#st2-submit').textContent = mode === 'github' ? (srv ? (cur ? '저장하기' : '자동 동기화 켜기') : GH.login ? (cur ? '저장하기' : 'GitHub로 옮기기') : '먼저 토큰으로 연결해 주세요') : (cur ? '저장하기' : srv ? '자동 동기화 끄기' : '이 브라우저로 옮기기');
-  $('#st2-submit').disabled = mode === 'github' && !srv && !GH.login;
+  $('#st2-submit').textContent = mode === 'github' ? (cur ? '저장하기' : '자동 동기화 켜기') : (cur ? '저장하기' : '자동 동기화 끄기');
 }
 function openProfiles(){
   const f = $('#dlg-profile form'); f.reset();
@@ -2010,6 +2008,24 @@ function deleteItem(kind, id){
 }
 
 /* ---------------- 상태 화면 ---------------- */
+function vConnect(){
+  const a = PKMStore.github.auth();
+  return `<div class="page"><header class="page-head"><div><h1 tabindex="-1">GitHub에 연결하기</h1><p class="sub">노트를 내 비공개 저장소에 마크다운으로 저장해요</p></div></header>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0">이 주소는 서버 없이 열려 있어서 노트를 GitHub 저장소에 저장해요. 어느 기기에서든 같은 저장소에 연결하면 같은 노트가 열려요. 이 컴퓨터에 파일로 저장하려면 로컬 서버(<code>npm start</code>)로 열어 주세요.</p>
+      ${!a ? `<form data-form="connect" class="st-extra" novalidate>
+        <p class="faint" style="margin:0">GitHub › Settings › Developer settings › Fine-grained tokens에서 <b>저장소 하나</b>에 Contents <b>읽기·쓰기</b>만 주고 만료일을 정해 만든 토큰을 붙여 넣어요. 토큰은 이 브라우저에만 저장돼요.</p>
+        <label class="field"><span>개인 토큰</span><input type="password" name="token" id="cn-token" autocomplete="off" spellcheck="false" aria-describedby="cn-err"></label>
+        <p class="err" id="cn-err" hidden></p>
+        <button class="btn btn-primary" type="submit" style="align-self:flex-start">연결하기</button></form>`
+      : `<form data-form="pickrepo" class="st-extra" novalidate>
+        <p style="margin:0"><b>${esc(a.login)}</b>로 연결했어요 <button class="btn btn-text btn-sm" type="button" data-act="gh-logout">연결 끊기</button></p>
+        <fieldset class="choice"><legend>어느 저장소에 둘까요 <span class="faint">— 비공개 저장소를 골라 주세요</span></legend>
+          ${GH.repos.length ? GH.repos.map((r, i) => `<label><input type="radio" name="repo" value="${esc(r.full)}" ${i === 0 ? 'checked' : ''}><span><b>${esc(r.full)}</b><small>${r.private ? '비공개' : '공개 — 노트가 모두에게 보여요'}</small></span></label>`).join('') : '<p class="faint">저장소 목록을 불러오는 중이에요…</p>'}</fieldset>
+        <p class="err" id="cn-err" hidden></p>
+        <button class="btn btn-primary" type="submit" style="align-self:flex-start" ${GH.repos.length ? '' : 'disabled'}>이 저장소 쓰기</button></form>`}
+    </div></div>`;
+}
 function vLoading(){
   const bar = (w, h = 16) => `<div class="sk" style="width:${w};height:${h}px;margin-top:10px"></div>`;
   return `<div class="page" aria-busy="true"><h1 tabindex="-1" class="sr-only">불러오는 중</h1>
@@ -2070,7 +2086,10 @@ function render(){
   document.querySelectorAll('.profile-name').forEach(x => x.textContent = S.profile);
   document.querySelectorAll('.store-line').forEach(x => x.textContent = storeText(S.profile));
   document.querySelectorAll('.profile-btn').forEach(x => x.setAttribute('aria-label', `프로필 바꾸기, 지금 ${S.profile}`));
-  main.innerHTML = S.mode === 'loading' ? vLoading() : S.mode === 'error' ? vError() : route(p);
+  main.innerHTML = S.mode === 'connect' ? vConnect() : S.mode === 'loading' ? vLoading() : S.mode === 'error' ? vError() : route(p);
+  if (S.mode === 'connect' && PKMStore.github.auth() && !GH.repos.length && !GH.loading){
+    GH.loading = true; PKMStore.github.repos().then(r => { GH.repos = r; GH.loading = false; render(); }).catch(e => { GH.loading = false; toast(e.message); });
+  }
   const cur = main.querySelector('.seg-scroll a[aria-current]'); if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - 8;   // 기록 종류가 많아도 지금 탭이 보이게
   const h1 = main.querySelector('h1');
   document.title = (h1 ? h1.textContent.trim() : 'pkm') + ' · pkm';
@@ -2168,14 +2187,11 @@ document.addEventListener('click', e => {
     case 'sort-inbox': openSort(id); break;
     case 'profiles': openProfiles(); break;
     case 'storage': $('#dlg-profile').close(); openStorage(); break;
-    case 'gh-token': {
-      const v = $('#gh-token-input').value.trim();
-      if (!v){ $('#gh-token-err').hidden = false; $('#gh-token-input').setAttribute('aria-invalid', 'true'); $('#gh-token-input').focus(); break; }
-      PKMStore.github.connect(v).then(async login => { GH.login = login; GH.repos = (await PKMStore.github.repos()).map(x => x.full); syncStorage(); $('#dlg-storage input[name=repo]')?.focus(); toast(`${login}로 연결했어요`); })
-        .catch(e => { $('#gh-token-err').textContent = e.message; $('#gh-token-err').hidden = false; $('#gh-token-input').focus(); });
-      break;
+    case 'gh-logout': {
+      PKMStore.github.disconnect(); GH.login = null; GH.repos = [];
+      Object.keys(PROFILES).forEach(k => delete PROFILES[k]); PLIST = [];
+      $('#dlg-storage').close(); S.mode = 'connect'; render(); toast('GitHub 연결을 끊었어요. 토큰은 이 브라우저에서 지웠어요'); break;
     }
-    case 'gh-logout': PKMStore.github.disconnect(); GH.login = null; GH.repos = []; syncStorage(); toast('GitHub 연결을 끊었어요. 토큰은 이 브라우저에서 지웠어요'); break;
     case 'sync-now': STORE.syncNow(S.profile).then(r => { SYNCST[S.profile] = r; syncStorage(); render(); toast(r.state === 'ok' ? 'GitHub와 맞췄어요' : `동기화하지 못했어요 — ${r.error || ''}`); }).catch(e => toast(e.message)); break;
     case 'st-export': {
       const files = profileFiles(S.profile), a = document.createElement('a');
@@ -2223,7 +2239,7 @@ document.addEventListener('click', e => {
     case 'dismiss-tip': S.dismissed[id] = true; LS.set('pkm:v1:dismissed', S.dismissed); render(); $('#main').focus(); break;
     case 'reload': if (!PROFILES[S.profile] && STORE){ openProfile(S.profile); } else if (STORE) reloadProfile(); else boot(); break;
     case 'obsidian': {
-      if (STORE.kind !== 'server'){ toast('이 브라우저에 저장된 노트라 Obsidian에서 열 수 없어요. 이 컴퓨터(로컬 서버)에서 열어 주세요'); break; }
+      if (STORE.kind !== 'server'){ toast('GitHub에 저장된 노트예요. Obsidian에서는 Obsidian Git으로 같은 저장소를 받아 열어 주세요'); break; }
       const key = parse()[2], file = key && (IDX[S.profile] || {})[key];
       if (!file){ toast('아직 파일로 저장되지 않았어요. 잠시 뒤 다시 눌러 주세요'); break; }
       location.href = `obsidian://open?vault=${encodeURIComponent(S.profile)}&file=${encodeURIComponent(file.replace(/\.md$/, ''))}`;
@@ -2376,7 +2392,7 @@ document.addEventListener('submit', e => {
     if (bad){ e.textContent = bad; return invalid(f.elements.name, 'pf-err'); }
     if (PLIST.some(x => x.name === n)){ e.textContent = '이미 있는 프로필이에요'; return invalid(f.elements.name, 'pf-err'); }
     createProfileIn(n).then(() => { f.closest('dialog').close(); S.inline = null; go('#/today'); return openProfile(n); })
-      .then(() => toast(`${n} 프로필을 만들었어요 · ${STORE.kind === 'server' ? `data/${n} 폴더` : '이 브라우저'}에 저장해요`, { label:'저장 위치 바꾸기', fn:openStorage }))
+      .then(() => toast(`${n} 프로필을 만들었어요 · ${STORE.kind === 'server' ? `${n} 폴더` : `GitHub ${PKMStore.github.repo()}`}에 저장해요`, { label:'저장 위치 바꾸기', fn:openStorage }))
       .catch(err => { e.textContent = err.message; e.hidden = false; });
   } else if (kind === 'blkadd'){
     const ids = [...f.querySelectorAll('input[name=ids]:checked')].map(x => x.value);
@@ -2417,29 +2433,20 @@ document.addEventListener('submit', e => {
     if (kid) Object.assign(kindOf(kid), data); else { id = uid('k'); D.kinds.push({ id, ...data }); }
     f.closest('dialog').close(); go(`#/time/${id}`); render();
     toast(kid ? '기록 종류를 고쳤어요' : `${name} 기록 종류를 만들었어요 · 02_시간/${name} 폴더와 템플릿이 생겨요`, { label:'되돌리기', fn:() => { undo(); go('#/time/daily'); } });
-  } else if (kind === 'storage'){
-    const n = S.profile, st = pstore(n), mode = f.mode.value, set = pset(), prev = { storage:set.storage, repo:set.repo };
-    if (STORE.kind === 'server'){
-      set.storage = mode; f.closest('dialog').close(); render();
-      if (mode === 'github' && prev.storage !== 'github') setTimeout(() => STORE.syncNow(n).then(r => { SYNCST[n] = r; render(); toast(r.state === 'ok' ? 'GitHub에 처음 올렸어요' : `GitHub에 올리지 못했어요 — ${r.error || ''}`); }).catch(() => {}), 1200);
-      toast(mode === prev.storage ? '저장 위치를 그대로 뒀어요' : mode === 'github' ? 'GitHub 자동 동기화를 켰어요 · 곧 첫 커밋·푸시를 해요' : 'GitHub 자동 동기화를 껐어요 · 이미 올린 기록은 그대로 둬요');
-      return;
-    }
-    if (mode === 'github'){
-      const repo = f.repo && f.repo.value; if (!repo){ const e = $('#st-err'); e.textContent = '저장소를 골라 주세요'; e.hidden = false; return; }
-      const files = profileFiles(n);
-      $('#st2-submit').disabled = true; $('#st2-submit').textContent = 'GitHub로 옮기는 중…';
-      PKMStore.github.load(n, repo).then(() => PKMStore.github.save(n, repo, { writes:files, deletes:[] })).then(() => {
-        set.storage = 'github'; set.repo = repo; PKMStore.device.setStorage(n, 'github', repo); PLIST = PLIST.map(x => x.name === n ? { ...x, storage:'github', repo } : x);
-        LAST[n] = files; f.closest('dialog').close(); render(); toast(`${repo}에 노트 ${Object.keys(files).length}개를 올렸어요 · 이제 어느 기기에서든 열려요`);
-      }).catch(e => { const er = $('#st-err'); er.textContent = e.message; er.hidden = false; syncStorage(); });
-      return;
-    }
-    const files = profileFiles(n);
-    PKMStore.device.save(n, { writes:files, deletes:Object.keys(PKMStore.LS.get(`pkm:v1:files:${n}`, {})).filter(p => !(p in files)) }).then(() => {
-      set.storage = 'device'; delete set.repo; PKMStore.device.setStorage(n, 'device'); PLIST = PLIST.map(x => x.name === n ? { ...x, storage:'device', repo:'' } : x);
-      LAST[n] = files; f.closest('dialog').close(); render(); toast(prev.storage === 'github' ? '이 브라우저로 옮겼어요 · GitHub 저장소는 지우지 않고 그대로 뒀어요' : '이 브라우저에만 저장해요');
-    }).catch(e => { const er = $('#st-err'); er.textContent = e.message; er.hidden = false; });
+  } else if (kind === 'storage'){   // 로컬 서버로 열었을 때만 — 이 컴퓨터 / GitHub 자동 동기화
+    const n = S.profile, mode = f.mode.value, set = pset(), prev = set.storage;
+    set.storage = mode; f.closest('dialog').close(); render();
+    if (mode === 'github' && prev !== 'github') setTimeout(() => STORE.syncNow(n).then(r => { SYNCST[n] = r; render(); toast(r.state === 'ok' ? 'GitHub에 처음 올렸어요' : `GitHub에 올리지 못했어요 — ${r.error || ''}`); }).catch(() => {}), 1200);
+    toast(mode === prev ? '저장 위치를 그대로 뒀어요' : mode === 'github' ? 'GitHub 자동 동기화를 켰어요 · 곧 첫 커밋·푸시를 해요' : 'GitHub 자동 동기화를 껐어요 · 이미 올린 기록은 그대로 둬요');
+  } else if (kind === 'connect'){
+    const v = f.token.value.trim(), e = $('#cn-err');
+    if (!v){ e.textContent = '토큰을 붙여 넣어 주세요'; return invalid(f.token, 'cn-err'); }
+    PKMStore.github.connect(v).then(login => { GH.login = login; GH.repos = []; render(); toast(`${login}로 연결했어요 · 저장소를 골라 주세요`); })
+      .catch(err => { e.textContent = err.message; e.hidden = false; f.token.focus(); });
+  } else if (kind === 'pickrepo'){
+    const r = f.repo && f.repo.value; if (!r) return;
+    PKMStore.github.setRepo(r); S.mode = 'loading'; render();
+    openData().then(() => render());
   } else if (kind === 'result'){
     const v = f.result.value.trim(); if (!v) return invalid(f.result, 'rs-err');
     const t = find('tasks', f.dataset.id), prev = t.result; t.result = v; f.closest('dialog').close(); render();
@@ -2567,7 +2574,7 @@ $('#import-input').addEventListener('change', async e => {
   }
   if (!Object.keys(writes).length){ toast(`새로 가져올 파일이 없어요 · 이미 있는 ${skipped}개는 건너뛰었어요`); return; }
   try {
-    await (STORE.kind !== 'server' && pstore(n).mode === 'github' ? PKMStore.github.save(n, pstore(n).repo, { writes, deletes:[] }) : storeFor(n).save(n, { writes, deletes:[] }));
+    await STORE.save(n, { writes, deletes:[] });
     await loadProfile(n); $('#dlg-storage').close(); render();
     toast(`노트 ${Object.keys(writes).length}개를 가져왔어요${skipped ? ` · 이미 있는 ${skipped}개는 건너뛰었어요` : ''}`);
   } catch (err) { toast(`가져오지 못했어요 — ${err.message}`); }
