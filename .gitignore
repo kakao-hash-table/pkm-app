@@ -1,0 +1,12 @@
+# 노트 데이터 — 앱 저장소에 넣지 않는다(별도 비공개 저장소나 PKM_DATA 폴더에)
+/data/
+.trash/
+
+# 로컬 도구·환경
+.claude/
+.env
+.env.*
+node_modules/
+*.tmp
+*.log
+.DS_Store

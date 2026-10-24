@@ -1,0 +1,15 @@
+{
+  "name": "pkm-app",
+  "version": "0.1.0",
+  "description": "지식·시간·행동을 한 화면에서 다루는 개인 지식관리(PKM) 웹 앱 — Obsidian 호환 마크다운으로 저장",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.mjs"
+  }
+}
