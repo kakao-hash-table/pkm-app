@@ -227,6 +227,47 @@ a.row:hover{background:var(--fill)}
 .tl-blocked .tl-title,.tl-blocked .tl-time{color:var(--text-3)}
 .timeline li.past .tl-time,.timeline li.past .tl-title,.timeline li.past .tl-link{color:var(--text-3)}
 .tl-free .tl-title{color:var(--text-2)}
+/* 지금 — 카드 목록 */
+.now-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.now-card{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;padding:16px 16px 16px 20px;background:var(--surface);border-radius:var(--r-lg)}
+.now-card.tl-kind{box-shadow:inset 3px 0 0 var(--kc)}
+.nc-main{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.nc-kicker{font-size:.8125rem;color:var(--text-2);font-weight:600}
+.nc-title{font-size:1.0625rem;font-weight:700;overflow-wrap:anywhere}
+.nc-title a{color:var(--text);text-decoration:none}
+.nc-title a:hover{text-decoration:underline}
+.nc-acts{display:flex;gap:8px;flex:none;margin-left:auto}
+.nc-quiet .nc-title,.nc-empty .nc-title{color:var(--text-2)}
+.now-card .meta{display:flex;flex-wrap:wrap;gap:4px 10px;color:var(--text-2);font-size:.875rem}
+.now-card>.bq-list,.now-card>.bq-more,.now-card>.bq-retro,.now-card>.bq-done{flex-basis:100%;margin-top:0}
+.now-next{margin:12px 0 0;padding:0 4px;color:var(--text-2)}
+.now-links{margin-top:20px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.now-quiet{padding:28px 24px}
+.shift-ask{margin-bottom:24px}
+.shift-ask h2{font-size:1.0625rem;margin-bottom:4px}
+.shift-ask .t-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:16px}
+/* 계획 — 날짜 띠 */
+.week{margin:0 0 20px}
+.wk-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.wk-range{color:var(--text-2);font-size:.875rem;font-weight:600}
+.week ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(max(44px,3em),1fr));gap:2px;overflow-x:auto}
+.week a.day{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;padding-bottom:6px;border-radius:var(--r-md);text-decoration:none;color:var(--text-2);font-size:.8125rem;font-weight:600;white-space:nowrap}
+.week a.day b{font-size:1.0625rem;color:var(--text);white-space:nowrap}
+.week a.day:hover{background:var(--fill)}
+.week a.day.is-today b{color:var(--primary)}
+.week a.day.is-today::after{content:'';position:absolute;bottom:6px;width:4px;height:4px;border-radius:50%;background:currentColor;color:var(--primary)}
+.week a.day[aria-current]{background:var(--primary-fill);color:var(--on-primary)}
+.week a.day[aria-current] b,.week a.day[aria-current]::after{color:var(--on-primary)}
+.wk-arrow{min-width:44px;padding:0;font-size:1.25rem}
+.tl-group{display:block!important;padding:0!important}
+.tl-group summary{display:flex;gap:8px;align-items:center;min-height:48px;padding:0 16px 0 20px;color:var(--text-3);font-size:.9375rem;cursor:pointer;list-style:none}
+.tl-group summary::-webkit-details-marker{display:none}
+.tl-group summary::after{content:'›';margin-left:auto;font-size:1.25rem;transition:transform .15s}
+.tl-group details[open] summary::after{transform:rotate(90deg)}
+.tl-group .timeline{border-radius:0;background:transparent}
+.plan-head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.plan-head h2{font-size:1.1875rem}
+.plan-head .sub{color:var(--text-2);margin-top:4px}
 .tl-free.drop{outline:2px dashed var(--primary);outline-offset:-2px}
 .timeline li.tl-now{display:flex;gap:8px;align-items:center;padding:4px 16px;color:var(--primary);font-weight:700;font-size:.8125rem;border-top:2px solid var(--primary)}
 .blk{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -244,9 +285,9 @@ a.row:hover{background:var(--fill)}
 .timeline li.tl-kind{box-shadow:inset 3px 0 0 var(--kc)}
 .blk-inbox{--kc:#7A5AF8}.blk-knowledge{--kc:#0E9384}.blk-time{--kc:#E0531F}.blk-action{--kc:var(--primary-fill)}
 .bq-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
-.timeline .bq-list li.bq{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 8px 8px 12px;background:var(--surface-2);border-radius:var(--r-md)}
-.timeline .bq-list li.bq .btn-tonal,.timeline .bq-list li.bq .btn-ghost{background:var(--surface)}
-.timeline .bq-list li.bq .btn-tonal{color:var(--on-primary-weak)}
+.bq-list li.bq{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 8px 8px 12px;background:var(--surface-2);border-radius:var(--r-md)}
+.bq-list li.bq .btn-tonal,.bq-list li.bq .btn-ghost{background:var(--surface)}
+.bq-list li.bq .btn-tonal{color:var(--on-primary-weak)}
 .bq-t{min-width:0;font-size:.9375rem;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .bq-more{align-self:flex-start;font-size:.875rem;font-weight:600;margin-top:6px;min-height:32px;display:inline-flex;align-items:center;text-decoration:none}
 .bq-more:hover{text-decoration:underline}
@@ -715,6 +756,19 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 </dialog>
 
 <!-- 결과 한 줄 -->
+<!-- 이날 시작 시각 -->
+<dialog id="dlg-start" aria-labelledby="ds-title">
+  <form data-form="daystart" novalidate>
+    <div><h2 id="ds-title">이날 시작 시각</h2><p class="faint" id="ds-sub" style="margin:4px 0 0"></p></div>
+    <label class="field"><span>시작 <span class="hint">루틴과 블록이 옮긴 만큼 따라 움직여요. 약속·비워 둔 시간과 겹치면 그 뒤로 가요</span></span><input type="time" name="start" id="ds-input" aria-describedby="ds-err"></label>
+    <p class="err" id="ds-err" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
+      <button class="btn btn-primary" type="submit">이날 시작 바꾸기</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlg-result" aria-labelledby="rs-title">
   <form data-form="result" novalidate>
     <div><h2 id="rs-title">결과 한 줄</h2><p class="faint" id="rs-sub" style="margin:4px 0 0"></p></div>
@@ -908,11 +962,21 @@ async function openData(){
     S.profile = pick; await loadProfile(pick); S.mode = 'data';
   } catch (e) { S.mode = 'error'; S.error = e.message; }
 }
-/* 시계 — 30초마다. 날짜가 바뀌거나 오늘 화면이면 다시 그린다(입력 중·대화상자 열림이면 기다린다) */
+/* 시계 — 30초마다. 날짜가 바뀌거나 지금·계획 화면이면 다시 그린다(입력 중·대화상자 열림이면 기다린다) */
+let lastShape = '';
+function dayShape(){   // 지금 시각이 블록 경계를 넘거나 시작 질문이 바뀔 때만 달라진다
+  if (S.mode !== 'data' || !/^#\/(now|today|time\/plan)|^#?$/.test(location.hash)) return '';
+  const keep = PD; PD = TODAY;
+  const D = db(), L = dayLayout(D, TODAY), sh = L.map(x => x.to <= NOW_MIN ? 2 : x.from <= NOW_MIN ? 1 : 0).join('') + '|' + L.filter(x => x.kind === 'free' && x.from <= NOW_MIN && NOW_MIN < x.to).map(x => x.to - NOW_MIN < 15 ? 's' : 'l').join('') + '|' + shiftAsk(D, pset()).length + (NOW_MIN < toMin(dayStart(TODAY)) ? 'a' : NOW_MIN >= toMin(pset().day_end) ? 'z' : 'm');
+  PD = keep; return sh;
+}
 function tick(){
   const prev = TODAY; NOW = new Date(); TODAY = ymd(NOW); NOW_MIN = toMin(nowHM());
+  document.querySelectorAll('[data-clock]').forEach(x => x.textContent = nowHM());
+  document.querySelectorAll('[data-left]').forEach(x => x.textContent = `${fmtMin(Math.max(0, +x.dataset.left - NOW_MIN))} 남음`);
   const busy = document.querySelector('dialog[open]') || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
-  if (!busy && S.mode === 'data' && (prev !== TODAY || /^#\/today|^#?$/.test(location.hash))) render();
+  const shape = dayShape();
+  if (!busy && S.mode === 'data' && (prev !== TODAY || shape !== lastShape)) render();
 }
 /* 바깥(Obsidian·다른 기기)에서 바뀌었는지 — 로컬 서버일 때만 */
 let lastGhPoll = 0;
@@ -967,19 +1031,29 @@ function fmtAmt(v, unit){
   }
   return `${+v.toFixed(2)}${unit}`;
 }
+// 시 칸 "10-22/2"(또는 별표/2) = 하루 여러 번 — 시작~끝 시를 간격마다. 요일 칸 "4L" = 그 달 마지막 목요일
+const cronEvery = c => +(c.split(' ')[1].split('/')[1] || 0);
+const cronEnd = c => { const m = c.split(' ')[1].match(/-(\d+)\//); return m ? +m[1] : 23; };
+function cronTimes(c){
+  const [mi, h] = c.split(' '), e = cronEvery(c), t = x => `${String(x).padStart(2,'0')}:${mi.padStart(2,'0')}`;
+  if (!e) return [t(+h)];
+  const out = []; for (let x = h[0] === '*' ? 0 : +h.split('-')[0]; x <= cronEnd(c); x += e) out.push(t(x));
+  return out;
+}
 function cronText(c){
-  const [mi, h, dom, mon, dow] = c.split(' ');
-  const t = `${h.padStart(2,'0')}:${mi.padStart(2,'0')}`;
+  const [, , dom, mon, dow] = c.split(' ');
+  const ts = cronTimes(c), e = cronEvery(c), t = e ? `${ts[0]}–${ts[ts.length - 1]} ${e}시간마다` : ts[0];
   if (dom === '*' && mon === '*'){
     if (dow === '*') return `매일 ${t}`;
     if (dow === '1-5') return `평일 ${t}`;
     if (dow === '0,6' || dow === '6,0') return `주말 ${t}`;
+    if (/^\dL$/.test(dow)) return `매달 마지막 ${WD[+dow[0]]}요일 ${t}`;
     return `매주 ${dow.split(',').map(d => WD[+d]).join('·')}요일 ${t}`;
   }
   if (mon === '*' && dow === '*') return `매달 ${dom}일 ${t}`;
   return c;
 }
-function cronTime(c){ const [mi, h] = c.split(' '); return `${h.padStart(2,'0')}:${mi.padStart(2,'0')}`; }
+const cronTime = c => cronTimes(c)[0];
 function runsOn(c, date){
   const [, , dom, , dow] = c.split(' ');
   const day = new Date(date + 'T00:00:00').getDay();
@@ -987,11 +1061,13 @@ function runsOn(c, date){
   if (dom !== '*' && +dom !== dd) return false;
   if (dow === '*') return true;
   if (dow === '1-5') return day >= 1 && day <= 5;
+  if (/^\dL$/.test(dow)) return day === +dow[0] && dd + 7 > new Date(+date.slice(0, 4), +date.slice(5, 7), 0).getDate();
   return dow.split(',').map(Number).includes(day);
 }
-const FREQS = [['*|*','매일'],['*|1-5','평일'],['*|0,6','주말'],...[0,1,2,3,4,5,6].map(d => [`*|${d}`, `매주 ${WD[d]}요일`]),['28|*','매달 28일'],['1|*','매달 1일']];
+const FREQS = [['*|*','매일'],['*|1-5','평일'],['*|0,6','주말'],...[0,1,2,3,4,5,6].map(d => [`*|${d}`, `매주 ${WD[d]}요일`]),['28|*','매달 28일'],['1|*','매달 1일'],...[0,1,2,3,4,5,6].map(d => [`*|${d}L`, `매달 마지막 ${WD[d]}요일`])];
+const EVERY = [[0, '하루 한 번'], [1, '1시간마다'], [2, '2시간마다'], [3, '3시간마다'], [4, '4시간마다']];
 function freqOf(c){ const [, , dom, , dow] = c.split(' '); return `${dom === '*' ? '*' : dom}|${dom === '*' ? dow : '*'}`; }
-function buildCron(freq, time){ const [dom, dow] = freq.split('|'); const [h, m] = time.split(':'); return `${+m} ${+h} ${dom} * ${dow}`; }
+function buildCron(freq, time, every = 0, end = 23){ const [dom, dow] = freq.split('|'); const [h, m] = time.split(':'); return `${+m} ${every ? `${+h}-${Math.max(end, +h)}/${every}` : +h} ${dom} * ${dow}`; }
 
 const find = (arr, id) => db()[arr].find(x => x.id === id);
 const longByTitle = t => db().longs.find(l => l.title === t);
@@ -1122,12 +1198,25 @@ let NOW_MIN = toMin(nowHM());
 const DAYS = [['*', '매일'], ['1-5', '평일'], ['0,6', '주말']];
 const onDay = (spec, date) => { const d = new Date(date + 'T00:00:00').getDay(); return spec === '*' || (spec === '1-5' ? d >= 1 && d <= 5 : d === 0 || d === 6); };
 const estOf = t => t.estimate || pset().default_block;
+/* 시간표를 그리는 날 — '지금'은 오늘, 시간 › 계획은 고른 날. 지난 날은 모두 지났고 앞날은 아직 오지 않았다 */
+let PD = TODAY;
+const NM = () => PD === TODAY ? NOW_MIN : PD < TODAY ? 9999 : -1;
+/* 그날만 하루 시작을 옮길 수 있다(데일리 start). 루틴은 옮긴 만큼 따라 움직이고, 약속·비워 둔 시간·하루 끝은 그대로 */
+const dayStart = date => (db().dailies[date] || {}).start || pset().day_start;
 function dayLayout(D, date){
-  const P = pset(), s0 = toMin(P.day_start), s1 = toMin(P.day_end), fixed = [];
+  const P = pset(), s0 = toMin(dayStart(date)), s1 = toMin(P.day_end), shift = s0 - toMin(P.day_start), fixed = [];
   D.appts.filter(a => a.start.slice(0, 10) === date).forEach(a => fixed.push({ kind:'appt', from:toMin(hm(a.start)), to:a.end.slice(0, 10) === date ? toMin(hm(a.end)) : 1440, a }));
   const acts = [];   // 행동 블록 = 할 일을 담는 예약 시간 (빈 시간과 같은 그릇)
-  D.routines.filter(r => r.enabled && runsOn(r.cron, date)).forEach(r => { const f = toMin(cronTime(r.cron)), to = f + (r.duration || 30); r.block === 'action' ? acts.push({ kind:'free', from:f, to, r, key:toHM(f), action:true }) : fixed.push({ kind:'routine', from:f, to, r }); });
   P.blocked.filter(b => onDay(b.days, date)).forEach(b => fixed.push({ kind:'blocked', from:toMin(b.from), to:toMin(b.to), b }));
+  const walls = fixed.slice(), hit = (a, b) => walls.find(w => a < w.to && w.from < b);
+  // 하루 여러 번 도는 루틴은 회차마다 한 칸(k = 'id@시각'으로 회차를 따로 체크), 하루 끝 뒤 회차는 뺀다
+  const rs = D.routines.filter(r => r.enabled && runsOn(r.cron, date)).flatMap(r => { const ts = cronTimes(r.cron), d = r.duration || 30; return ts.map(t => ({ t, at:toMin(t) })).filter(o => ts.length === 1 || o.at < s1).map(({ t, at }) => ({ r, d, k:ts.length > 1 ? `${r.id}@${t}` : r.id, from:Math.max(at + shift, 0), keep:at + d <= s1, free:!hit(at, at + d) })); });
+  if (shift > 0){
+    rs.sort((a, b) => a.from - b.from).forEach(x => { let w; while (x.free && (w = hit(x.from, x.from + x.d))) x.from = w.to; });   // 원래 비어 있던 자리의 루틴이 약속·비워 둔 시간에 밀려 들어가면 그 끝 뒤로
+    let lim = s1;   // 하루 끝을 넘게 된 루틴은 순서대로 하루 끝 앞에 붙인다
+    rs.sort((a, b) => b.from - a.from).forEach(x => { if (x.keep && x.from + x.d > lim) x.from = Math.max(lim - x.d, 0); if (x.keep) lim = Math.min(lim, x.from); });
+  }
+  rs.forEach(({ r, d, k, from:f }) => { const to = f + d; r.block === 'action' ? acts.push({ kind:'free', from:f, to, r, key:toHM(f), action:true }) : fixed.push({ kind:'routine', from:f, to, r, k }); });
   const busy = [...fixed, ...acts].map(x => [Math.max(x.from, s0), Math.min(x.to, s1)]).filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]);
   const gaps = []; let cur = s0;
   for (const [a, b] of busy){ if (a > cur) gaps.push([cur, a]); cur = Math.max(cur, b); }
@@ -1144,10 +1233,10 @@ function dayLayout(D, date){
 const ent = e => typeof e === 'string' ? { id:e, min:null, done:false } : e;
 const slotMin = (e, t) => e.min || estOf(t);
 const slotDone = (e, t) => t.status === '완료' || e.done;
-function planOf(D){ const d = D.dailies[TODAY] || (D.dailies[TODAY] = { memo:'', retro:'', did:[] }), p = d.plan || (d.plan = {}); Object.values(p).forEach(a => a.forEach((e, i) => { if (typeof e === 'string') a[i] = ent(e); })); return p; }   // 배열을 바꾸지 않고 안에서만 고친다(다른 곳이 같은 배열을 쥐고 있다)
+function planOf(D){ const d = D.dailies[PD] || (D.dailies[PD] = { memo:'', retro:'', did:[] }), p = d.plan || (d.plan = {}); Object.values(p).forEach(a => a.forEach((e, i) => { if (typeof e === 'string') a[i] = ent(e); })); return p; }   // 배열을 바꾸지 않고 안에서만 고친다(다른 곳이 같은 배열을 쥐고 있다)
 const slotsOf = (D, id) => Object.entries(planOf(D)).flatMap(([k, a]) => a.filter(e => e.id === id).map(e => ({ key:k, e })));
 function freeBlocks(D){
-  const free = dayLayout(D, TODAY).filter(x => x.kind === 'free'), plan = planOf(D);
+  const free = dayLayout(D, PD).filter(x => x.kind === 'free'), plan = planOf(D);
   Object.keys(plan).forEach(k => {           // 약속이 생겨 블록이 바뀌면 할 일을 가까운 뒤 블록으로
     if (free.some(f => f.key === k) || !free.length) return;
     const to = free.find(f => f.from >= toMin(k)) || free[free.length - 1];
@@ -1158,13 +1247,13 @@ function freeBlocks(D){
 }
 const plannedIds = D => new Set(Object.values(planOf(D)).flat().map(e => e.id));
 const fillRank = t => t.status === '진행' ? 0 : t.due && dayDiff(t.due, TODAY) <= 1 ? 1 : 2;
-const candidates = D => { const pl = plannedIds(D); return D.tasks.filter(t => (t.status === '진행' || t.status === '대기') && !pl.has(t.id)).sort((a, b) => fillRank(a) - fillRank(b) || (a.due || '9999').localeCompare(b.due || '9999')); };
+const candidates = D => { const pl = plannedIds(D), drop = (D.dailies[PD] || {}).dropped || []; return D.tasks.filter(t => (t.status === '진행' || t.status === '대기') && !pl.has(t.id) && !drop.includes(t.id)).sort((a, b) => fillRank(a) - fillRank(b) || (a.due || '9999').localeCompare(b.due || '9999')); };
 /* 채우기: 여유 비율은 남은 빈 시간 전체에 적용(블록마다 아님). 우선순위 순으로, 들어갈 수 있는 블록 중 남는 자리가 가장 작은 곳에 넣는다 */
 function fillBlocks(){
-  const D = db(), P = pset(), plan = planOf(D), free = freeBlocks(D), carry = [];
-  free.filter(f => f.to <= NOW_MIN).forEach(f => { plan[f.key] = (plan[f.key] || []).filter(e => slotDone(e, find('tasks', e.id)) || (carry.push(e), false)); });
-  const fut = free.filter(f => f.to > NOW_MIN).map(f => {
-    const len = f.to - Math.max(f.from, NOW_MIN), ids = plan[f.key] || (plan[f.key] = []);
+  const D = db(), P = pset(), plan = planOf(D), free = freeBlocks(D), carry = [], now = NM();
+  free.filter(f => f.to <= now).forEach(f => { plan[f.key] = (plan[f.key] || []).filter(e => slotDone(e, find('tasks', e.id)) || (carry.push(e), false)); });
+  const fut = free.filter(f => f.to > now).map(f => {
+    const len = f.to - Math.max(f.from, now), ids = plan[f.key] || (plan[f.key] = []);
     return { f, len, ids, room:len - ids.reduce((n, e) => { const t = find('tasks', e.id); return n + (slotDone(e, t) ? 0 : slotMin(e, t)); }, 0) };
   });
   let budget = fut.reduce((n, b) => n + b.len, 0) * P.fill_ratio - fut.reduce((n, b) => n + (b.len - b.room), 0);
@@ -1180,63 +1269,138 @@ function fillBlocks(){
   }
   return { added, carried:carry.length, left:queue.length - added };
 }
-function vToday(){
-  const D = db(), P = pset(), done = D.routineDone[TODAY] || (D.routineDone[TODAY] = {});
-  const free = freeBlocks(D), plan = planOf(D), L = dayLayout(D, TODAY);
-  const nextAppt = L.filter(x => x.kind === 'appt' && x.from > NOW_MIN)[0];
+function vPlan(date){
+  PD = date;
+  const D = db(), P = pset(), done = D.routineDone[date] || {}, isT = date === TODAY, now = NM();
+  const free = freeBlocks(D), plan = planOf(D), L = dayLayout(D, date), skipped = D.dailies[date].skipped || [];
+  const nextAppt = isT && L.filter(x => x.kind === 'appt' && x.from > now)[0];
   const row = x => {
-    const time = `<span class="tl-time num">${toHM(x.from)}<small>–${toHM(x.to)}</small></span>`, past = x.to <= NOW_MIN;
+    const time = `<span class="tl-time num">${toHM(x.from)}<small>–${toHM(x.to)}</small></span>`, past = x.to <= now;
     if (x.kind === 'blocked') return `<li class="tl-blocked">${time}<div class="tl-main"><span class="tl-title">${esc(x.b.label || '비워 둔 시간')}</span><span class="meta"><span>비워 둔 시간</span></span></div></li>`;
     if (x.kind === 'routine'){
       const r = x.r;
-      const on = !!done[r.id] || (r.block === 'inbox' && !D.inbox.length);   // 인박스 블록은 0개면 끝난 것으로 보인다(기록은 남기지 않음)
+      const on = !!done[x.k] || (isT && r.block === 'inbox' && !D.inbox.length), sk = !on && skipped.includes(x.k);   // 인박스 블록은 0개면 끝난 것으로 보인다(기록은 남기지 않음)
       return `<li class="tl-fixed ${r.block ? 'tl-kind blk-' + r.block : ''} ${past ? 'past' : ''}">${time}<div class="tl-main">
         ${r.block ? blockChip(r.block) : ''}
-        <label class="check"><input type="checkbox" id="rc-${r.id}" data-change="routine-check" data-id="${r.id}" ${on ? 'checked' : ''}><span>${esc(r.title)}</span></label>
-        <span class="meta"><span>${r.block ? '' : '루틴 · '}${fmtMin(x.to - x.from)}</span>${r.area ? `<span>${areaLink(r.area)}에 쌓여요</span>` : ''}</span>${r.block ? blockBody(D, r) : ''}</div></li>`;
+        ${date > TODAY ? `<span class="tl-title">${esc(r.title)}</span>` : `<label class="check"><input type="checkbox" id="rc-${kId(x.k)}" data-change="routine-check" data-id="${r.id}" data-k="${x.k}" ${on ? 'checked' : ''}><span>${esc(r.title)}</span></label>`}
+        <span class="meta"><span>${r.block ? '' : '루틴 · '}${fmtMin(x.to - x.from)}</span>${sk ? '<span>건너뜀</span>' : ''}${r.area ? `<span>${areaLink(r.area)}에 쌓여요</span>` : ''}</span>${r.block && isT ? blockBody(D, r) : ''}</div></li>`;
     }
     if (x.kind === 'appt'){
-      const a = x.a, mins = x.from - NOW_MIN;
+      const a = x.a, mins = x.from - now;
       const soon = nextAppt === x ? `<span class="soon">${fmtMin(mins)} 뒤</span>` : '';
       return `<li class="tl-fixed ${past ? 'past' : ''}">${time}<div class="tl-main"><a class="tl-link" href="#/action/appt/${a.id}">${esc(a.title)}</a>
         <span class="meta"><span>약속</span>${soon}${a.location ? `<span>${esc(a.location)}</span>` : ''}</span></div></li>`;
     }
     const ents = (plan[x.key] || []).map(e => ({ e, t:find('tasks', e.id) })), tasks = ents;
-    const len = x.to - Math.max(x.from, NOW_MIN), open = ents.filter(({ e, t }) => !slotDone(e, t));
+    const len = x.to - Math.max(x.from, now), open = ents.filter(({ e, t }) => !slotDone(e, t));
     const used = open.reduce((n, { e, t }) => n + slotMin(e, t), 0);
     if (past){
       return `<li class="tl-free past" data-block="${x.key}">${time}<div class="tl-main"><span class="tl-title">${x.action ? esc(x.r.title) : '빈 시간'} · 지나감</span>
         ${ents.length ? `<ol class="blk">${ents.map(({ e, t }) => blkTask(t, e, x, null)).join('')}</ol>` : ''}
-        ${open.length ? `<span class="meta"><span>못 끝낸 할 일 ${open.length}개 — <b>남은 빈 시간 채우기</b>로 뒤로 옮겨요</span></span>` : ''}
+        ${open.length && isT ? `<span class="meta"><span>못 끝낸 할 일 ${open.length}개 — <b>남은 빈 시간 채우기</b>로 뒤로 옮겨요</span></span>` : ''}
         <button class="btn btn-text btn-sm add-blk" type="button" data-act="blk-add" data-block="${x.key}">+ 이때 한 일 넣기</button></div></li>`;
     }
-    let cursor = Math.max(x.from, NOW_MIN);
+    let cursor = Math.max(x.from, now);
     const state = !open.length ? (tasks.length ? '다 끝냈어요' : '비어 있어요') : used > len ? `<span class="over">${fmtMin(used - len)} 넘쳐요</span>` : `${fmtMin(used)} 찼어요`;
-    return `<li class="tl-free ${x.action ? 'tl-kind blk-action' : ''}" data-block="${x.key}">${time}<div class="tl-main">${x.action ? blockChip('action') : ''}<span class="tl-title">${x.action ? esc(x.r.title) + ' ' : '빈 시간 '}${fmtMin(len)}${x.from < NOW_MIN ? ' 남음' : ''} <span class="faint">·</span> <span class="fill-state">${state}</span></span>
+    return `<li class="tl-free ${x.action ? 'tl-kind blk-action' : ''}" data-block="${x.key}">${time}<div class="tl-main">${x.action ? blockChip('action') : ''}<span class="tl-title">${x.action ? esc(x.r.title) + ' ' : '빈 시간 '}${fmtMin(len)}${x.from < now ? ' 남음' : ''} <span class="faint">·</span> <span class="fill-state">${state}</span></span>
       ${ents.length ? `<ol class="blk">${ents.map(({ e, t }) => { const st = slotDone(e, t) ? null : cursor; if (st !== null) cursor += slotMin(e, t); return blkTask(t, e, x, st); }).join('')}</ol>` : ''}
       <button class="btn btn-text btn-sm add-blk" type="button" data-act="blk-add" data-block="${x.key}">+ 할 일 넣기</button></div></li>`;
   };
-  const items = []; let nowPut = false;
-  L.forEach(x => { if (!nowPut && x.from > NOW_MIN){ items.push(`<li class="tl-now" aria-label="지금 ${nowHM()}"><span class="num">${nowHM()}</span><span>지금</span></li>`); nowPut = true; } items.push(row(x)); });
-  const futureFree = free.filter(f => f.to > NOW_MIN).reduce((n, f) => n + f.to - Math.max(f.from, NOW_MIN), 0);
-  const carryN = free.filter(f => f.to <= NOW_MIN).reduce((n, f) => n + (plan[f.key] || []).filter(e => !slotDone(e, find('tasks', e.id))).length, 0);
+  const items = []; let nowPut = false, idle = [];
+  const flush = () => { if (idle.length > 1) items.push(`<li class="tl-group"><details><summary><span class="num">${toHM(idle[0].from)}–${toHM(idle[idle.length - 1].to)}</span> 지나간 빈 시간 ${idle.length}개</summary><ol class="timeline">${idle.map(row).join('')}</ol></details></li>`); else idle.forEach(x => items.push(row(x))); idle = []; };
+  L.forEach(x => {
+    if (isT && !nowPut && x.from > now){ flush(); items.push(`<li class="tl-now" aria-label="지금 ${nowHM()}"><span class="num">${nowHM()}</span><span>지금</span></li>`); nowPut = true; }
+    if (x.kind === 'free' && x.to <= now && !(plan[x.key] || []).length){ idle.push(x); return; }
+    flush(); items.push(row(x));
+  });
+  flush();
+  const futureFree = free.filter(f => f.to > now).reduce((n, f) => n + f.to - Math.max(f.from, now), 0);
+  const carryN = free.filter(f => f.to <= now).reduce((n, f) => n + (plan[f.key] || []).filter(e => !slotDone(e, find('tasks', e.id))).length, 0);
   const cand = candidates(D).length;
-  const fillBar = futureFree ? `<div class="fill-bar"><p><b>남은 빈 시간 ${fmtMin(futureFree)}</b><span class="faint">넣을 수 있는 할 일 ${cand}개${carryN ? ` · 못 끝낸 ${carryN}개` : ''}</span></p>
-      ${cand || carryN ? `<button class="btn btn-primary btn-sm" type="button" data-act="fill-blocks">남은 빈 시간 채우기</button>` : ''}</div>` : '';
+  const fillBar = !futureFree ? '' : futureFree < 15 ? `<div class="fill-bar"><p><b>남은 빈 시간 ${fmtMin(futureFree)}</b><span class="faint">채울 만한 자리가 없어요</span></p></div>`
+    : `<div class="fill-bar"><p><b>남은 빈 시간 ${fmtMin(futureFree)}</b><span class="faint">넣을 수 있는 할 일 ${cand}개${carryN ? ` · 못 끝낸 ${carryN}개` : ''}</span></p>
+      ${cand || carryN ? `<button class="btn ${P.onboarded === false ? 'btn-tonal' : 'btn-primary'} btn-sm" type="button" data-act="fill-blocks">남은 빈 시간 채우기</button>` : ''}</div>`;
   const tl = `${fillBar}<ol class="timeline">${items.join('')}</ol>
     <p class="faint" style="margin-top:8px">남은 빈 시간 전체의 ${Math.round(P.fill_ratio * 100)}%까지 채우고 나머지는 여유로 남겨요. 예상 시간이 없는 할 일은 ${fmtMin(P.default_block)}으로 셈해요.</p>`;
-  const waits = D.tasks.filter(t => t.status === '기다림').length;
-
-  const fl = D.fleeting.length, ib = D.inbox.length;
-  const allEmpty = !L.some(x => x.kind === 'appt' || x.kind === 'routine') && !D.tasks.length && !ib && !fl;
-  const firstRun = `<div class="empty" style="margin-top:8px"><h2>오늘 할 것이 아직 없어요</h2><p>떠오른 생각 하나를 메모하는 것부터 시작해요. 약속·루틴을 만들면 하루가 블록으로 나뉘고, 남는 시간에 할 일을 채울 수 있어요.</p><button class="btn ${P.onboarded === false ? 'btn-tonal' : 'btn-primary'}" type="button" data-act="capture">메모하기</button><p style="margin-top:12px"><button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="appt">약속 만들기</button> <button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="short">할 일 만들기</button></p></div>`;
-  return `<div class="page">
-    <header class="page-head"><div><h1 tabindex="-1">오늘</h1><p class="sub">${md2(TODAY)} ${wd(TODAY)}요일 · <span class="num">${P.day_start}–${P.day_end}</span></p></div>
-      <span class="doc-actions" style="margin:0"><button class="btn btn-ghost btn-sm" type="button" data-act="day-settings">하루 설정</button><a class="btn btn-ghost btn-sm" href="#/time/daily/${TODAY}">데일리</a></span></header>
+  const ws = P.week_start ?? 1, w0 = addDays(date, -((new Date(date + 'T00:00:00').getDay() - ws + 7) % 7));
+  const week = `<nav class="week" aria-label="날짜 고르기"><div class="wk-bar"><span class="wk-range">${md2(w0)} – ${md2(addDays(w0, 6))}</span><span><a class="btn btn-text btn-sm wk-arrow" href="#/time/plan/${addDays(date, -7)}" aria-label="지난주">‹</a><a class="btn btn-text btn-sm wk-arrow" href="#/time/plan/${addDays(date, 7)}" aria-label="다음 주">›</a></span></div>
+    <ol>${[...Array(7)].map((_, i) => addDays(w0, i)).map(d => `<li><a class="day ${d === TODAY ? 'is-today' : ''}" href="#/time/plan/${d}" ${d === date ? 'aria-current="true"' : ''} aria-label="${md2(d)} ${wd(d)}요일${d === TODAY ? ', 오늘' : ''}"><span>${wd(d)}</span><b class="num">${+d.slice(8)}</b></a></li>`).join('')}</ol></nav>`;
+  const st = dayStart(date), moved = st !== P.day_start;
+  return `${week}
+    <div class="plan-head"><div><h2>${md2(date)} ${wd(date)}요일${isT ? ' · 오늘' : ''}</h2><p class="sub"><span class="num">${st}–${P.day_end}</span>${moved ? ` <span class="faint">· 이날만 시작을 ${P.day_start}에서 옮겼어요</span>` : ''}</p></div>
+      <span class="doc-actions" style="margin:0">${isT ? '' : `<a class="btn btn-tonal btn-sm" href="#/time/plan/${TODAY}">오늘로</a>`}<button class="btn btn-ghost btn-sm" type="button" data-act="day-start">이날 시작 바꾸기</button><button class="btn btn-ghost btn-sm" type="button" data-act="day-settings">하루 설정</button>${date <= TODAY ? `<a class="btn btn-ghost btn-sm" href="#/time/daily/${date}">데일리</a>` : ''}</span></div>
     ${onboardCard()}
-    ${tip('today', '약속·루틴을 놓고 남는 시간을 <strong>빈 시간</strong> 블록으로 나눠요. <strong>남은 빈 시간 채우기</strong>를 누르면 진행 중인 일 → 마감이 가까운 일 순으로 채워요. 루틴에 블록 종류(인박스·지식·시간·행동)를 정하면 그 블록 안에 할 거리가 모여요.')}
-    ${allEmpty ? firstRun : `<section class="section" style="margin-top:0"><h2 class="sr-only">하루 시간표</h2>${tl}${autoTag('루틴을 체크하면 연결된 장기 누적 기록에 한 줄 추가')}</section>`
-      + (waits ? `<p style="margin-top:12px"><button class="btn btn-text btn-sm" type="button" data-act="go-waiting">기다리는 중 ${waits}개 ›</button></p>` : '')}
+    ${tip('plan', '약속·루틴을 놓고 남는 시간을 <strong>빈 시간</strong> 블록으로 나눠요. <strong>남은 빈 시간 채우기</strong>를 누르면 진행 중인 일 → 마감이 가까운 일 순으로 채워요. 다른 날도 위 날짜를 눌러 미리 짤 수 있어요.')}
+    <section class="section" style="margin-top:0"><h3 class="sr-only">하루 시간표</h3>${date < TODAY ? `<ol class="timeline">${items.join('')}</ol>` : tl}${isT ? autoTag('루틴을 체크하면 연결된 장기 누적 기록에 한 줄 추가') : ''}</section>`;
+}
+/* ---------------- 화면: 지금 ----------------
+   지금 시각에 걸친 것만 카드로 보여 준다. 계획은 시간 › 계획에서 짜고, 여기서는 끝냈다·나중에·건너뛰기만 한다.
+   시간이 지났는데 체크하지 않은 루틴은 했는지 건너뛸지 묻는다 — 오늘 것만, 날이 바뀌면 쌓이지 않는다 */
+const rDone = (D, date, x) => !!(D.routineDone[date] || {})[x.k] || (date === TODAY && x.r.block === 'inbox' && !D.inbox.length);
+const rSkipped = (D, date, x) => ((D.dailies[date] || {}).skipped || []).includes(x.k);
+const kId = k => k.replace(/[@:]/g, '-');   // 회차 키를 요소 id에 쓸 수 있게
+const kName = x => x.k === x.r.id ? x.r.title : `${x.r.title} ${x.k.split('@')[1]}`;
+function shiftAsk(D, P){
+  const d = D.dailies[TODAY] || {}, s0 = toMin(P.day_start);
+  if (d.start || NOW_MIN - s0 < 30 || NOW_MIN - s0 > 180 || NOW_MIN > toMin(P.day_end) - 60) return '';   // 30분~3시간 늦었을 때만. 더 늦으면 앱을 늦게 연 것일 수 있다
+  const started = Object.values(D.routineDone[TODAY] || {}).some(Boolean) || D.tasks.some(t => t.doneAt === TODAY) || Object.values(d.plan || {}).flat().some(e => e.done);
+  if (started) return '';   // 이미 무언가 끝냈으면 하루가 시작된 것
+  const at = toHM(Math.ceil(NOW_MIN / 5) * 5);
+  return `<section class="card shift-ask" aria-labelledby="sa-title"><h2 id="sa-title">오늘 ${at}에 시작할까요?</h2>
+    <p class="muted">루틴과 블록이 ${fmtMin(toMin(at) - s0)} 뒤로 밀려요. 약속과 비워 둔 시간은 그대로이고, 겹치는 루틴은 그 뒤로 가요.</p>
+    <div class="t-acts"><button class="btn btn-text" type="button" data-act="shift-no">${P.day_start} 그대로 두기</button><button class="btn btn-primary" type="button" data-act="shift-yes" data-at="${at}">${at}에 시작하기</button></div></section>`;
+}
+const routineBtns = x => `<button class="btn btn-ghost btn-sm" type="button" id="now-skip-${kId(x.k)}" data-act="routine-skip" data-id="${x.r.id}" data-k="${x.k}" aria-label="${esc(kName(x))} 건너뛰기">건너뛰기</button><button class="btn btn-tonal btn-sm" type="button" id="now-did-${kId(x.k)}" data-act="routine-did" data-id="${x.r.id}" data-k="${x.k}" aria-label="${esc(kName(x))} 했어요">했어요</button>`;
+function nowCard(cls, kicker, title, meta, acts, extra = ''){
+  return `<li class="now-card ${cls}"><div class="nc-main"><span class="nc-kicker">${kicker}</span><span class="nc-title">${title}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</div>${acts ? `<div class="nc-acts">${acts}</div>` : ''}${extra}</li>`;
+}
+function vNow(){
+  PD = TODAY;
+  const D = db(), P = pset(), L = dayLayout(D, TODAY), free = freeBlocks(D), plan = planOf(D);
+  const s0 = toMin(dayStart(TODAY)), s1 = toMin(P.day_end), span = x => `<span class="num">${toHM(x.from)}–${toHM(x.to)}</span>`, left = x => `<span data-left="${x.to}">${fmtMin(x.to - NOW_MIN)} 남음</span>`;
+  const cards = []; let todo = 0;
+  L.filter(x => x.from <= NOW_MIN && NOW_MIN < x.to).forEach(x => {
+    if (x.kind === 'appt') cards.push(nowCard('', `약속 · ${span(x)}`, `<a href="#/action/appt/${x.a.id}">${esc(x.a.title)}</a>`, left(x) + (x.a.location ? `<span>${esc(x.a.location)}</span>` : ''), ''));
+    else if (x.kind === 'blocked') cards.push(nowCard('nc-quiet', `비워 둔 시간 · ${span(x)}`, esc(x.b.label || '비워 둔 시간'), left(x), ''));
+    else if (x.kind === 'routine'){
+      const r = x.r; if (rDone(D, TODAY, x) || rSkipped(D, TODAY, x)) return;
+      todo++; cards.push(nowCard(r.block ? `tl-kind blk-${r.block}` : '', `${r.block ? BLOCKS[r.block].label : '루틴'} · ${span(x)}`, `<a href="#/action/routine/${r.id}">${esc(r.title)}</a>`, left(x) + (r.area ? `<span>${areaLink(r.area)}에 쌓여요</span>` : ''), routineBtns(x),r.block && r.block !== 'action' ? blockBody(D, r) : ''));
+    } else {   // 빈 시간·행동 블록 — 넣어 둔 할 일 하나하나가 카드
+      const kick = `${x.action ? esc(x.r.title) : '빈 시간'} · ${span(x)}`, cls = x.action ? 'tl-kind blk-action' : '';
+      const open = (plan[x.key] || []).map(e => ({ e, t:find('tasks', e.id) })).filter(({ e, t }) => t && !slotDone(e, t));
+      const nb = free.find(f => f.from >= x.to), k = x.key.replace(':', '');
+      todo += open.length; open.forEach(({ e, t }) => {
+        const part = slotsOf(D, t.id).some(o => o.key !== x.key && !o.e.done);   // 다른 블록에도 있으면 이 블록 분량만 끝낸다
+        const later = nb && !(plan[nb.key] || []).some(o => o.id === t.id) ? `${nb.key} 블록으로` : '오늘은 빼기';
+        cards.push(nowCard(cls, kick, `<a href="#/action/short/${t.id}">${esc(t.title)}</a>`, `<span>${fmtMin(slotMin(e, t))}</span>${dueText(t.due, t.status)}`,
+          `<button class="btn btn-ghost btn-sm" type="button" id="now-later-${t.id}-${k}" data-act="now-later" data-id="${t.id}" data-block="${x.key}" aria-label="${esc(t.title)} ${later}">${later}</button><button class="btn btn-tonal btn-sm" type="button" id="now-done-${t.id}-${k}" data-act="now-done" data-id="${t.id}" data-block="${x.key}" aria-label="${esc(t.title)} ${part ? '이 블록 끝내기' : '완료하기'}">${part ? '이 블록 끝내기' : '완료하기'}</button>`));
+      });
+      if (open.length) return;
+      const cand = x.to - NOW_MIN < 15 ? [] : candidates(D).slice(0, 3), short = x.to - NOW_MIN < 15;
+      cards.push(nowCard(`nc-empty ${cls}`, kick, (plan[x.key] || []).length ? '이 블록에 넣은 할 일을 다 끝냈어요' : '이 블록에 넣은 할 일이 없어요', left(x) + (!short && !cand.length ? '<span>단기에 남은 할 일이 없어요</span>' : ''),
+        !short && !cand.length ? `<button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="short">할 일 만들기</button>` : '',
+        cand.length ? `<ul class="bq-list">${cand.map(t => `<li class="bq"><span class="bq-t">${esc(t.title)} <span class="faint">${t.status}</span></span><button class="btn btn-tonal btn-sm" type="button" id="now-take-${t.id}" data-act="now-take" data-id="${t.id}" data-block="${x.key}" aria-label="${esc(t.title)} 지금 하기">지금 하기</button></li>`).join('')}</ul>` : ''));
+    }
+  });
+  const ask = shiftAsk(D, P);   // 시작을 옮길지 묻는 동안은 지나간 루틴을 묻지 않는다(옮기면 지나간 게 아니게 된다)
+  const missed = ask ? [] : L.filter(x => x.kind === 'routine' && x.to <= NOW_MIN && !rDone(D, TODAY, x) && !rSkipped(D, TODAY, x));
+  const carryN = free.filter(f => f.to <= NOW_MIN).reduce((n, f) => n + (plan[f.key] || []).filter(e => !slotDone(e, find('tasks', e.id))).length, 0);
+  const nx = L.find(x => x.from > NOW_MIN && x.kind !== 'blocked');
+  const nextLine = nx ? `<p class="now-next"><span class="faint">다음</span> <span class="num">${toHM(nx.from)}</span> ${nx.kind === 'appt' ? esc(nx.a.title) : nx.kind === 'routine' ? esc(nx.r.title) : `${nx.action ? esc(nx.r.title) : '빈 시간'}${(plan[nx.key] || []).length ? ` · 할 일 ${plan[nx.key].length}개` : ''}`}</p>` : '';
+  const waits = D.tasks.filter(t => t.status === '기다림').length;
+  const allEmpty = !L.some(x => x.kind === 'appt' || x.kind === 'routine') && !D.tasks.length && !D.inbox.length && !D.fleeting.length;
+  const quiet = NOW_MIN < s0 ? ['아직 하루 전이에요', `하루는 ${toHM(s0)}에 시작해요.`] : NOW_MIN >= s1 ? ['오늘 하루를 마쳤어요', '한 줄 회고를 남기거나 내일 계획을 미리 짜 보세요.'] : ['지금은 정해 둔 것이 없어요', '다음 일정까지 쉬어도 돼요.'];
+  const quietCard = `<div class="empty now-quiet"><h3>${quiet[0]}</h3><p>${quiet[1]}</p>${NOW_MIN >= s1 ? `<p style="margin-top:12px"><a class="btn btn-text btn-sm" href="#/time/daily/${TODAY}">한 줄 회고 쓰기</a> <a class="btn btn-text btn-sm" href="#/time/plan/${addDays(TODAY, 1)}">내일 계획 짜기</a></p>` : ''}</div>`;
+  const firstRun = `<div class="empty"><h2>오늘 할 것이 아직 없어요</h2><p>떠오른 생각 하나를 메모하는 것부터 시작해요. 약속·루틴을 만들면 하루가 블록으로 나뉘고, 지금 할 것이 여기에 카드로 떠요.</p><button class="btn btn-primary" type="button" data-act="capture">메모하기</button><p style="margin-top:12px"><button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="appt">약속 만들기</button> <button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="short">할 일 만들기</button>${P.onboarded === false ? ` <a class="btn btn-text btn-sm" href="#/time/plan/${TODAY}">하루 계획 세우기</a>` : ''}</p></div>`;
+  return `<div class="page">
+    <header class="page-head"><div><h1 tabindex="-1">지금</h1><p class="sub">${md2(TODAY)} ${wd(TODAY)}요일 · <span class="num" data-clock>${nowHM()}</span></p></div>
+      <span class="doc-actions" style="margin:0"><a class="btn btn-ghost btn-sm" href="#/time/plan/${TODAY}">오늘 계획</a></span></header>
+    ${allEmpty ? firstRun : `${ask}
+    <section class="section" style="margin-top:0" aria-labelledby="now-h"><h2 id="now-h" tabindex="-1">지금 할 것${todo ? ` <span class="count">${todo}</span>` : ''}</h2>${cards.length ? `<ul class="now-list">${cards.join('')}</ul>` : quietCard}${nextLine}</section>
+    ${missed.length ? `<section class="section" aria-labelledby="missed-h"><h2 id="missed-h">지나간 루틴 <span class="count">${missed.length}</span></h2><p class="faint" style="margin:-4px 0 12px">했으면 [했어요], 못 했으면 [건너뛰기]를 눌러요. 건너뛴 것은 실패로 세지 않아요.</p>
+      <ul class="now-list">${missed.map(x => nowCard(x.r.block ? `tl-kind blk-${x.r.block}` : '', `${x.r.block ? BLOCKS[x.r.block].label : '루틴'} · ${span(x)}`, esc(kName(x)), '', routineBtns(x))).join('')}</ul></section>` : ''}
+    ${carryN ? `<div class="fill-bar" style="margin-top:24px"><p><b>지나간 블록에 못 끝낸 할 일 ${carryN}개</b><span class="faint">남은 빈 시간으로 옮길 수 있어요</span></p><button class="btn btn-tonal btn-sm" type="button" data-act="fill-blocks">남은 빈 시간 채우기</button></div>` : ''}`}
+    ${waits ? `<p class="now-links"><button class="btn btn-text btn-sm" type="button" data-act="go-waiting">기다리는 중 ${waits}개 ›</button></p>` : ''}
   </div>`;
 }
 /* 블록 종류 — 방법론의 네 영역(1층)이라 고정. 행동만 챙기고 지식·시간이 밀리지 않게, 그 입구를 하루 시간표에 둔다 */
@@ -1366,7 +1530,7 @@ function openBlkAdd(key){
   const list = D.tasks.filter(t => (t.status === '진행' || t.status === '대기') && !here.has(t.id)).sort((a, b) => (plannedIds(D).has(a.id) ? 1 : 0) - (plannedIds(D).has(b.id) ? 1 : 0) || fillRank(a) - fillRank(b) || (a.due || '9999').localeCompare(b.due || '9999'));
   form.reset(); form.dataset.block = key;
   const used = (planOf(D)[key] || []).map(e => ({ e, t:find('tasks', e.id) })).filter(({ e, t }) => !slotDone(e, t)).reduce((n, { e, t }) => n + slotMin(e, t), 0);
-  $('#ba-sub').textContent = f.to <= NOW_MIN ? `${blockLabel(f)} · 지나간 시간이에요. 이때 한 일을 넣고 완료로 체크해요` : `${blockLabel(f)} · ${fmtMin(Math.max(0, f.to - Math.max(f.from, NOW_MIN) - used))} 남음`;
+  $('#ba-sub').textContent = f.to <= NM() ? `${blockLabel(f)} · 지나간 시간이에요. 이때 한 일을 넣고 완료로 체크해요` : `${blockLabel(f)} · ${fmtMin(Math.max(0, f.to - Math.max(f.from, NM()) - used))} 남음`;
   $('#ba-list').innerHTML = '<legend class="sr-only">넣을 할 일과 얼마나 할지</legend>' + (list.length ? list.map(t => `<div class="cand"><label><input type="checkbox" name="ids" value="${t.id}"><span><b>${esc(t.title)}</b><small>${t.status}${t.due ? ` · ${md2(t.due)}까지` : ''}${slotsOf(D, t.id).length ? ` · 다른 블록에도 있어요(${slotsOf(D, t.id).map(x => x.key).join(', ')})` : ''}</small></span></label>
       ${estChips('est-' + t.id, t.estimate, `${esc(t.title)} — 얼마나 할까요`)}</div>`).join('')
     : '<p class="faint">넣을 할 일이 없어요. 진행·대기 중인 단기가 모두 이 블록에 들어가 있어요.</p>');
@@ -1378,7 +1542,7 @@ function openBlkMove(id, key){
   form.dataset.id = id; form.dataset.block = key; $('#bm-sub').textContent = t.title;
   $('#bm-est').innerHTML = `<p class="field-label">이 블록에서 얼마나 할까요</p>${estChips('est', e.min || t.estimate, '이 블록에서 얼마나 할까요')}`;
   const fut = freeBlocks(D);
-  $('#bm-list').innerHTML = '<legend>어느 블록에 둘까요</legend>' + fut.map(f => `<label><input type="radio" name="to" value="${f.key}" ${f.key === key ? 'checked' : ''}><span><b class="num">${blockLabel(f)}</b><small>${f.action ? esc(f.r.title) + ' · ' : '빈 시간 · '}${fmtMin(f.to - f.from)}${f.to <= NOW_MIN ? ' · 지나감' : ''}</small></span></label>`).join('');
+  $('#bm-list').innerHTML = '<legend>어느 블록에 둘까요</legend>' + fut.map(f => `<label><input type="radio" name="to" value="${f.key}" ${f.key === key ? 'checked' : ''}><span><b class="num">${blockLabel(f)}</b><small>${f.action ? esc(f.r.title) + ' · ' : '빈 시간 · '}${fmtMin(f.to - f.from)}${f.to <= NM() ? ' · 지나감' : ''}</small></span></label>`).join('');
   if (!form.querySelector('input[name=to]:checked') && form.querySelector('input[name=to]')) form.querySelector('input[name=to]').checked = true;
   openDlg('dlg-blkmove'); form.querySelector('input[name=to]:checked')?.focus();
 }
@@ -1572,29 +1736,31 @@ function vCtx(id){
 }
 
 /* ---------------- 화면: 시간 ---------------- */
-function vTime(tab){
-  const D = db(), k = tab !== 'daily' && tab !== 'review' && kindOf(tab);
-  if (tab !== 'daily' && tab !== 'review' && !k) return vNotFound();
-  const days = Object.keys(D.dailies).sort().reverse();
+function vTime(tab, date){
+  const D = db(), fixedTab = ['plan', 'daily', 'review'].includes(tab), k = !fixedTab && kindOf(tab);
+  if (!fixedTab && !k) return vNotFound();
+  const days = Object.keys(D.dailies).filter(d => d <= TODAY && (d === TODAY || hasDay(D, d))).sort().reverse();   // 계획만 열어 본 빈 날은 목록에 넣지 않는다
   const head = `<header class="page-head"><h1 tabindex="-1">시간</h1>
       <span class="doc-actions" style="margin:0">${k ? `<button class="btn btn-ghost btn-sm" type="button" data-act="kind-edit" data-kind="${k.id}">종류 편집</button><button class="btn btn-primary" type="button" data-act="new-record" data-kind="${k.id}">${esc(k.name)} 쓰기</button>` : ''}</span></header>
-    ${seg([['daily', '#/time/daily', '데일리', '하루 기록'], ['review', '#/time/review', '돌아보기', '여러 날'], ...D.kinds.map(x => [x.id, `#/time/${x.id}`, `${esc(x.name)} <span class="num">${D.meetings.filter(m => (m.kind || 'meeting') === x.id).length}</span>`, ''])], tab, 'seg-compact seg-scroll')}
-    <p style="margin:-12px 0 16px;display:flex;justify-content:flex-end"><button class="btn btn-text btn-sm" type="button" data-act="kind-new" style="color:var(--primary)">+ 기록 종류 만들기</button></p>`;
+    ${seg([['plan', '#/time/plan', '계획', '하루 시간표'], ['daily', '#/time/daily', '데일리', '하루 기록'], ['review', '#/time/review', '돌아보기', '여러 날'], ...D.kinds.map(x => [x.id, `#/time/${x.id}`, `${esc(x.name)} <span class="num">${D.meetings.filter(m => (m.kind || 'meeting') === x.id).length}</span>`, ''])], tab, 'seg-compact seg-scroll')}
+    ${tab === 'plan' ? '' : `<p style="margin:-12px 0 16px;display:flex;justify-content:flex-end"><button class="btn btn-text btn-sm" type="button" data-act="kind-new" style="color:var(--primary)">+ 기록 종류 만들기</button></p>`}`;
   let body = '';
-  if (tab === 'daily'){
+  if (tab === 'plan') body = vPlan(date);
+  else if (tab === 'daily'){
     body = days.length ? `<ul class="list">${days.map(d => {
       const x = D.dailies[d]; const isToday = d === TODAY;
       const cnt = todayDid(d).length;
       return `<li><a class="row" href="#/time/daily/${d}"><span class="body"><span class="title">${fmtDate(d)}${isToday ? ' · 오늘' : ''}</span>
         <span class="meta"><span>한 일 <span class="num">${cnt}</span></span><span>${x.retro ? esc(x.retro) : (isToday ? '기록 중' : '회고 없음')}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`; }).join('')}</ul>${autoTag('매일 자정에 그날 데일리를 만들고 한 일을 모음')}`
-      : empty('아직 데일리가 없어요', '오늘 한 일은 밤에 자동으로 데일리로 모여요. 지금은 오늘 화면에서 할 일을 체크해 보세요.', `<a class="btn btn-tonal" href="#/today">오늘로 가기</a>`);
+      : empty('아직 데일리가 없어요', '오늘 한 일은 밤에 자동으로 데일리로 모여요. 지금은 지금 화면에서 할 일을 끝내 보세요.', `<a class="btn btn-tonal" href="#/now">지금으로 가기</a>`);
   } else if (tab === 'review') body = vReview();
   else body = vKind(tab);
   return `<div class="page">${head}${body}</div>`;
 }
+const hasDay = (D, d) => { const x = D.dailies[d]; return !!(x.memo || x.retro || (x.start && x.start !== pset().day_start) || (x.skipped || []).length || Object.values(x.plan || {}).some(a => a.length) || todayDid(d).length); };
 function todayDid(date = TODAY){
   const D = db(), out = [], done = D.routineDone[date] || {};
-  D.routines.forEach(r => { if (done[r.id]) out.push({ k:'루틴', t:r.title, href:`#/action/routine/${r.id}` }); });
+  D.routines.forEach(r => Object.keys(done).filter(k => done[k] && k.split('@')[0] === r.id).sort().forEach(k => out.push({ k:'루틴', t:kName({ r, k }), href:`#/action/routine/${r.id}` })));
   D.appts.filter(a => a.start.slice(0,10) === date && (date < TODAY || a.end.slice(11) <= nowHM())).forEach(a => out.push({ k:'약속', t:a.title, href:`#/action/appt/${a.id}` }));
   D.tasks.filter(t => t.status === '완료' && t.doneAt === date).forEach(t => out.push({ k:'단기 완료', t:t.title, href:`#/action/short/${t.id}` }));
   D.fleeting.filter(f => f.created.slice(0,10) === date).forEach(f => out.push({ k:'노트', t:'임시노트 — ' + f.text.slice(0, 30) + (f.text.length > 30 ? '…' : ''), href:'#/knowledge/fleeting' }));
@@ -1644,7 +1810,7 @@ function rvData(){
   const D = db(), r = rvRange();
   const done = D.tasks.filter(t => t.status === '완료' && inRange(t.doneAt, r));
   const areas = D.longs.map(L => { const recs = L.records.filter(x => inRange(x.date, r)); return { L, n:recs.length, sum:recs.reduce((a, x) => a + x.amt, 0) }; }).filter(x => x.n);
-  const cnt = {}; Object.entries(D.routineDone).filter(([d]) => inRange(d, r)).forEach(([, o]) => Object.keys(o).filter(k => o[k]).forEach(k => cnt[k] = (cnt[k] || 0) + 1));
+  const cnt = {}; Object.entries(D.routineDone).filter(([d]) => inRange(d, r)).forEach(([, o]) => Object.keys(o).filter(k => o[k]).map(k => k.split('@')[0]).forEach(k => cnt[k] = (cnt[k] || 0) + 1));
   const routines = Object.entries(cnt).map(([id, n]) => ({ r:find('routines', id), n })).filter(x => x.r).sort((a, b) => b.n - a.n);
   const records = D.meetings.filter(m => inRange(m.date, r) && !m.draft);
   const notes = [...D.perms.filter(p => inRange(p.created, r)).map(p => ({ k:'영구노트', t:p.title, href:`#/knowledge/perm/${p.id}` })), ...(D.ctxs || []).filter(c => inRange(c.updated, r)).map(c => ({ k:inRange(c.created, r) ? '맥락노트' : '맥락노트 고침', t:c.title, href:`#/knowledge/ctx/${c.id}` }))];
@@ -1803,7 +1969,7 @@ function vAction(board){
     body = D.routines.length ? `<ul class="list">${D.routines.map(r => `<li class="rt-row ${r.enabled ? '' : 'off'}">
         <span class="body"><a href="#/action/routine/${r.id}">${esc(r.title)}</a><span class="meta" style="display:flex;flex-wrap:wrap;gap:4px 10px;color:var(--text-2);font-size:.875rem"><span class="num">${cronText(r.cron)}</span>${r.area ? `<span>${esc(r.area)}</span>` : ''}${r.enabled ? '' : '<span>꺼짐</span>'}</span></span>
         <input type="checkbox" class="switch" role="switch" id="sw-${r.id}" data-change="routine-toggle" data-id="${r.id}" ${r.enabled ? 'checked' : ''} aria-label="${esc(r.title)} 켜기"></li>`).join('')}</ul>`
-      : empty('아직 루틴이 없어요', '반복하는 일을 루틴으로 만들면 해당하는 날 오늘 화면에 나와요.', `<button class="btn btn-tonal" type="button" data-act="new-action" data-board="routine">루틴 만들기</button>`);
+      : empty('아직 루틴이 없어요', '반복하는 일을 루틴으로 만들면 해당하는 날 계획과 지금 화면에 나와요.', `<button class="btn btn-tonal" type="button" data-act="new-action" data-board="routine">루틴 만들기</button>`);
   } else {
     const up = D.appts.filter(a => a.start.slice(0,10) >= TODAY).sort((a, b) => a.start.localeCompare(b.start));
     const past = D.appts.filter(a => a.start.slice(0,10) < TODAY).sort((a, b) => b.start.localeCompare(a.start));
@@ -1879,7 +2045,9 @@ function vRoutine(id){
     <section class="section"><h2>언제</h2>
       <div class="card form-row">
         <label class="field" style="flex:1 1 180px"><span>주기</span><select id="rf-${r.id}" data-change="routine-freq" data-id="${r.id}">${FREQS.map(([v, l]) => `<option value="${v}" ${v === freqOf(r.cron) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        <label class="field" style="flex:1 1 140px"><span>시각</span><input type="time" id="rt-${r.id}" data-change="routine-time" data-id="${r.id}" value="${h.padStart(2,'0')}:${mi}"></label>
+        <label class="field" style="flex:1 1 140px"><span>${cronEvery(r.cron) ? '처음 시각' : '시각'}</span><input type="time" id="rt-${r.id}" data-change="routine-time" data-id="${r.id}" value="${h.padStart(2,'0')}:${mi}"></label>
+        <label class="field" style="flex:1 1 140px"><span>반복</span><select id="re-${r.id}" data-change="routine-every" data-id="${r.id}">${EVERY.map(([v, l]) => `<option value="${v}" ${v === cronEvery(r.cron) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        ${cronEvery(r.cron) ? `<p class="faint num" style="width:100%">하루 ${cronTimes(r.cron).length}번 · ${cronTimes(r.cron).join(' · ')} — 하루 끝(${pset().day_end}) 뒤 회차는 나오지 않아요</p>` : ''}
         <p class="faint" style="width:100%">노트에는 <code class="num">cron: "${esc(r.cron)}"</code>로 저장돼요.</p>
       </div></section>
     <section class="section"><h2>쌓이는 곳</h2>
@@ -2038,18 +2206,18 @@ function vError(){
     <button class="btn btn-primary" type="button" data-act="reload">다시 불러오기</button></div></div>`;
 }
 function vNotFound(){
-  return `<div class="page"><h1 tabindex="-1">노트를 찾지 못했어요</h1><p class="muted" style="margin-top:8px">이름이 바뀌었거나 지운 노트일 수 있어요.</p><a class="btn btn-tonal" style="margin-top:16px" href="#/today">오늘로 가기</a></div>`;
+  return `<div class="page"><h1 tabindex="-1">노트를 찾지 못했어요</h1><p class="muted" style="margin-top:8px">이름이 바뀌었거나 지운 노트일 수 있어요.</p><a class="btn btn-tonal" style="margin-top:16px" href="#/now">오늘로 가기</a></div>`;
 }
 
 /* ---------------- 내비 ---------------- */
 const ICONS = {
   inbox:'<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z"/>',
-  today:'<path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/><circle cx="12" cy="12" r="4"/>',
+  now:'<path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/><circle cx="12" cy="12" r="4"/>',
   knowledge:'<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/>',
   time:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   action:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>'
 };
-const NAV = [['today','오늘','#/today'],['inbox','인박스','#/inbox'],['knowledge','지식','#/knowledge/ref'],['time','시간','#/time/daily'],['action','행동','#/action/short']];
+const NAV = [['now','지금','#/now'],['inbox','인박스','#/inbox'],['knowledge','지식','#/knowledge/ref'],['time','시간','#/time/plan'],['action','행동','#/action/short']];
 function buildNav(){
   const svg = k => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
   $('#nav-side').innerHTML = NAV.map(([k, l, h]) => `<li><a href="${h}" data-nav="${k}">${svg(k)}${l}</a></li>`).join('');
@@ -2057,16 +2225,17 @@ function buildNav(){
 }
 
 /* ---------------- 렌더 ---------------- */
-function parse(){ const h = location.hash.replace(/^#\/?/, '') || 'today'; return h.split('/').map(decodeURIComponent); }
+function parse(){ const h = location.hash.replace(/^#\/?/, '') || 'now', p = h.split('/').map(decodeURIComponent); if (p[0] === 'today') p[0] = 'now'; return p; }   // 옛 주소 #/today는 지금으로
 const EDIT_KIND = { 'knowledge/ref':'refs', 'knowledge/perm':'perms', 'knowledge/ctx':'ctxs', 'time/daily':'dailies', 'time/meeting':'meetings', 'action/short':'tasks', 'action/long':'longs', 'action/routine':'routines', 'action/appt':'appts' };
 function route(p){
   if (p[3] === 'edit'){ const ek = EDIT_KIND[p[0] + '/' + p[1]] || (p[0] === 'time' && p[1] !== 'daily' ? 'meetings' : null); if (ek) return vEdit(ek, p[2]); }
   switch (p[0]){
-    case 'today': return vToday();
+    case 'now': return vNow();
     case 'inbox': return vInbox();
     case 'knowledge': if (p[2]) return p[1] === 'ref' ? vRef(p[2]) : p[1] === 'ctx' ? vCtx(p[2]) : vPerm(p[2]); return vKnowledge(['ref','fleeting','perm','ctx'].includes(p[1]) ? p[1] : 'ref');
     case 'refine': return vRefine(p[1], p[2], p[3]);
-    case 'time': if (p[2]) return p[1] === 'daily' ? vDaily(p[2]) : vRecord(p[2]); return vTime(p[1] || 'daily');
+    case 'time': if (p[1] === 'plan') return vTime('plan', /^\d{4}-\d{2}-\d{2}$/.test(p[2] || '') ? p[2] : TODAY);
+      if (p[2]) return p[1] === 'daily' ? vDaily(p[2]) : vRecord(p[2]); return vTime(p[1] || 'daily');
     case 'action': {
       const b = ['short','long','routine','appt'].includes(p[1]) ? p[1] : 'short';
       if (p[2]) return ({ short:vTask, long:vLong, routine:vRoutine, appt:vAppt })[b](p[2]);
@@ -2090,11 +2259,17 @@ function render(){
   if (S.mode === 'connect' && PKMStore.github.auth() && !GH.repos.length && !GH.loading){
     GH.loading = true; PKMStore.github.repos().then(r => { GH.repos = r; GH.loading = false; render(); }).catch(e => { GH.loading = false; toast(e.message); });
   }
-  const cur = main.querySelector('.seg-scroll a[aria-current]'); if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - 8;   // 기록 종류가 많아도 지금 탭이 보이게
+  const cur = main.querySelector('.seg-scroll a[aria-current]'); if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - 8;
+  const wd0 = main.querySelector('.week a.day[aria-current]'); if (wd0){ const ol = wd0.closest('ol'); if (ol.scrollWidth > ol.clientWidth) ol.scrollLeft = wd0.parentElement.offsetLeft - ol.clientWidth / 2; }   // 큰 글씨에서도 고른 날이 보이게   // 기록 종류가 많아도 지금 탭이 보이게
   const h1 = main.querySelector('h1');
   document.title = (h1 ? h1.textContent.trim() : 'pkm') + ' · pkm';
   if (navChanged){ window.scrollTo(0, 0); if (booted && h1) h1.focus({ preventScroll:true }); }
-  else { window.scrollTo(0, y); const el = activeId && document.getElementById(activeId); if (el) el.focus({ preventScroll:true }); }
+  else {
+    window.scrollTo(0, y); const el = activeId && document.getElementById(activeId);
+    if (el) el.focus({ preventScroll:true });
+    else if (activeId && /^now-/.test(activeId)) (main.querySelector('.now-card .nc-acts button, .now-card .bq-list button') || $('#now-h'))?.focus({ preventScroll:true });   // 누른 카드가 사라지면 다음 카드로
+  }
+  lastShape = dayShape();
   scheduleSave();
 }
 let booted = false;
@@ -2167,6 +2342,34 @@ function syncStatusDlg(){
   $('#st-submit').textContent = `${T_TO[to]} 옮기기`;
 }
 
+/* 루틴 체크 — 그날(PD) 기록. 장기에 연결돼 있으면 누적 기록도 한 줄. 체크하면 건너뜀은 풀린다 */
+function checkRoutine(id, on, k = id){   // k = 회차 키(하루 여러 번 도는 루틴은 'id@시각')
+  const D = db(), r = find('routines', id), date = PD, day = D.routineDone[date] || (D.routineDone[date] = {}), L = r.area && longByTitle(r.area), d = D.dailies[date], memo = `루틴 · ${kName({ r, k })}`;
+  day[k] = on;
+  if (on && d && d.skipped) d.skipped = d.skipped.filter(x => x !== k);
+  if (on && L && r.amount){
+    const rec = { date, amt:r.amount, memo, src:'루틴' }; L.records.push(rec); render();
+    toast(`${L.title}에 ${fmtAmt(r.amount, L.unit)}을 기록했어요`, { label:'되돌리기', fn:() => { L.records = L.records.filter(x => x !== rec); day[k] = false; render(); } });
+    return true;
+  }
+  if (!on && L) L.records = L.records.filter(x => !(x.date === date && x.src === '루틴' && x.memo === memo));
+  render(); return false;
+}
+/* 블록에 넣은 할 일을 끝냄 — 다른 블록에 또 있으면 이 블록 분량만 끝낸 것 */
+function finishSlot(id, key){
+  const D = db(), t = find('tasks', id), e = (planOf(D)[key] || []).find(x => x.id === id);
+  const rest = slotsOf(D, id).filter(x => x.key !== key && !x.e.done);
+  if (rest.length && t.status !== '완료'){
+    e.done = true; render(); toast(`이 블록 분량을 끝냈어요 · ${rest.map(x => x.key).join(', ')} 블록에 한 번 더 있어요`, { label:'되돌리기', fn:() => { e.done = false; render(); } });
+  } else moveTask(id, '완료');
+}
+const dayOf = date => db().dailies[date] || (db().dailies[date] = { memo:'', retro:'', did:[], plan:{} });
+function openStart(){
+  const f = $('#dlg-start form'), P = pset();
+  $('#ds-sub').textContent = `${md2(PD)} ${wd(PD)}요일만 바꿔요. 기본 시작 ${P.day_start}은 하루 설정에서 바꿔요.`;
+  f.start.value = dayStart(PD); openDlg('dlg-start'); f.start.focus();
+}
+
 /* ---------------- 이벤트 ---------------- */
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -2215,14 +2418,40 @@ document.addEventListener('click', e => {
       [arr[i], arr[j]] = [arr[j], arr[i]]; render(); break;
     }
     case 'day-settings': openDay(); break;
+    case 'day-start': openStart(); break;
+    case 'shift-yes': case 'shift-no': {
+      const d = dayOf(TODAY), P = pset(), at = b.dataset.act === 'shift-yes' ? b.dataset.at : P.day_start;
+      d.start = at; render();
+      if (b.dataset.act === 'shift-yes') toast(`오늘은 ${at}에 시작해요 · 루틴과 블록을 ${fmtMin(toMin(at) - toMin(P.day_start))} 뒤로 옮겼어요`, { label:'되돌리기', fn:() => { delete d.start; render(); } });
+      break;
+    }
+    case 'routine-did': { const r = find('routines', id), k = b.dataset.k || id; if (!checkRoutine(id, true, k)) toast(`${eul(r.title)} 했어요`, { label:'되돌리기', fn:() => checkRoutine(id, false, k) }); break; }
+    case 'routine-skip': {
+      const r = find('routines', id), d = dayOf(PD), k = b.dataset.k || id; d.skipped = [...(d.skipped || []).filter(x => x !== k), k]; render();
+      toast(`${eul(r.title)} 건너뛰었어요`, { label:'되돌리기', fn:() => { d.skipped = d.skipped.filter(x => x !== k); render(); } });
+      break;
+    }
+    case 'now-done': finishSlot(id, b.dataset.block); break;
+    case 'now-later': {   // 다음 빈 시간 블록으로. 뒤에 블록이 없으면 오늘 계획에서만 뺀다
+      const key = b.dataset.block, cur = freeBlocks(D).find(f => f.key === key), nx = freeBlocks(D).find(f => f.from >= cur.to), undo = snapshot(), plan = planOf(D);
+      if (nx && !(plan[nx.key] || []).some(x => x.id === id)){ moveInPlan(id, key, nx.key); render(); toast(`${nx.key} 블록으로 옮겼어요`, { label:'되돌리기', fn:undo }); }
+      else { plan[key] = (plan[key] || []).filter(x => x.id !== id); if (!nx){ const d = dayOf(PD); Object.defineProperty(d, 'dropped', { value:[...(d.dropped || []), id], configurable:true, enumerable:false, writable:true }); } render(); toast(nx ? `${nx.key} 블록에 이미 있어서 여기서만 뺐어요` : '오늘 계획에서 뺐어요 · 단기보드에는 그대로 있어요', { label:'되돌리기', fn:undo }); }
+      break;
+    }
+    case 'now-take': {
+      const t = find('tasks', id), undo = snapshot(), plan = planOf(D);
+      (plan[b.dataset.block] || (plan[b.dataset.block] = [])).push({ id, min:null, done:false }); render();
+      toast(`${eul(t.title)} 지금 하기로 했어요`, { label:'되돌리기', fn:undo });
+      break;
+    }
     case 'onb-skip': pset().onboarded = true; render(); toast('건너뛰었어요. 하루 설정에서 언제든 다시 고를 수 있어요'); break;
-    case 'onb-again': pset().onboarded = false; $('#dlg-day').close(); go('#/today'); render(); break;
+    case 'onb-again': pset().onboarded = false; $('#dlg-day').close(); go('#/time/plan'); render(); break;
     case 'day-add-row': { const n = $('#day-rows').children.length; $('#day-rows').insertAdjacentHTML('beforeend', dayRow({ days:'1-5', from:'12:00', to:'13:00', label:'' }, n)); $('#day-rows').lastElementChild.querySelector('select').focus(); break; }
     case 'day-del-row': { const r = b.closest('[data-row]'), nx = r.nextElementSibling || r.previousElementSibling; r.remove(); (nx ? nx.querySelector('select') : $('#dlg-day [data-act=day-add-row]')).focus(); break; }
     case 'go-waiting': S.shortTab = '기다림'; go('#/action/short'); break;
     case 'switch-profile': {
       $('#dlg-profile').close();
-      if (b.dataset.name !== S.profile){ clearTimeout(saveTimer); if (saveTimer || saving) saveNow(); S.inline = null; go('#/today'); const to = b.dataset.name; openProfile(to).then(() => toast(`${to} 프로필로 바꿨어요`)); }
+      if (b.dataset.name !== S.profile){ clearTimeout(saveTimer); if (saveTimer || saving) saveNow(); S.inline = null; go('#/now'); const to = b.dataset.name; openProfile(to).then(() => toast(`${to} 프로필로 바꿨어요`)); }
       break;
     }
     case 'delete-item': deleteItem(b.dataset.kind, id); break;
@@ -2318,31 +2547,19 @@ document.addEventListener('change', e => {
   const act = el.dataset.change; if (!act) return;
   const D = db(), id = el.dataset.id;
   if (act === 'routine-check'){
-    const r = find('routines', id); D.routineDone[TODAY] = D.routineDone[TODAY] || {};
-    D.routineDone[TODAY][id] = el.checked;
-    const L = r.area && longByTitle(r.area);
-    if (el.checked && L && r.amount){
-      const rec = { date:TODAY, amt:r.amount, memo:`루틴 · ${r.title}`, src:'루틴' }; L.records.push(rec); render();
-      toast(`${L.title}에 ${fmtAmt(r.amount, L.unit)}을 기록했어요`, { label:'되돌리기', fn:() => { L.records = L.records.filter(x => x !== rec); D.routineDone[TODAY][id] = false; render(); } });
-    } else {
-      if (!el.checked && L) L.records = L.records.filter(x => !(x.date === TODAY && x.src === '루틴' && x.memo === `루틴 · ${r.title}`));
-      render();
-    }
+    checkRoutine(id, el.checked, el.dataset.k || id);
   } else if (act === 'routine-toggle'){
     const r = find('routines', id); r.enabled = el.checked; render();
-    toast(r.enabled ? `${r.title} 루틴을 켰어요` : `${r.title} 루틴을 껐어요. 오늘 화면에 나오지 않아요`);
-  } else if (act === 'routine-freq' || act === 'routine-time'){
+    toast(r.enabled ? `${r.title} 루틴을 켰어요` : `${r.title} 루틴을 껐어요. 계획과 지금 화면에 나오지 않아요`);
+  } else if (act === 'routine-freq' || act === 'routine-time' || act === 'routine-every'){
     const r = find('routines', id);
-    r.cron = buildCron($('#rf-' + id).value, $('#rt-' + id).value || '07:00'); render();
+    r.cron = buildCron($('#rf-' + id).value, $('#rt-' + id).value || '07:00', +$('#re-' + id).value, cronEnd(r.cron)); render();
     toast(`${cronText(r.cron)}로 바꿨어요`);
   } else if (act === 'rv-inc'){
     S.rv.off[el.dataset.k] = !el.checked; render();
   } else if (act === 'blk-done'){
     const t = find('tasks', id), e = (planOf(D)[el.dataset.block] || []).find(x => x.id === id);
-    const rest = slotsOf(D, id).filter(x => x.key !== el.dataset.block && !x.e.done);
-    if (el.checked && rest.length && t.status !== '완료'){   // 다른 블록에 또 있으면 이 블록 분량만 끝낸 것
-      e.done = true; render(); toast(`이 블록 분량을 끝냈어요 · ${rest.map(x => x.key).join(', ')} 블록에 한 번 더 있어요`, { label:'되돌리기', fn:() => { e.done = false; render(); } });
-    } else if (el.checked) moveTask(id, '완료');
+    if (el.checked) finishSlot(id, el.dataset.block);
     else { e.done = false; if (t.status === '완료') moveTask(id, '진행'); else render(); }
   } else if (act === 'todo-toggle'){
     const t = find('tasks', id); t.todos[+el.dataset.i].d = el.checked; render();
@@ -2391,7 +2608,7 @@ document.addEventListener('submit', e => {
     const bad = !n ? '프로필 이름을 적어 주세요' : n.startsWith('_') ? '_로 시작하는 이름은 쓸 수 없어요' : /[\\/:]/.test(n) ? '/ \\ : 는 이름에 쓸 수 없어요' : '';
     if (bad){ e.textContent = bad; return invalid(f.elements.name, 'pf-err'); }
     if (PLIST.some(x => x.name === n)){ e.textContent = '이미 있는 프로필이에요'; return invalid(f.elements.name, 'pf-err'); }
-    createProfileIn(n).then(() => { f.closest('dialog').close(); S.inline = null; go('#/today'); return openProfile(n); })
+    createProfileIn(n).then(() => { f.closest('dialog').close(); S.inline = null; go('#/now'); return openProfile(n); })
       .then(() => toast(`${n} 프로필을 만들었어요 · ${STORE.kind === 'server' ? `${n} 폴더` : `GitHub ${PKMStore.github.repo()}`}에 저장해요`, { label:'저장 위치 바꾸기', fn:openStorage }))
       .catch(err => { e.textContent = err.message; e.hidden = false; });
   } else if (kind === 'blkadd'){
@@ -2415,14 +2632,21 @@ document.addEventListener('submit', e => {
       if (moved) moveInPlan(f.dataset.id, f.dataset.block, to);
       render(); toast(moved ? `${to} 블록으로 옮겼어요` : `이 블록에서 ${fmtMin(e.min)} 하기로 했어요`, { label:'되돌리기', fn:undo });
     }
+  } else if (kind === 'daystart'){
+    const v = f.start.value, P = pset();
+    if (!v || v >= P.day_end){ $('#ds-err').textContent = !v ? '시작 시각을 정해 주세요' : `하루 끝(${P.day_end})보다 앞으로 정해 주세요`; return invalid(f.start, 'ds-err'); }
+    const d = dayOf(PD), prev = d.start; d.start = v; f.closest('dialog').close(); render();
+    toast(v === P.day_start ? `${md2(PD)}은 기본 시각 ${v}에 시작해요` : `${md2(PD)}은 ${v}에 시작해요 · 루틴과 블록이 따라 움직여요`, { label:'되돌리기', fn:() => { if (prev) d.start = prev; else delete d.start; render(); } });
   } else if (kind === 'day'){
     const e = $('#day-err'), rows = [...f.querySelectorAll('[data-row]')].map(r => ({ days:r.querySelector('[name=days]').value, from:r.querySelector('[name=from]').value, to:r.querySelector('[name=to]').value, label:r.querySelector('[name=label]').value.trim() }));
     const bad = !f.day_start.value || !f.day_end.value ? '하루 시작과 끝을 정해 주세요' : f.day_end.value <= f.day_start.value ? '하루 끝을 시작보다 뒤로 정해 주세요' : rows.some(r => !r.from || !r.to || r.to <= r.from) ? '비워 둘 시간의 끝을 시작보다 뒤로 정해 주세요' : '';
     if (bad){ e.textContent = bad; e.hidden = false; return; }
-    const prev = JSON.parse(JSON.stringify(pset()));
+    const prev = JSON.parse(JSON.stringify(pset())), delta = toMin(f.day_start.value) - toMin(prev.day_start);
+    const moved = delta ? D.routines.map(r => [r, r.cron]) : [];   // 루틴은 하루 시작을 따라 움직인다 — 기본 시작을 바꾸면 루틴 시각도 같은 만큼
+    moved.forEach(([r]) => { const e = cronEvery(r.cron); r.cron = buildCron(freqOf(r.cron), toHM(Math.min(Math.max(toMin(cronTime(r.cron)) + delta, 0), 1439)), e, e ? Math.min(Math.max(cronEnd(r.cron) + Math.round(delta / 60), 0), 23) : 23); });
     Object.assign(pset(), { week_start:+f.week_start.value, day_start:f.day_start.value, day_end:f.day_end.value, blocked:rows, fill_ratio:+f.fill_ratio.value, max_block:+f.max_block.value, default_block:+f.default_block.value });
     f.closest('dialog').close(); render();
-    toast('하루 설정을 바꿨어요', { label:'되돌리기', fn:() => { PSET[S.profile] = prev; render(); } });
+    toast(moved.length ? `하루 설정을 바꿨어요 · 루틴 ${moved.length}개도 ${fmtMin(Math.abs(delta))} ${delta > 0 ? '뒤로' : '앞으로'} 옮겼어요` : '하루 설정을 바꿨어요', { label:'되돌리기', fn:() => { PSET[S.profile] = prev; moved.forEach(([r, c]) => r.cron = c); render(); } });
   } else if (kind === 'kind'){
     const e = $('#kd-err'), kid = f.dataset.kind, name = f.elements.name.value.trim();
     const rows = [...f.querySelectorAll('.kd-row')].map(r => [r.dataset.key || 'f' + uid(''), r.querySelector('input').value.trim()]).filter(([, l]) => l);

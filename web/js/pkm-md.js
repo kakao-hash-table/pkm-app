@@ -174,12 +174,15 @@
     const days = new Set([...Object.keys(D.dailies || {}), ...Object.keys(D.routineDone || {})]);
     [...days].sort().forEach(d => {
       const x = (D.dailies || {})[d] || {}, rd = (D.routineDone || {})[d] || {};
-      const done = Object.keys(rd).filter(k => rd[k]).map(id => byId(D.routines, id)).filter(Boolean);
+      // 하루 여러 번 도는 루틴의 회차('id@시각')는 시각을 별칭으로 — [[물 250ml|12:00]]
+      const rLink = k => { const [id, t] = k.split('@'), r = byId(D.routines, id); return r ? (t ? `[[${clean(r.title)}|${t}]]` : link(r.title)) : ''; };
+      const done = Object.keys(rd).filter(k => rd[k]).sort().map(rLink).filter(Boolean);
       const plan = x.plan || {};
       const planText = Object.keys(plan).sort().filter(k => plan[k].length).map(k => `## ${k}\n${plan[k].map(e => { const t = byId(D.tasks, e.id); return t ? `- [${e.done ? 'x' : ' '}] ${link(t.title)}${e.min ? ` · ${e.min}분` : ''}` : ''; }).filter(Boolean).join('\n')}`).join('\n\n');
-      if (!x.memo && !x.retro && !planText && !done.length) return;
+      const skipped = (x.skipped || []).map(rLink).filter(Boolean);
+      if (!x.memo && !x.retro && !planText && !done.length && !x.start && !skipped.length) return;
       index[d] = `${F.daily}/${d}.md`;
-      files[`${F.daily}/${d}.md`] = writeDoc({ type:'daily', date:d, routines:done.map(r => link(r.title)) }, [['오늘 계획', planText], ['메모', x.memo], ['한 줄 회고', x.retro]]);
+      files[`${F.daily}/${d}.md`] = writeDoc({ type:'daily', date:d, start:x.start || undefined, routines:done, skipped:skipped.length ? skipped : undefined }, [['오늘 계획', planText], ['메모', x.memo], ['한 줄 회고', x.retro]]);
     });
     // 기록(종류별 폴더)
     const kinds = D.kinds || [];
@@ -288,6 +291,7 @@
       else if (type === 'daily'){
         const date = String(f.date || base(d.path));
         const x = { memo:S['메모'] || '', retro:S['한 줄 회고'] || '', did:[], plan:{} };
+        if (/^\d{1,2}:\d{2}$/.test(String(f.start || ''))) x.start = String(f.start).padStart(5, '0');   // 그날만 하루 시작을 옮긴 시각
         D.dailies[date] = x;
         const planText = S['오늘 계획'] || '';
         later.push(() => {
@@ -297,8 +301,11 @@
             const m = l.match(/^\s*-\s+\[( |x|X)\]\s+\[\[(.+?)\]\](?:\s*·\s*(\d+)분)?/); if (!m || !key) return;
             const t = D.tasks.find(y => same(y.title, m[2])); if (t) x.plan[key].push({ id:t.id, min:m[3] ? Number(m[3]) : null, done:m[1] !== ' ' });
           });
-          const rd = {}; (f.routines || []).map(unlink).forEach(t => { const r = D.routines.find(y => same(y.title, t)); if (r) rd[r.id] = true; });
+          const rKey = v => { const r = D.routines.find(y => same(y.title, unlink(v))), t = (String(v).match(/\|\s*(\d{1,2}:\d{2})\s*\]\]$/) || [])[1]; return r ? (t ? `${r.id}@${t.padStart(5, '0')}` : r.id) : null; };   // [[물 250ml|12:00]] → 'id@12:00'
+          const rd = {}; (f.routines || []).map(rKey).filter(Boolean).forEach(k => rd[k] = true);
           if (Object.keys(rd).length) D.routineDone[date] = rd;
+          const sk = (f.skipped || []).map(rKey).filter(Boolean);
+          if (sk.length) x.skipped = sk;
         });
       }
       else if (type === 'record'){

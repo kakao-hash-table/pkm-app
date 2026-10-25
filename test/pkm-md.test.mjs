@@ -38,3 +38,26 @@ test('템플릿 주석이 달린 프런트매터를 읽는다', () => {
   const d = MD.parseDoc('---\ntype: project\nstatus: todo    # todo 대기 | doing 진행\narea:          # 쌓이는 장기\nblocked:\n  - { days: "1-5", from: "09:00", to: "18:00", label: "회사" }\n---\n# 할 일\n- [x] 하나\n');
   assert.equal(d.fm.status, 'todo'); assert.equal(d.fm.area, null); assert.equal(d.fm.blocked[0].from, '09:00'); assert.match(d.sections['할 일'], /하나/);
 });
+
+test('데일리의 그날 시작 시각과 건너뛴 루틴이 왕복한다', () => {
+  const db = { ...MD.emptyDb(), routines:[{ id:'R1', title:'아침 스트레칭', enabled:true, cron:'0 7 * * *', duration:15, block:'', area:'', amount:null, content:'' }],
+    dailies:{ '2026-10-26':{ memo:'', retro:'', did:[], plan:{}, start:'08:40', skipped:['R1'] }, '2026-10-27':{ memo:'', retro:'', did:[], plan:{}, start:'10:00' } } };
+  const files = MD.serialize({ db, settings });
+  assert.match(files['02_시간/데일리/2026-10-26.md'], /start: "08:40"\nroutines: \[\]\nskipped: \["\[\[아침 스트레칭\]\]"\]/);
+  const back = MD.parse(files).db;
+  assert.equal(back.dailies['2026-10-26'].start, '08:40');
+  assert.deepEqual(back.dailies['2026-10-26'].skipped, ['R1']);
+  assert.equal(back.dailies['2026-10-27'].start, '10:00');   // 시작만 옮긴 앞날도 파일이 남는다
+});
+
+test('하루 여러 번 도는 루틴은 회차별로 체크·건너뛰기가 왕복한다', () => {
+  const db = { ...MD.emptyDb(), routines:[{ id:'R1', title:'물 250ml', enabled:true, cron:'0 10-22/2 * * *', duration:5, block:'', area:'', amount:null, content:'' }, { id:'R2', title:'기상', enabled:true, cron:'30 6 * * *', duration:5, block:'', area:'', amount:null, content:'' }],
+    routineDone:{ '2026-10-26':{ 'R1@10:00':true, 'R1@12:00':true, R2:true } },
+    dailies:{ '2026-10-26':{ memo:'', retro:'', did:[], plan:{}, skipped:['R1@14:00'] } } };
+  const files = MD.serialize({ db, settings });
+  assert.match(files['02_시간/데일리/2026-10-26.md'], /routines: \["\[\[물 250ml\|10:00\]\]", "\[\[물 250ml\|12:00\]\]", "\[\[기상\]\]"\]\nskipped: \["\[\[물 250ml\|14:00\]\]"\]/);
+  const back = MD.parse(files).db;
+  assert.equal(back.routines.find(r => r.id === 'R1').cron, '0 10-22/2 * * *');
+  assert.deepEqual(back.routineDone['2026-10-26'], { 'R1@10:00':true, 'R1@12:00':true, R2:true });
+  assert.deepEqual(back.dailies['2026-10-26'].skipped, ['R1@14:00']);
+});
