@@ -207,6 +207,9 @@ a.row:hover{background:var(--fill)}
 .empty .btn{margin-top:20px}
 .empty .smile{margin-top:12px;color:var(--text-3);font-size:.875rem}
 
+.inbox-acts{flex:1 1 100%;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.inbox-acts>.faint{margin-right:auto}
+.ia-btns{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;margin-left:auto}
 .tip{display:flex;gap:12px;align-items:flex-start;background:var(--primary-weak);color:var(--text);border-radius:var(--r-lg);padding:14px 8px 14px 18px;margin-bottom:24px}
 .tip p{flex:1;padding-top:4px}
 .tip strong{color:var(--on-primary-weak)}
@@ -510,6 +513,7 @@ form.card>.btn{align-self:flex-end}
 /* 다이얼로그 — 모바일은 바텀시트, 버튼 줄은 시트 아래에 붙음 */
 dialog{border:0;border-radius:var(--r-xl);padding:0;width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 48px);background:var(--surface);color:var(--text);box-shadow:var(--shadow-pop)}
 dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog{overscroll-behavior:contain}
 dialog form{padding:28px 24px 24px;display:flex;flex-direction:column;gap:18px}
 dialog h2{font-size:1.3125rem;letter-spacing:-.02em}
 .dlg-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:4px}
@@ -1823,18 +1827,18 @@ function openDay(){
   f.fill_ratio.innerHTML = RATIOS.map(r => `<option value="${r}" ${r === P.fill_ratio ? 'selected' : ''}>${Math.round(r * 100)}%</option>`).join('');
   f.max_block.innerHTML = MAXB.map(([v, l]) => `<option value="${v}" ${v === (P.max_block || 0) ? 'selected' : ''}>${l}</option>`).join('');
   f.default_block.innerHTML = DEFB.map(v => `<option value="${v}" ${v === P.default_block ? 'selected' : ''}>${fmtMin(v)}</option>`).join('');
-  openDlg('dlg-day'); f.day_start.focus();
+  openDlg('dlg-day'); focusEl(f.day_start);
 }
 
 /* ---------------- 화면: 인박스 ---------------- */
 function vInbox(){
   const D = db();
   const list = D.inbox.length ? `<ul class="list">${D.inbox.map(x => `<li class="idea">${S.inline === x.id ? inlineEdit('inbox', x) : `<p style="white-space:pre-wrap">${esc(x.text)}</p>
-      <div class="t-acts" style="flex:1 1 100%"><span class="faint" style="margin-right:auto">${relTime(x.created)}</span><span><button class="btn btn-text btn-sm" type="button" data-act="inline-edit" data-id="${x.id}">고치기</button> <button class="btn btn-tonal btn-sm" type="button" data-act="sort-inbox" data-id="${x.id}">정리하기</button></span></div>`}</li>`).join('')}</ul>`
+      <div class="t-acts inbox-acts"><span class="faint">${relTime(x.created)}</span><span class="ia-btns"><button class="btn btn-text btn-sm" type="button" data-act="del-inbox" data-id="${x.id}" aria-label="${esc(firstLine(x.text))} 삭제하기">삭제하기</button><button class="btn btn-text btn-sm" type="button" data-act="inline-edit" data-id="${x.id}" aria-label="${esc(firstLine(x.text))} 고치기">고치기</button><button class="btn btn-ghost btn-sm" type="button" data-act="done-inbox" data-id="${x.id}" aria-label="${esc(firstLine(x.text))} 완료하기">완료하기</button><button class="btn btn-tonal btn-sm" type="button" data-act="sort-inbox" data-id="${x.id}" aria-label="${esc(firstLine(x.text))} 정리하기">정리하기</button></span></div>`}</li>`).join('')}</ul>`
     : empty('인박스가 비었어요', '떠오른 것은 무엇이든 메모하기로 담아 두고, 여유 있을 때 할 일이나 노트로 다듬어요.', `<button class="btn btn-tonal" type="button" data-act="capture">메모하기</button>`);
   return `<div class="page">
     <header class="page-head"><div><h1 tabindex="-1">인박스</h1><p class="sub">아직 무엇인지 정하지 않은 것 ${D.inbox.length}개</p></div></header>
-    ${tip('inbox', '<strong>정리하기</strong>를 누르면 내 생각은 임시노트로, 읽을거리는 참조노트로, 할 일은 행동 보드로 다듬어 보내요.')}
+    ${tip('inbox', '<strong>정리하기</strong>를 누르면 내 생각은 임시노트로, 읽을거리는 참조노트로, 할 일은 행동 보드로 다듬어 보내요. 2분이면 끝나는 일은 바로 하고 <strong>완료하기</strong>를 누르세요.')}
     ${list}
   </div>`;
 }
@@ -2523,7 +2527,7 @@ function render(){
   if (navChanged){ window.scrollTo(0, 0); if (booted && h1) h1.focus({ preventScroll:true }); }
   else {
     window.scrollTo(0, y); const el = activeId && document.getElementById(activeId);
-    if (el) el.focus({ preventScroll:true });
+    if (el) focusEl(el, { preventScroll:true });
     else if (activeId && /^now-/.test(activeId)) (main.querySelector('.now-card .nc-acts button, .now-card .bq-list button') || $('#now-h'))?.focus({ preventScroll:true });   // 누른 카드가 사라지면 다음 카드로
   }
   lastShape = dayShape();
@@ -2546,8 +2550,28 @@ function toast(msg, action){
 const go = h => { location.hash = h; };
 
 /* ---------------- 다이얼로그 ---------------- */
-function openDlg(id){ const d = $('#' + id); d.querySelectorAll('.err').forEach(e => e.hidden = true); d.querySelectorAll('[aria-invalid]').forEach(e => e.removeAttribute('aria-invalid')); d.showModal(); }
-function invalid(input, err){ input.setAttribute('aria-invalid', 'true'); $('#' + err).hidden = false; input.focus(); }
+function openDlg(id){ const d = $('#' + id); d.querySelectorAll('.err').forEach(e => e.hidden = true); d.querySelectorAll('[aria-invalid]').forEach(e => e.removeAttribute('aria-invalid')); lockScroll();
+  const h = d.querySelector('h2');   // 터치 기기는 시트 제목에 먼저 포커스 — 첫 칸이 시각·선택 박스면 iOS가 선택창부터 띄운다
+  if (h && matchMedia('(pointer:coarse)').matches){ h.tabIndex = -1; h.autofocus = true; } else if (h) h.autofocus = false;
+  d.showModal(); }
+/* 대화상자가 열린 동안 뒤 페이지가 스크롤되지 않게 — iOS 사파리는 overflow:hidden만으로는 막히지 않아 body를 고정하고 위치를 기억한다 */
+let lockY = null;
+function lockScroll(){
+  if (lockY !== null) return;
+  lockY = window.scrollY;
+  Object.assign(document.body.style, { position:'fixed', top:`-${lockY}px`, left:'0', right:'0' });
+}
+function unlockScroll(){
+  if (lockY === null || document.querySelector('dialog[open]')) return;
+  const y = lockY; lockY = null;
+  Object.assign(document.body.style, { position:'', top:'', left:'', right:'' });
+  window.scrollTo(0, y);
+}
+new MutationObserver(() => unlockScroll()).observe(document.body, { subtree:true, attributes:true, attributeFilter:['open'] });   // 닫기 버튼·ESC 어느 쪽으로 닫혀도
+/* 터치 기기에서 선택 박스·날짜·시각 칸에 포커스를 주면 선택창이 열린다(iOS). 그런 칸은 코드로 포커스하지 않는다 */
+const opensPicker = el => !!el && matchMedia('(pointer:coarse)').matches && (el.tagName === 'SELECT' || /^(date|time|datetime-local|month|week)$/.test(el.type || ''));
+function focusEl(el, opts){ if (el && !opensPicker(el)) el.focus(opts); }
+function invalid(input, err){ input.setAttribute('aria-invalid', 'true'); $('#' + err).hidden = false; focusEl(input); }
 const ACT_LABEL = { short:['무엇을 하나요', '예: 주간 보고서 쓰기'], long:['이름', '예: 체력'], routine:['무엇을 하나요', '예: 아침 스트레칭'], appt:['무엇을 하나요', '예: 민지와 점심'] };
 const ACT_ERR = { short:'무엇을 할지 적어 주세요', long:'이름을 적어 주세요', routine:'무엇을 할지 적어 주세요', appt:'무엇을 할지 적어 주세요' };
 function openAction(board, from){
@@ -2624,7 +2648,7 @@ const dayOf = date => db().dailies[date] || (db().dailies[date] = { memo:'', ret
 function openStart(){
   const f = $('#dlg-start form'), P = pset();
   $('#ds-sub').textContent = `${md2(PD)} ${wd(PD)}요일만 바꿔요. 기본 시작 ${P.day_start}은 하루 설정에서 바꿔요.`;
-  f.start.value = dayStart(PD); openDlg('dlg-start'); f.start.focus();
+  f.start.value = dayStart(PD); openDlg('dlg-start'); focusEl(f.start);
 }
 
 /* ---------------- 이벤트 ---------------- */
@@ -2703,8 +2727,8 @@ document.addEventListener('click', e => {
     }
     case 'onb-skip': pset().onboarded = true; render(); toast('건너뛰었어요. 하루 설정에서 언제든 다시 고를 수 있어요'); break;
     case 'onb-again': pset().onboarded = false; $('#dlg-day').close(); go('#/time/plan'); render(); break;
-    case 'day-add-row': { const n = $('#day-rows').children.length; $('#day-rows').insertAdjacentHTML('beforeend', dayRow({ days:'1-5', from:'12:00', to:'13:00', label:'' }, n)); $('#day-rows').lastElementChild.querySelector('select').focus(); break; }
-    case 'day-del-row': { const r = b.closest('[data-row]'), nx = r.nextElementSibling || r.previousElementSibling; r.remove(); (nx ? nx.querySelector('select') : $('#dlg-day [data-act=day-add-row]')).focus(); break; }
+    case 'day-add-row': { const n = $('#day-rows').children.length; $('#day-rows').insertAdjacentHTML('beforeend', dayRow({ days:'1-5', from:'12:00', to:'13:00', label:'' }, n)); focusEl($('#day-rows').lastElementChild.querySelector('select')); break; }
+    case 'day-del-row': { const r = b.closest('[data-row]'), nx = r.nextElementSibling || r.previousElementSibling; r.remove(); focusEl(nx ? nx.querySelector('select') : $('#dlg-day [data-act=day-add-row]')); break; }
     case 'go-waiting': S.shortTab = '기다림'; go('#/action/short'); break;
     case 'switch-profile': {
       $('#dlg-profile').close();
@@ -2714,6 +2738,14 @@ document.addEventListener('click', e => {
     case 'delete-item': deleteItem(b.dataset.kind, id); break;
     case 'inline-edit': S.inline = id; render(); { const t = document.getElementById('ie-' + id); t && t.focus(); } break;
     case 'inline-cancel': S.inline = null; render(); break;
+    case 'done-inbox': {   // 2분 안에 끝나는 일 — 바로 하고 완료한 단기로 남긴다(오늘 한 일·돌아보기에 잡히게)
+      const i = D.inbox.findIndex(x => x.id === id); if (i < 0) break;
+      const [gone] = D.inbox.splice(i, 1), lines = gone.text.split('\n');
+      const t = { id:uid('t'), title:firstLine(gone.text) || '인박스에서 바로 한 일', status:'완료', doneAt:TODAY, created:TODAY, area:'', due:'', estimate:null, todos:[], done:[''], memo:lines.slice(1).join('\n').trim(), result:'' };
+      D.tasks.push(t); render();
+      toast('완료했어요 · 오늘 한 일에 남겼어요', { label:'되돌리기', fn:() => { D.tasks = D.tasks.filter(x => x !== t); D.inbox.splice(i, 0, gone); render(); } });
+      break;
+    }
     case 'del-inbox': {
       const i = D.inbox.findIndex(x => x.id === id); const [gone] = D.inbox.splice(i, 1); S.inline = null; render();
       toast('휴지통으로 옮겼어요', { label:'되돌리기', fn:() => { D.inbox.splice(i, 0, gone); render(); } });
