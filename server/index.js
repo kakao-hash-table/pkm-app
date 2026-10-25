@@ -148,10 +148,12 @@ if (process.env.PKM_HUB_LINK && fss.existsSync(process.env.PKM_HUB_LINK)) withHu
 
 /* ---------- HTTP ---------- */
 const TYPES = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json', '.svg':'image/svg+xml', '.png':'image/png', '.webmanifest':'application/manifest+json', '.ico':'image/x-icon' };
-// AI 연결(pkm-ai-server)이 닿을 수 있는 곳 — 이 컴퓨터와 Tailscale 주소. 다른 주소에 띄웠다면 PKM_AI_CONNECT에 공백으로 더한다
+// AI 연결(pkm-ai-server)이 닿을 수 있는 곳 — 이 컴퓨터, Tailscale 주소, 그리고 이 화면을 연 호스트의 다른 포트(휴대폰에서 junhosoft:5270으로 열면 junhosoft:5280).
+// 다른 주소에 띄웠다면 PKM_AI_CONNECT에 공백으로 더한다
 const AI_CONNECT = ['http://127.0.0.1:*', 'http://localhost:*', 'https://*.ts.net', ...(process.env.PKM_AI_CONNECT || '').split(/\s+/).filter(Boolean)].join(' ');
-const SEC = { 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com ${AI_CONNECT}; frame-ancestors 'none'` };
-const send = (res, code, body, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'content-type':type, 'cache-control':'no-store', ...SEC }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
+const sameHost = req => { const h = String(req.headers.host || '').replace(/:\d+$/, ''); return /^[a-z0-9.-]+$/i.test(h) ? ` http://${h}:* https://${h}:*` : ''; };
+const SEC = req => ({ 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com ${AI_CONNECT}${sameHost(req)}; frame-ancestors 'none'` });
+const send = (res, code, body, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'content-type':type, 'cache-control':'no-store', ...SEC(res.req) }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
 async function body(req){ let s = ''; for await (const c of req){ s += c; if (s.length > 20e6) throw Object.assign(new Error('너무 커요'), { status:413 }); } return s ? JSON.parse(s) : {}; }
 
 async function api(req, res, url){
