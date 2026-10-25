@@ -61,3 +61,12 @@ test('하루 여러 번 도는 루틴은 회차별로 체크·건너뛰기가 �
   assert.deepEqual(back.routineDone['2026-10-26'], { 'R1@10:00':true, 'R1@12:00':true, R2:true });
   assert.deepEqual(back.dailies['2026-10-26'].skipped, ['R1@14:00']);
 });
+
+test('메뉴 순서와 숨김이 왕복하고, 적힌 적 없으면 쓰지 않는다', () => {
+  const plain = MD.serialize({ db: MD.emptyDb(), settings });
+  assert.doesNotMatch(plain['_설정.md'], /menu_/);
+  const files = MD.serialize({ db: MD.emptyDb(), settings: { ...settings, menu_order: ['time', 'now', 'action'], menu_hidden: ['knowledge'] } });
+  const back = MD.parse(files).settings;
+  assert.deepEqual(back.menu_order, ['time', 'now', 'action']);
+  assert.deepEqual(back.menu_hidden, ['knowledge']);
+});

@@ -207,6 +207,14 @@ a.row:hover{background:var(--fill)}
 .empty .btn{margin-top:20px}
 .empty .smile{margin-top:12px;color:var(--text-3);font-size:.875rem}
 
+.menu-edit{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.menu-edit li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 4px 14px;background:var(--surface-2);border-radius:var(--r-md)}
+.menu-edit .check{flex:1;min-height:48px}
+.menu-edit .check input:checked+span,.menu-edit .check span{text-decoration:none;color:var(--text)}
+.menu-edit .check input:not(:checked)+span{color:var(--text-3)}
+.mn-move{display:flex;gap:2px}
+.mn-move .btn{min-width:44px;padding:0;color:var(--text-2)}
+.menu-edit li:first-child [data-act=mn-up],.menu-edit li:last-child [data-act=mn-down]{visibility:hidden}
 .inbox-acts{flex:1 1 100%;flex-wrap:wrap;align-items:center;gap:4px 8px}
 .inbox-acts>.faint{margin-right:auto}
 .ia-btns{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;margin-left:auto}
@@ -671,12 +679,26 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
     <div><h2 id="pf-title">프로필</h2><p class="faint" style="margin:4px 0 0">프로필마다 데이터가 따로 있어요. Obsidian 볼트 하나가 프로필 하나예요.</p></div>
     <ul class="profile-list" id="pf-list"></ul>
     <p class="faint" style="margin:0">지금 프로필의 데이터 위치 <button class="btn btn-text btn-sm" type="button" data-act="storage" style="padding:0 6px">저장 위치 바꾸기</button></p>
+    <p class="faint" style="margin:-12px 0 0">메뉴 순서와 보이는 메뉴 <button class="btn btn-text btn-sm" type="button" data-act="menu-edit" aria-haspopup="dialog" style="padding:0 6px">메뉴 편집하기</button></p>
     <p class="faint" style="margin:-12px 0 0"><span class="ai-line-t">AI 연결 안 됨</span> <button class="btn btn-text btn-sm" type="button" data-act="ai" data-ai-open aria-haspopup="dialog" style="padding:0 6px">AI 연결하기</button></p>
     <label class="field"><span>새 프로필 이름</span><input name="name" id="pf-name" autocomplete="off" placeholder="예: 사이드 프로젝트" aria-describedby="pf-err"></label>
     <p class="err" id="pf-err" hidden></p>
     <div class="dlg-actions">
       <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
       <button class="btn btn-ghost" type="submit">프로필 추가하기</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 메뉴 편집 -->
+<dialog id="dlg-menu" aria-labelledby="mn-title">
+  <form data-form="menu" novalidate>
+    <div><h2 id="mn-title">메뉴 편집</h2><p class="faint" id="mn-sub" style="margin:4px 0 0"></p></div>
+    <ol class="menu-edit" id="mn-list" aria-label="메뉴 순서"></ol>
+    <p class="err" id="mn-err" hidden>메뉴를 하나 이상 보이게 해 주세요</p>
+    <div class="dlg-actions">
+      <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
+      <button class="btn btn-primary" type="submit">저장하기</button>
     </div>
   </form>
 </dialog>
@@ -2479,14 +2501,33 @@ const ICONS = {
   action:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>'
 };
 const NAV = [['now','지금','#/now'],['inbox','인박스','#/inbox'],['knowledge','지식','#/knowledge/ref'],['time','시간','#/time/plan'],['action','행동','#/action/short']];
+/* 메뉴 순서·숨김은 프로필 설정(_설정.md의 menu_order·menu_hidden). 적힌 순서에 없는 메뉴는 뒤에 붙는다 */
+function menuItems(){
+  const P = PSET[S.profile] || {}, order = (P.menu_order || []).filter(k => NAV.some(n => n[0] === k));
+  const all = [...order, ...NAV.map(n => n[0]).filter(k => !order.includes(k))], hidden = new Set(P.menu_hidden || []);
+  return all.map(k => ({ k, n:NAV.find(n => n[0] === k), shown:!hidden.has(k) }));
+}
+const homeHash = () => (menuItems().find(m => m.shown) || { n:NAV[0] }).n[2];
+let navSig = '';
 function buildNav(){
+  const items = menuItems().filter(m => m.shown), sig = items.map(m => m.k).join();
+  if (sig === navSig && $('#nav-side').children.length) return;
+  navSig = sig;
   const svg = k => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
-  $('#nav-side').innerHTML = NAV.map(([k, l, h]) => `<li><a href="${h}" data-nav="${k}">${svg(k)}${l}</a></li>`).join('');
-  $('#nav-tab').innerHTML = NAV.map(([k, l, h]) => `<li><a href="${h}" data-nav="${k}">${svg(k)}${l}</a></li>`).join('');
+  const html = items.map(({ k, n:[, l, h] }) => `<li><a href="${h}" data-nav="${k}">${svg(k)}${l}</a></li>`).join('');
+  $('#nav-side').innerHTML = html; $('#nav-tab').innerHTML = html;
+}
+function openMenuEdit(){
+  const chev = d => `<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d ? 'm6 9 6 6 6-6' : 'm18 15-6-6-6 6'}"/></svg>`;
+  $('#mn-sub').textContent = `${S.profile} 프로필에서 체크한 메뉴만 보여요. 숨긴 메뉴도 데이터는 그대로예요.`;
+  $('#mn-list').innerHTML = menuItems().map(({ k, n:[, l], shown }) => `<li data-key="${k}">
+    <label class="check"><input type="checkbox" name="show" value="${k}" ${shown ? 'checked' : ''}><span>${l}</span></label>
+    <span class="mn-move"><button class="btn btn-text btn-sm" type="button" data-act="mn-up" aria-label="${l} 위로">${chev(false)}</button><button class="btn btn-text btn-sm" type="button" data-act="mn-down" aria-label="${l} 아래로">${chev(true)}</button></span></li>`).join('');
+  openDlg('dlg-menu'); focusEl($('#mn-list input'));
 }
 
 /* ---------------- 렌더 ---------------- */
-function parse(){ const h = location.hash.replace(/^#\/?/, '') || 'now', p = h.split('/').map(decodeURIComponent); if (p[0] === 'today') p[0] = 'now'; return p; }   // 옛 주소 #/today는 지금으로
+function parse(){ const h = location.hash.replace(/^#\/?/, '') || homeHash().replace(/^#\//, ''), p = h.split('/').map(decodeURIComponent); if (p[0] === 'today') p[0] = 'now'; return p; }   // 옛 주소 #/today는 지금으로
 const EDIT_KIND = { 'knowledge/ref':'refs', 'knowledge/perm':'perms', 'knowledge/ctx':'ctxs', 'time/daily':'dailies', 'time/meeting':'meetings', 'action/short':'tasks', 'action/long':'longs', 'action/routine':'routines', 'action/appt':'appts' };
 function route(p){
   if (p[3] === 'edit'){ const ek = EDIT_KIND[p[0] + '/' + p[1]] || (p[0] === 'time' && p[1] !== 'daily' ? 'meetings' : null); if (ek) return vEdit(ek, p[2]); }
@@ -2507,7 +2548,7 @@ function route(p){
 }
 let lastHash = null;
 function render(){
-  const main = $('#main'); const p = parse();
+  buildNav(); const main = $('#main'); const p = parse();
   const sec = p[0] === 'refine' ? 'knowledge' : p[0];
   document.querySelectorAll('[data-nav]').forEach(a => a.dataset.nav === sec ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
   const navChanged = lastHash !== location.hash; lastHash = location.hash;
@@ -2738,6 +2779,15 @@ document.addEventListener('click', e => {
     case 'delete-item': deleteItem(b.dataset.kind, id); break;
     case 'inline-edit': S.inline = id; render(); { const t = document.getElementById('ie-' + id); t && t.focus(); } break;
     case 'inline-cancel': S.inline = null; render(); break;
+    case 'menu-edit': $('#dlg-profile').close(); openMenuEdit(); break;
+    case 'mn-up': case 'mn-down': {   // 다시 그리지 않고 줄만 옮긴다 — 누른 버튼에 포커스가 남게
+      const li = b.closest('li'), to = b.dataset.act === 'mn-up' ? li.previousElementSibling : li.nextElementSibling;
+      if (!to) break;
+      b.dataset.act === 'mn-up' ? to.before(li) : to.after(li);
+      const other = li.querySelector(`[data-act=${b.dataset.act === 'mn-up' ? 'mn-down' : 'mn-up'}]`);
+      (getComputedStyle(b).visibility === 'hidden' ? other : b).focus();   // 맨 위·맨 아래로 가면 반대쪽 버튼으로
+      break;
+    }
     case 'done-inbox': {   // 2분 안에 끝나는 일 — 바로 하고 완료한 단기로 남긴다(오늘 한 일·돌아보기에 잡히게)
       const i = D.inbox.findIndex(x => x.id === id); if (i < 0) break;
       const [gone] = D.inbox.splice(i, 1), lines = gone.text.split('\n');
@@ -2921,6 +2971,12 @@ document.addEventListener('submit', e => {
       if (moved) moveInPlan(f.dataset.id, f.dataset.block, to);
       render(); toast(moved ? `${to} 블록으로 옮겼어요` : `이 블록에서 ${fmtMin(e.min)} 하기로 했어요`, { label:'되돌리기', fn:undo });
     }
+  } else if (kind === 'menu'){
+    const order = [...f.querySelectorAll('#mn-list li')].map(li => li.dataset.key), hidden = order.filter(k => !f.querySelector(`input[value="${k}"]`).checked);
+    if (hidden.length === order.length){ $('#mn-err').hidden = false; return; }
+    const P = pset(), prev = { order:P.menu_order || [], hidden:P.menu_hidden || [] };
+    P.menu_order = order; P.menu_hidden = hidden; f.closest('dialog').close(); render();
+    toast(hidden.length ? `메뉴를 바꿨어요 · ${hidden.length}개 숨김` : '메뉴 순서를 바꿨어요', { label:'되돌리기', fn:() => { P.menu_order = prev.order; P.menu_hidden = prev.hidden; render(); } });
   } else if (kind === 'daystart'){
     const v = f.start.value, P = pset();
     if (!v || v >= P.day_end){ $('#ds-err').textContent = !v ? '시작 시각을 정해 주세요' : `하루 끝(${P.day_end})보다 앞으로 정해 주세요`; return invalid(f.start, 'ds-err'); }

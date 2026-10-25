@@ -228,7 +228,8 @@
       week_start:S.week_start ?? 1, day_start:S.day_start || '09:00', day_end:S.day_end || '18:00',
       blocked:(S.blocked || []).map(b => ({ days:b.days, from:b.from, to:b.to, label:b.label || '' })),
       fill_ratio:S.fill_ratio ?? 0.75, max_block:S.max_block ?? 120, default_block:S.default_block ?? 60,
-      gcal_account:S.gcal_account || null, gcal_task_blocks:!!S.gcal_task_blocks, onboarded:S.onboarded !== false
+      gcal_account:S.gcal_account || null, gcal_task_blocks:!!S.gcal_task_blocks, onboarded:S.onboarded !== false,
+      menu_order:S.menu_order && S.menu_order.length ? S.menu_order : undefined, menu_hidden:S.menu_hidden && S.menu_hidden.length ? S.menu_hidden : undefined
     };
     return writeDoc(fm, []);
   }
@@ -251,7 +252,8 @@
         blocked:(s.blocked || []).filter(b => b && typeof b === 'object').map(b => ({ days:String(b.days ?? '*'), from:String(b.from), to:String(b.to), label:b.label || '' })),
         fill_ratio:s.fill_ratio ?? 0.75, max_block:s.max_block ?? 120, default_block:s.default_block ?? 60,
         gcal_account:s.gcal_account || '', gcal_task_blocks:!!s.gcal_task_blocks,
-        onboarded:s.onboarded === false ? false : s.onboarded === true ? true : null   // null = 적힌 적 없음(앱이 정한다)
+        onboarded:s.onboarded === false ? false : s.onboarded === true ? true : null,   // null = 적힌 적 없음(앱이 정한다)
+        menu_order:Array.isArray(s.menu_order) ? s.menu_order.map(String) : [], menu_hidden:Array.isArray(s.menu_hidden) ? s.menu_hidden.map(String) : []
       });
       const folders = Object.assign({}, s.folders || {}); const recMap = folders.records || {}; delete folders.records;
       settings.folders = folders;
