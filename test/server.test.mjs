@@ -51,3 +51,52 @@ test('앱 템플릿이 바뀌면 프로필 복사본을 맞추고, 프로필만�
   assert.match(fs.readFileSync(path.join(tmp, '개인', '_템플릿', '단기보드.md'), 'utf8'), /estimate/);
   assert.ok(fs.existsSync(path.join(tmp, '개인', '_템플릿', '기록_요리.md')));
 });
+
+const PLUGIN = new URL('./fixtures/plugin-ok/', import.meta.url).pathname;
+test('플러그인: 로컬 폴더를 검사하고, 설치·목록·업데이트·지우기', async () => {
+  const ins = await post('/api/plugins/inspect', { local:PLUGIN });
+  assert.equal(ins.status, 200, JSON.stringify(ins.body));
+  assert.equal(ins.body.ok, true);
+  assert.equal(ins.body.manifest.id, 'deploy-loop');
+  assert.equal(ins.body.scripts[0].path, 'scripts/pr-body.mjs');
+  assert.match(ins.body.scripts[0].text, /PR body/);
+  assert.match(ins.body.scripts[0].sha256, /^[0-9a-f]{64}$/);
+  assert.ok(!fs.existsSync(path.join(tmp, '개인', '_플러그인')));   // 검사만 — 아직 설치 안 함
+  const inst = await post('/api/profile/개인/plugins', { stage:ins.body.stage });
+  assert.equal(inst.status, 201);
+  assert.ok(fs.existsSync(path.join(tmp, '개인', '_플러그인/deploy-loop/scripts/pr-body.mjs')));
+  assert.equal((await post('/api/profile/개인/plugins', { stage:ins.body.stage })).status, 404);   // 한 번 쓴 stage는 끝
+  const list = (await j('/api/profile/개인/plugins')).body.plugins;
+  assert.equal(list[0].id, 'deploy-loop'); assert.equal(list[0].source.type, 'local'); assert.deepEqual(list[0].changed, []);
+  // 설치된 스크립트가 바깥에서 바뀌면 목록에 표시
+  fs.appendFileSync(path.join(tmp, '개인', '_플러그인/deploy-loop/scripts/pr-body.mjs'), '// 바뀜\n');
+  assert.deepEqual((await j('/api/profile/개인/plugins')).body.plugins[0].changed, ['scripts/pr-body.mjs']);
+  // 다시 설치(업데이트)하면 이전 것은 휴지통으로
+  const again = await post('/api/plugins/inspect', { local:PLUGIN });
+  assert.equal((await post('/api/profile/개인/plugins', { stage:again.body.stage })).body.previous, '0.1.0');
+  assert.ok(fs.readdirSync(path.join(tmp, '개인', '.trash/_플러그인')).some(n => n.startsWith('deploy-loop-')));
+  // 플러그인 문서는 노트로 읽히지 않는다
+  assert.ok(Object.keys((await j('/api/profile/개인')).body.files).some(p => p.startsWith('_플러그인/')));
+  assert.equal((await j('/api/profile/개인/plugins/deploy-loop', { method:'DELETE' })).status, 200);
+  assert.ok(!fs.existsSync(path.join(tmp, '개인', '_플러그인/deploy-loop')));
+});
+test('플러그인: 검사를 통과하지 못하면 설치하지 않는다', async () => {
+  const bad = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-bad-'));
+  fs.cpSync(PLUGIN, bad, { recursive:true });
+  fs.writeFileSync(path.join(bad, 'scripts/evil.sh'), 'rm -rf ~');
+  const ins = await post('/api/plugins/inspect', { local:bad });
+  assert.equal(ins.body.ok, false); assert.match(ins.body.errors.join(), /evil.sh/);
+  assert.equal((await post('/api/profile/개인/plugins', { stage:ins.body.stage })).status, 400);
+  assert.equal((await post('/api/plugins/inspect', { local:'relative/path' })).status, 400);
+  assert.equal((await post('/api/plugins/inspect', { git:'file:///etc' })).status, 400);
+  fs.rmSync(bad, { recursive:true, force:true });
+});
+test('다른 사이트에서 온 쓰기 요청은 거절', async () => {
+  const r = await fetch(base + '/api/profiles', { method:'POST', headers:{ 'content-type':'application/json', origin:'https://evil.example' }, body:JSON.stringify({ name:'x' }) });
+  assert.equal(r.status, 403);
+  const r2 = await fetch(base + '/api/profiles', { method:'POST', headers:{ 'content-type':'application/json', 'sec-fetch-site':'cross-site' }, body:JSON.stringify({ name:'x' }) });
+  assert.equal(r2.status, 403);
+  // 프록시 뒤라 Host가 달라도 브라우저가 same-origin이라고 하면 받는다
+  const r3 = await fetch(base + '/api/plugins/inspect', { method:'POST', headers:{ 'content-type':'application/json', 'sec-fetch-site':'same-origin', origin:'https://mac.tail.ts.net:5270' }, body:'{}' });
+  assert.equal(r3.status, 400);
+});

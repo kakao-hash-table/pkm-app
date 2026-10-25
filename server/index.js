@@ -10,6 +10,10 @@
 // POST /api/profile/:p/save {writes, deletes}   쓰고 지운다(지운 파일은 .trash/ 로)
 // GET  /api/profile/:p/sync              git 동기화 상태
 // POST /api/profile/:p/sync              지금 동기화
+// POST /api/plugins/inspect {git, ref} | {local}   플러그인 가져와서 검사만(설치 안 함) → { stage, ok, errors, manifest, scripts… }
+// GET  /api/profile/:p/plugins            설치된 플러그인
+// POST /api/profile/:p/plugins {stage}    검사한 플러그인을 이 프로필에 설치
+// DELETE /api/profile/:p/plugins/:id      휴지통으로
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -19,6 +23,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import * as plugins from './plugins.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.PKM_DATA ? path.resolve(process.env.PKM_DATA) : path.join(ROOT, 'data');
@@ -158,6 +163,15 @@ async function body(req){ let s = ''; for await (const c of req){ s += c; if (s.
 
 async function api(req, res, url){
   const parts = url.pathname.split('/').slice(2).map(decodeURIComponent);   // ['profiles'] · ['profile', p, ...]
+  // 다른 사이트가 이 로컬 서버에 쓰기 요청을 보내지 못하게. 브라우저가 붙이는 Sec-Fetch-Site를 먼저 본다(프록시를 거쳐도 그대로라
+  // tailscale serve 뒤에서도 맞다). 없는 브라우저면 Origin과 Host를 비교한다
+  if (req.method !== 'GET'){
+    const site = req.headers['sec-fetch-site'];
+    let cross = site ? !['same-origin', 'none'].includes(site) : false;
+    if (!site && req.headers.origin){ let host = ''; try { host = new URL(req.headers.origin).host; } catch {} cross = host !== req.headers.host && host !== req.headers['x-forwarded-host']; }
+    if (cross) return send(res, 403, { error:'다른 사이트에서 온 요청이에요' });
+  }
+  if (parts[0] === 'plugins' && parts[1] === 'inspect' && req.method === 'POST') return send(res, 200, await plugins.inspect(await body(req)));
   if (parts[0] === 'profiles'){
     if (req.method === 'GET') return send(res, 200, { profiles:await listProfiles() });
     if (req.method === 'POST') return send(res, 201, await createProfile(String((await body(req)).name || '').trim()));
@@ -167,6 +181,12 @@ async function api(req, res, url){
     if (req.method === 'GET' && !sub) return send(res, 200, await readProfile(p));
     if (req.method === 'GET' && sub === 'version') return send(res, 200, { version:await versionOf(p), sync:SYNC[p] ? { state:SYNC[p].state, at:SYNC[p].at, error:SYNC[p].error } : null });
     if (req.method === 'POST' && sub === 'save') return send(res, 200, await save(p, await body(req)));
+    if (sub === 'plugins'){
+      const dir = path.join(DATA, p);
+      if (req.method === 'GET' && !parts[3]) return send(res, 200, { plugins:await plugins.list(dir) });
+      if (req.method === 'POST' && !parts[3]){ const r = await plugins.install(dir, String((await body(req)).stage || '')); if ((await settingsOf(p)).storage === 'github') scheduleSync(p); return send(res, 201, r); }
+      if (req.method === 'DELETE' && parts[3]){ const r = await plugins.remove(dir, parts[3]); if ((await settingsOf(p)).storage === 'github') scheduleSync(p); return send(res, 200, r); }
+    }
     if (sub === 'sync'){
       if (req.method === 'POST'){ const s = await syncNow(p); return send(res, 200, { state:s.state, at:s.at, error:s.error }); }
       const s = SYNC[p] || {}; return send(res, 200, { storage:(await settingsOf(p)).storage || 'device', state:s.state || 'idle', at:s.at || null, error:s.error || null });

@@ -241,7 +241,7 @@
 
   function parse(files){
     const D = emptyDb(), settings = {};
-    const docs = Object.entries(files).filter(([p]) => p.endsWith('.md') && !p.startsWith('_템플릿/') && !p.includes('/.trash/') && !p.startsWith('.trash/')).map(([p, t]) => ({ path:p, ...parseDoc(t) }));
+    const docs = Object.entries(files).filter(([p]) => p.endsWith('.md') && !p.startsWith('_템플릿/') && !p.startsWith('_플러그인/') && !p.includes('/.trash/') && !p.startsWith('.trash/')).map(([p, t]) => ({ path:p, ...parseDoc(t) }));
     // 설정 먼저
     const sdoc = docs.find(d => d.path === SETTINGS);
     if (sdoc){
