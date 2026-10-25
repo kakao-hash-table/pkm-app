@@ -10,6 +10,7 @@
 // POST /api/profile/:p/save {writes, deletes}   쓰고 지운다(지운 파일은 .trash/ 로)
 // GET  /api/profile/:p/sync              git 동기화 상태
 // POST /api/profile/:p/sync              지금 동기화
+// PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
@@ -147,7 +148,9 @@ if (process.env.PKM_HUB_LINK && fss.existsSync(process.env.PKM_HUB_LINK)) withHu
 
 /* ---------- HTTP ---------- */
 const TYPES = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json', '.svg':'image/svg+xml', '.png':'image/png', '.webmanifest':'application/manifest+json', '.ico':'image/x-icon' };
-const SEC = { 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com; frame-ancestors 'none'" };
+// AI 연결(pkm-ai-server)이 닿을 수 있는 곳 — 이 컴퓨터와 Tailscale 주소. 다른 주소에 띄웠다면 PKM_AI_CONNECT에 공백으로 더한다
+const AI_CONNECT = ['http://127.0.0.1:*', 'http://localhost:*', 'https://*.ts.net', ...(process.env.PKM_AI_CONNECT || '').split(/\s+/).filter(Boolean)].join(' ');
+const SEC = { 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com ${AI_CONNECT}; frame-ancestors 'none'` };
 const send = (res, code, body, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'content-type':type, 'cache-control':'no-store', ...SEC }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
 async function body(req){ let s = ''; for await (const c of req){ s += c; if (s.length > 20e6) throw Object.assign(new Error('너무 커요'), { status:413 }); } return s ? JSON.parse(s) : {}; }
 

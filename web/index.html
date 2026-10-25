@@ -331,6 +331,36 @@ a.row:hover{background:var(--fill)}
 .store-line{color:var(--text-3);font-size:.8125rem;max-width:100%}
 .side .store-line{white-space:normal;text-align:left;line-height:1.45;padding:6px 8px;min-height:36px}
 .topbar .store-line{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* AI 연결 — 상태 줄(사이드바)과 연결 창 */
+.ai-line{justify-content:flex-start;gap:8px;margin-top:-20px;padding:6px 8px;min-height:36px;color:var(--text-3);font-size:.8125rem;font-weight:500;white-space:normal;text-align:left;line-height:1.45}
+.ai-line::before{content:'';flex:none;width:8px;height:8px;border-radius:50%;background:var(--line-strong)}
+.ai-line[data-state="ok"]::before{background:var(--s-done)}
+.ai-line[data-state="wait"]::before{background:var(--s-review)}
+.ai-line[data-state="bad"]::before{background:var(--danger)}
+.ai-body{display:flex;flex-direction:column;gap:18px}
+.ai-body .hint{display:block;color:var(--text-3);font-size:.8125rem;font-weight:500}
+.ai-state{padding:12px 16px;border-radius:var(--r-md);background:var(--s-wait-bg)}
+.ai-state b{display:block}
+.ai-state.ok{background:var(--s-done-bg)}.ai-state.ok b{color:var(--s-done)}
+.ai-state.wait{background:var(--s-review-bg)}.ai-state.wait b{color:var(--s-review)}
+.ai-state.bad{background:var(--danger-bg)}.ai-state.bad b{color:var(--danger)}
+.ai-state .btn{margin-top:10px}
+.ai-body code{display:inline-block;max-width:100%;margin-top:4px}
+.choice label:has(input:disabled){cursor:default;background:var(--surface-2)}
+.choice label:has(input:disabled) b{color:var(--text-2)}
+.ai-warn{display:block;margin-top:2px;color:var(--s-review)!important;font-weight:600}
+.ai-sec{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:18px}
+.ai-sec>h3{font-size:1.0625rem}
+.ai-win{display:flex;flex-direction:column;gap:6px}
+.ai-win-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ai-bar{position:relative;height:8px;border-radius:999px;background:var(--fill-strong)}
+.ai-bar>i{display:block;height:100%;max-width:100%;border-radius:inherit;background:var(--primary-fill)}
+.ai-bar.hi>i{background:var(--s-review)}
+.ai-bar>b{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:var(--text)}
+.ai-test{padding:12px 16px;border-radius:var(--r-md);background:var(--surface-2)}
+.ai-test.bad{background:var(--danger-bg)}
+.ai-reply{margin-top:4px;white-space:pre-wrap;color:var(--text-2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.ai-steps{margin:8px 0;padding-left:1.25em;display:flex;flex-direction:column;gap:10px}
 .title-input{font-size:1.625rem;font-weight:700;letter-spacing:-.02em;margin:4px 0 8px}
 .onboard{margin-bottom:24px;border-radius:var(--r-lg);padding:24px 20px;background:var(--surface)}
 .onboard h2{font-size:1.1875rem;margin:0 0 10px}
@@ -531,6 +561,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
   <aside class="side" aria-label="주 메뉴">
     <button class="profile-btn" type="button" data-act="profiles" aria-haspopup="dialog"><span class="brand">pkm</span><span class="profile-name"></span><span aria-hidden="true">▾</span></button>
     <button class="btn btn-text btn-sm store-line" type="button" data-act="storage" style="justify-content:flex-start;margin-top:-16px;font-weight:500"></button>
+    <button class="btn btn-text btn-sm ai-line" type="button" data-act="ai" aria-haspopup="dialog"><span class="ai-line-t">AI 연결 안 됨</span></button>
     <button class="btn btn-tonal btn-block" type="button" data-act="capture">
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>메모하기
     </button>
@@ -636,6 +667,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
     <div><h2 id="pf-title">프로필</h2><p class="faint" style="margin:4px 0 0">프로필마다 데이터가 따로 있어요. Obsidian 볼트 하나가 프로필 하나예요.</p></div>
     <ul class="profile-list" id="pf-list"></ul>
     <p class="faint" style="margin:0">지금 프로필의 데이터 위치 <button class="btn btn-text btn-sm" type="button" data-act="storage" style="padding:0 6px">저장 위치 바꾸기</button></p>
+    <p class="faint" style="margin:-12px 0 0"><span class="ai-line-t">AI 연결 안 됨</span> <button class="btn btn-text btn-sm" type="button" data-act="ai" data-ai-open aria-haspopup="dialog" style="padding:0 6px">AI 연결하기</button></p>
     <label class="field"><span>새 프로필 이름</span><input name="name" id="pf-name" autocomplete="off" placeholder="예: 사이드 프로젝트" aria-describedby="pf-err"></label>
     <p class="err" id="pf-err" hidden></p>
     <div class="dlg-actions">
@@ -731,6 +763,16 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
       <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
       <button class="btn btn-primary" type="submit">기록 쓰기</button>
     </div>
+  </form>
+</dialog>
+
+<!-- AI 연결 — 내용은 renderAI()가 그린다 -->
+<dialog id="dlg-ai" aria-labelledby="ai-title">
+  <form data-form="ai" novalidate>
+    <div><h2 id="ai-title" tabindex="-1">AI 연결하기</h2><p class="faint" id="ai-sub" style="margin:4px 0 0"></p></div>
+    <div class="ai-body" id="ai-body"></div>
+    <p class="sr-only" id="ai-live" aria-live="polite"></p>
+    <div class="dlg-actions" id="ai-actions"></div>
   </form>
 </dialog>
 
@@ -835,6 +877,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 
 <script src="js/pkm-md.js"></script>
 <script src="js/pkm-store.js"></script>
+<script src="js/pkm-ai.js"></script>
 <input type="file" id="import-input" webkitdirectory multiple hidden>
 <script>
 (() => {
@@ -1519,6 +1562,220 @@ function openProfiles(){
   $('#pf-list').innerHTML = PLIST.map(x => x.name).map(n => `<li><button type="button" data-act="switch-profile" data-name="${esc(n)}" ${n === S.profile ? 'aria-current="true"' : ''}><span><b>${esc(n)}</b><small>${esc(storeText(n))}</small></span><span class="faint">${n === S.profile ? '지금 보는 중' : '열기'}</span></button></li>`).join('');
   openDlg('dlg-profile'); $('#pf-list [aria-current]').focus();
 }
+
+/* ---------------- AI 연결 ----------------
+   내 컴퓨터의 pkm-ai-server에 붙고(js/pkm-ai.js), 쓸 AI·모델·한도를 고른다. 연결과 설정은 이 브라우저에만 둔다(기기마다 서버 주소·토큰이 다르다).
+   고르면 바로 저장한다 — 가볍고 언제든 다시 고를 수 있는 설정이라 저장 버튼을 두지 않는다. */
+const AI = { list:null, error:null, loading:false, slow:false, busy:false, recode:false, test:null, just:false, auto:false };
+const AI_WIN = { five_hour:'5시간', seven_day:'주간' };
+const AI_EFF = { minimal:'최소', low:'낮게', medium:'보통', high:'높게', xhigh:'아주 높게', max:'최대' };
+const AI_NAME = { claude:'Claude', codex:'GPT', gemini:'Gemini' };
+const AI_LOGIN = { 'claude.ai':'Claude 계정으로 로그인', chatgpt:'ChatGPT 계정으로 로그인', google:'Google 계정으로 로그인', vertex:'Vertex AI로 로그인', api_key:'API 키로 로그인' };
+const aiUsable = p => !!p && p.enabled !== false && p.installed && p.logged_in;
+const aiCur = () => (AI.list && AI.list.find(p => p.id === PKMAI.prefs().provider)) || null;
+const aiWhen = ms => { const d = new Date(ms), hm = d.toTimeString().slice(0, 5); return ymd(d) === TODAY ? hm : `${d.getMonth() + 1}월 ${d.getDate()}일 ${hm}`; };
+const aiNum = n => Number(n || 0).toLocaleString('ko-KR');
+const aiOrigin = () => `<br>서버 컴퓨터에서 아래를 실행하고 서버를 다시 켜 주세요<br><code>node bin/pkm-ai-server.js origin add ${esc(location.origin)}</code>`;
+function aiAutoPick(){   // 고른 AI가 없으면 쓸 수 있는 첫 번째를 골라 둔다(묻지 않음)
+  if (!AI.list || AI.list.some(p => p.id === PKMAI.prefs().provider)) return;
+  const u = AI.list.find(aiUsable); if (u){ PKMAI.setPrefs({ provider:u.id, model:'default', effort:null }); AI.auto = true; }
+}
+function aiWhy(p){
+  if (p.enabled === false) return '서버 설정에서 꺼 두었어요';
+  if (!p.installed) return `${p.via}가 그 컴퓨터에 없어요. 설치하고 로그인하면 고를 수 있어요`;
+  if (!p.logged_in) return `${p.via}에 로그인돼 있지 않아요. 그 컴퓨터에서 로그인한 뒤 상태를 다시 확인해 주세요`;
+  return '';
+}
+function aiLogin(p){
+  const v = p.version ? `${p.via} ${String(p.version).replace(/\s*\(.*\)\s*$/, '')}` : p.via;
+  return [v, AI_LOGIN[p.auth_method] || '로그인됨', p.plan && `${p.plan} 요금제`].filter(Boolean).join(' · ') + (p.auth_method === 'api_key' ? ' — 요금은 그 키의 요금제를 따라요' : '');
+}
+function aiBlocked(p){
+  const b = p.blocked; if (!b) return '';
+  return b.reason === 'login' ? '로그인이 풀려 기다리는 중이에요' : `사용 한도에 걸려 기다리는 중이에요${b.until ? ` · ${aiWhen(b.until)}에 다시 시작해요` : ''}`;
+}
+function aiMore(p, pr){   // 쉬는 이유 다음에 붙일 '언제 다시 쓰나'
+  if (p.blocked) return p.blocked.reason === 'login' ? '그 컴퓨터에서 다시 로그인하면 이어서 해요' : p.blocked.until ? `${aiWhen(p.blocked.until)}에 다시 시작해요` : '풀리면 다시 시작해요';
+  const hi = pr.pause_at != null && PKMAI.windows(p).find(w => w.used != null && w.used >= pr.pause_at);
+  if (hi) return hi.resets_at ? `${AI_WIN[hi.key] || hi.key} 사용률이 ${aiWhen(hi.resets_at)}에 초기화되면 다시 써요` : '';
+  if (pr.daily_max != null && p.today && p.today.requests >= pr.daily_max) return '내일 다시 써요';
+  return '';
+}
+function aiErrHTML(){
+  const e = AI.error;
+  return `<div class="ai-state bad" role="alert"><b>${esc(e.message)}</b>${e.code === 'origin' ? aiOrigin() : ''}
+    <div>${e.code === 'token' ? '<button class="btn btn-ghost btn-sm" type="button" data-act="ai-recode">연결 코드 다시 넣기</button>' : '<button class="btn btn-ghost btn-sm" type="button" data-act="ai-retry">다시 시도하기</button>'}</div></div>`;
+}
+function aiStateHTML(p, pr){
+  if (AI.error) return aiErrHTML();
+  if (!AI.list.some(aiUsable)) return `<div class="ai-state wait"><b>쓸 수 있는 AI가 없어요</b>그 컴퓨터에서 Claude Code·Codex CLI·Gemini CLI 중 하나를 설치하고 로그인한 뒤 상태를 다시 확인해 주세요.</div>`;
+  if (!p) return '<div class="ai-state wait"><b>쓸 AI를 골라 주세요</b></div>';
+  const why = PKMAI.guard(p, pr);
+  if (why){ const more = aiMore(p, pr); return `<div class="ai-state wait"><b>${aiUsable(p) ? 'pkm이 AI를 잠시 쉬어요' : '지금은 쓸 수 없어요'}</b>${esc(why)}${more ? ` · ${esc(more)}` : ''}</div>`; }
+  const m = (p.models || []).find(x => x.id === pr.model), eff = pr.effort && (p.efforts || []).includes(pr.effort) ? AI_EFF[pr.effort] || pr.effort : '';
+  return `<div class="ai-state ok"><b>${AI.just ? '연결했어요 · ' : ''}${esc(p.label)}를 쓸 수 있어요</b>${esc([`모델 ${m ? m.label : '계정 기본값'}`, eff && `생각하는 정도 ${eff}`].filter(Boolean).join(' · '))}${AI.just && AI.auto ? '<br>쓸 수 있는 AI 중 첫 번째를 골라 뒀어요. 아래에서 바꿀 수 있어요.' : ''}</div>`;
+}
+const aiChip = (name, v, label, on) => `<label class="chip"><input type="radio" name="${name}" value="${esc(v)}" ${on ? 'checked' : ''}><span>${esc(label)}</span></label>`;
+function aiTestHTML(p){
+  const t = AI.test; if (!t) return '';
+  if (t.state === 'run') return `<p class="ai-test" role="status">${esc(p ? p.label : 'AI')}에 보내고 답을 기다리는 중이에요</p>`;
+  if (t.state === 'ok') return `<div class="ai-test" role="status"><b>답이 왔어요</b> <span class="faint num">${t.sec}초${t.model ? ` · ${esc(t.model)}` : ''}</span><p class="ai-reply">${t.text ? esc(t.text) : '빈 답이 왔어요'}</p></div>`;
+  return `<p class="ai-test bad" role="alert">${esc(t.msg)}</p>`;
+}
+function aiFormHTML(){
+  const local = ['http://127.0.0.1:5270', 'http://localhost:5270'].includes(location.origin);   // 서버가 처음부터 허용하는 주소
+  return `${AI.recode && AI.error ? `<div class="ai-state bad"><b>${esc(AI.error.message)}</b></div>` : ''}
+    <label class="field"><span>연결 코드<span class="hint">pkmai1.로 시작하는 한 줄이에요</span></span><input name="code" id="ai-code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-describedby="ai-err"></label>
+    <p class="err" id="ai-err" role="alert" hidden></p>
+    <details class="more"><summary>연결 코드는 어디서 받나요?</summary>
+      <ol class="ai-steps">
+        <li>AI를 쓸 컴퓨터에서 <a href="https://github.com/kakao-hash-table/pkm-ai-server#readme" target="_blank" rel="noopener">pkm-ai-server</a>를 받아 켜요<br><code>node bin/pkm-ai-server.js serve</code></li>
+        ${local ? '' : `<li>이 웹 주소를 허용하고 서버를 다시 켜요<br><code>node bin/pkm-ai-server.js origin add ${esc(location.origin)}</code></li>`}
+        <li>이 기기의 연결 코드를 만들어요. 휴대폰 자리에는 기기 이름을 적어요<br><code>node bin/pkm-ai-server.js token create 휴대폰</code></li>
+        <li>나온 연결 코드를 위 칸에 붙여 넣어요. 코드는 이때 한 번만 보여요</li>
+      </ol>
+      <p class="faint">휴대폰에서 쓰려면 코드를 만들기 전에 <code>url add</code>로 Tailscale 주소를 넣어 두세요.</p>
+    </details>`;
+}
+function aiMainHTML(){
+  if (!AI.list) return AI.error ? aiErrHTML() : AI.slow ? '<div class="sk" style="height:56px"></div><div class="sk" style="height:180px"></div><p class="sr-only">AI 상태를 확인하는 중이에요</p>' : '';
+  const pr = PKMAI.prefs(), p = aiCur(), W = p ? PKMAI.windows(p) : [], now = Date.now();
+  const pick = `<fieldset class="choice"><legend>쓸 AI</legend>${AI.list.map(x => {
+    const ok = aiUsable(x), bl = aiBlocked(x);
+    return `<label><input type="radio" name="provider" value="${esc(x.id)}" ${x.id === pr.provider ? 'checked' : ''} ${ok ? '' : 'disabled'}><span><b>${esc(x.label)}</b><small>${esc(ok ? aiLogin(x) : aiWhy(x))}</small>${bl ? `<small class="ai-warn">${esc(bl)}</small>` : ''}</span></label>`;
+  }).join('')}</fieldset>`;
+  if (!p) return aiStateHTML(p, pr) + pick;
+  const models = p.models || [], mv = models.some(m => m.id === pr.model) ? pr.model : 'default', effs = p.efforts || [];
+  const opts = `${models.length ? `<label class="field"><span>${esc(p.label)} 모델<span class="hint">계정 기본값은 그 컴퓨터의 ${esc(p.via)} 설정을 따라요</span></span><select name="model">${models.map(m => `<option value="${esc(m.id)}" ${m.id === mv ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}</select></label>` : ''}
+    ${effs.length ? `<fieldset class="chips"><legend class="field-label">생각하는 정도<span class="hint">높을수록 오래 생각해서 느리고 사용량을 더 써요</span></legend>${[null, ...effs].map(v => aiChip('effort', v || '', v ? AI_EFF[v] || v : '기본', (effs.includes(pr.effort) ? pr.effort : null) === v)).join('')}</fieldset>` : ''}`;
+  const wins = W.length ? W.map(w => {
+    const pct = w.used == null ? null : Math.round(w.used * 100), gone = w.resets_at && w.resets_at < now;
+    return `<div class="ai-win"><div class="ai-win-top"><span>${esc(AI_WIN[w.key] || w.key)} 사용률</span><b class="num">${pct == null ? '모름' : pct + '%'}</b></div>
+      <div class="ai-bar${pct != null && (pct >= 90 || (pr.pause_at != null && w.used >= pr.pause_at)) ? ' hi' : ''}" aria-hidden="true"><i style="width:${pct || 0}%"></i>${pr.pause_at != null ? `<b style="left:${Math.round(pr.pause_at * 100)}%"></b>` : ''}</div>
+      <span class="faint">${w.resets_at ? gone ? '초기화 시각이 지났어요. 다음 요청 때 새로 받아요' : `${aiWhen(w.resets_at)}에 초기화` : ''}</span></div>`;
+  }).join('') + (p.usage_at ? `<p class="faint">${aiWhen(p.usage_at)} 요청 때 받은 값이에요</p>` : '')
+    : '<p>아직 받은 사용률이 없어요. 이 AI로 요청을 한 번 보내면 받아 와요.</p>';
+  const t = p.today, run = AI.test && AI.test.state === 'run';
+  const usage = `<div class="ai-sec"><h3>사용량</h3>${wins}
+    <p>${t && t.requests ? `오늘 요청 <b class="num">${aiNum(t.requests)}회</b> · 토큰 <b class="num">${aiNum((t.input_tokens || 0) + (t.output_tokens || 0))}</b> <span class="faint num">(입력 ${aiNum(t.input_tokens)} · 출력 ${aiNum(t.output_tokens)})</span>` : '오늘 보낸 요청이 없어요'}</p>
+    <div class="t-acts" style="justify-content:flex-start"><button class="btn btn-ghost btn-sm" type="button" data-act="ai-refresh"${AI.loading ? ' aria-disabled="true"' : ''}>${AI.loading ? '확인하는 중…' : '상태 다시 확인'}</button><button class="btn btn-ghost btn-sm" type="button" data-act="ai-test"${run ? ' aria-disabled="true"' : ''}>${run ? '보내는 중…' : '시험 요청 보내기'}</button></div>
+    <p class="faint" style="margin-top:-6px">시험 요청은 짧은 질문 하나를 보내 답이 오는지 봐요. 사용량이 조금 들어요.</p>
+    ${aiTestHTML(p)}</div>`;
+  const pauses = [null, .5, .7, .8, .9], dailies = [null, 20, 50, 100];
+  if (pr.pause_at != null && !pauses.includes(pr.pause_at)) pauses.push(pr.pause_at);
+  if (pr.daily_max != null && !dailies.includes(pr.daily_max)) dailies.push(pr.daily_max);
+  const limits = `<div class="ai-sec"><h3>pkm이 쓸 한도</h3><p class="faint" style="margin-top:-6px">pkm이 AI를 쓰는 양만 줄여요. 내가 ${esc(p.label)}를 직접 쓰는 데는 영향이 없어요.</p>
+    <fieldset class="chips"><legend class="field-label">사용률이 이만큼 차면 쉬기${W.length ? '<span class="hint">사용량 막대에 세로선으로 보여요</span>' : ''}</legend>${pauses.map(v => aiChip('pause', v == null ? '' : v, v == null ? '쉬지 않음' : `${Math.round(v * 100)}%`, pr.pause_at === v)).join('')}</fieldset>
+    ${pr.pause_at != null && !W.some(w => w.used != null) ? '<p class="faint">아직 사용률을 몰라서, 사용률을 받은 뒤부터 이 기준이 걸려요.</p>' : ''}
+    <fieldset class="chips"><legend class="field-label">하루 요청 최대<span class="hint">이 서버로 보낸 요청을 모두 세요(다른 기기 포함)</span></legend>${dailies.map(v => aiChip('daily', v == null ? '' : v, v == null ? '제한 없음' : `${v}회`, pr.daily_max === v)).join('')}</fieldset></div>`;
+  return aiStateHTML(p, pr) + pick + opts + usage + limits + '<p class="faint">고르면 바로 저장돼요. 기기마다 서버 주소와 토큰이 달라서 이 브라우저에만 둬요.</p>';
+}
+function renderAI(){
+  const d = $('#dlg-ai'), c = PKMAI.conn(), form = !c || AI.recode, a = document.activeElement;
+  const key = a && a !== d && d.contains(a) ? a.name ? `[name="${a.name}"]${a.type === 'radio' ? `[value="${CSS.escape(a.value)}"]` : ''}` : a.dataset.act ? `[data-act="${a.dataset.act}"]` : a.id ? '#' + a.id : null : null;
+  $('#ai-title').textContent = !c ? 'AI 연결하기' : AI.recode ? '연결 코드 다시 넣기' : 'AI 연결';
+  $('#ai-sub').innerHTML = !c ? '내 컴퓨터에 띄운 pkm-ai-server에 연결하면, 그 컴퓨터에 로그인해 둔 Claude·GPT·Gemini를 pkm이 쓸 수 있어요.' : `연결한 서버 <span class="num">${esc(c.url)}</span>`;
+  $('#ai-body').innerHTML = form ? aiFormHTML() : aiMainHTML();
+  $('#ai-actions').innerHTML = form ? '<button class="btn btn-text" type="button" data-act="close-dlg">닫기</button><button class="btn btn-primary" type="submit" id="ai-submit">연결하기</button>'
+    : '<button class="btn btn-text btn-danger" type="button" data-act="ai-off" style="margin-right:auto">연결 끊기</button><button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>';
+  if (key){ const n = d.querySelector(key); (n && !n.disabled ? n : $('#ai-title')).focus({ preventScroll:true }); }
+}
+function aiSay(t){ const l = $('#ai-live'); l.textContent = ''; setTimeout(() => { l.textContent = t; }, 60); }
+function syncAiLine(){
+  const c = PKMAI.conn(), id = PKMAI.prefs().provider, p = aiCur();
+  let t, st;
+  if (!c){ t = 'AI 연결 안 됨'; st = 'off'; }
+  else if (AI.error){ t = AI.error.code === 'token' ? 'AI · 연결 코드를 다시 넣어 주세요' : AI.error.code === 'origin' ? 'AI · 이 웹 주소를 허용해 주세요' : 'AI · 서버에 닿지 않음'; st = 'bad'; }
+  else if (!id){ t = 'AI · 쓸 AI를 골라 주세요'; st = 'wait'; }
+  else { const why = p && PKMAI.guard(p); t = `AI · ${(p && p.label) || AI_NAME[id] || id} ${why ? '쉬는 중' : '연결됨'}`; st = why ? 'wait' : 'ok'; }
+  document.querySelectorAll('.ai-line-t').forEach(x => { x.textContent = t; });
+  document.querySelectorAll('.ai-line').forEach(x => { x.dataset.state = st; });
+  document.querySelectorAll('[data-ai-open]').forEach(x => { x.textContent = c ? 'AI 설정 바꾸기' : 'AI 연결하기'; });
+}
+async function loadAI(refresh){
+  if (AI.loading) return;
+  AI.loading = true; AI.slow = false;
+  const slow = setTimeout(() => { AI.slow = true; if ($('#dlg-ai').open) renderAI(); }, 400);   // 400ms 안에 오면 아무것도 깜빡이지 않게
+  if (AI.list && $('#dlg-ai').open) renderAI();
+  try { AI.list = await PKMAI.providers(refresh); AI.error = null; }
+  catch (e) { AI.error = e; }
+  clearTimeout(slow); AI.loading = false; AI.slow = false;
+  aiAutoPick();
+  if ($('#dlg-ai').open) renderAI();
+  syncAiLine();
+}
+function openAI(){
+  Object.assign(AI, { recode:false, test:null, just:false, auto:false });
+  if (!PKMAI.conn()){ AI.list = null; AI.error = null; }
+  renderAI(); openDlg('dlg-ai');
+  if (PKMAI.conn()){ $('#ai-title').focus(); loadAI(false); } else $('#ai-code').focus();
+}
+async function aiTest(){
+  const p = aiCur();
+  if (AI.test && AI.test.state === 'run') return;
+  if (!p || !aiUsable(p) || p.blocked){ AI.test = { state:'err', msg:!p ? '먼저 쓸 AI를 골라 주세요' : p.blocked ? `${aiBlocked(p)}. 그동안은 시험 요청을 보낼 수 없어요` : aiWhy(p) }; renderAI(); return; }
+  AI.test = { state:'run' }; renderAI();
+  const t0 = Date.now(), ac = new AbortController(), tm = setTimeout(() => ac.abort(), 90000);
+  let text = '', waited = false;
+  try {
+    const job = await PKMAI.run({ prompt:'연결 확인이에요. "연결됐어요"라고만 답해 주세요.', tag:'pkm-test', force:true, signal:ac.signal,
+      onText:x => { text += x; }, onStatus:j => { if (j.status === 'waiting'){ waited = true; ac.abort(); } } });   // 내가 정한 한도는 건너뛰고(직접 누른 시험), 서버가 막으면 기다리지 않는다
+    AI.test = job.status === 'done' ? { state:'ok', text:String((job.result && job.result.text) || text).trim(), sec:Math.max(1, Math.round((Date.now() - t0) / 1000)), model:job.result && job.result.model } : { state:'err', msg:job.error || '답을 받지 못했어요' };
+  } catch (e) {
+    AI.test = { state:'err', msg:e.name === 'AbortError' ? waited ? '서버가 한도나 로그인 문제로 요청을 멈췄어요. 위 상태를 확인해 주세요' : '90초 안에 답이 오지 않아 그만뒀어요' : e.message };
+  }
+  clearTimeout(tm);
+  await loadAI(true);   // 사용률·오늘 요청이 바뀌었다
+  aiSay(AI.test.state === 'ok' ? '답이 왔어요' : AI.test.msg);
+}
+function aiOff(){
+  let keep = null; try { keep = localStorage.getItem('pkm:v1:ai'); } catch (e) {}   // 되돌리기용 — js/pkm-ai.js가 쓰는 키
+  PKMAI.disconnect(); AI.list = null; AI.error = null; $('#dlg-ai').close(); syncAiLine();
+  toast('AI 연결을 끊었어요. 토큰은 이 브라우저에서 지웠어요', keep && { label:'되돌리기', fn:() => { try { localStorage.setItem('pkm:v1:ai', keep); } catch (e) {} syncAiLine(); } });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-act^="ai"]'); if (!b) return;
+  switch (b.dataset.act){
+    case 'ai': $('#dlg-profile').close(); openAI(); break;
+    case 'ai-refresh': case 'ai-retry': loadAI(true); break;
+    case 'ai-test': aiTest(); break;
+    case 'ai-recode': AI.recode = true; renderAI(); $('#ai-code').focus(); break;
+    case 'ai-off': aiOff(); break;
+  }
+});
+document.addEventListener('change', e => {
+  const el = e.target, n = el.name, v = el.value; if (!el.closest || !el.closest('#dlg-ai')) return;
+  if (n === 'provider') PKMAI.setPrefs({ provider:v, model:'default', effort:null });
+  else if (n === 'model') PKMAI.setPrefs({ model:v });
+  else if (n === 'effort') PKMAI.setPrefs({ effort:v || null });
+  else if (n === 'pause') PKMAI.setPrefs({ pause_at:v === '' ? null : +v });
+  else if (n === 'daily') PKMAI.setPrefs({ daily_max:v === '' ? null : +v });
+  else return;
+  AI.just = false; if (n === 'provider') AI.test = null;
+  renderAI(); syncAiLine();
+  const st = $('#ai-body .ai-state'); aiSay(`저장했어요. ${st ? st.innerText.replace(/\s*\n\s*/g, ' ').trim() : ''}`);
+});
+document.addEventListener('submit', async e => {
+  const f = e.target; if (f.dataset.form !== 'ai') return;
+  e.preventDefault();
+  if (!f.elements.code || AI.busy) return;
+  const v = f.elements.code.value.trim(), er = $('#ai-err'), bt = $('#ai-submit');
+  er.hidden = true; f.elements.code.removeAttribute('aria-invalid');
+  try { PKMAI.parseCode(v); } catch (err) { er.textContent = err.message; return invalid(f.elements.code, 'ai-err'); }
+  AI.busy = true; bt.textContent = '연결하는 중…'; bt.setAttribute('aria-disabled', 'true');
+  try {
+    const r = await PKMAI.connect(v);
+    Object.assign(AI, { list:r.providers, error:null, recode:false, just:true, auto:false, test:null });
+    aiAutoPick(); renderAI(); syncAiLine(); $('#ai-title').focus();
+    const st = $('#ai-body .ai-state'); aiSay(st ? st.innerText.replace(/\s*\n\s*/g, ' ').trim() : '연결했어요');
+  } catch (err) {
+    er.innerHTML = esc(err.message) + (err.code === 'origin' ? aiOrigin() : '');
+    if (err.code === 'token') invalid(f.elements.code, 'ai-err'); else { er.hidden = false; f.elements.code.focus(); }
+  } finally {
+    AI.busy = false; if (bt.isConnected){ bt.textContent = '연결하기'; bt.removeAttribute('aria-disabled'); }
+  }
+});
+syncAiLine();
 
 /* 예상 시간은 눌러서 고른다(숫자 입력 없이) */
 const EST_CHIPS = [30, 60, 90, 120];
