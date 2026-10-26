@@ -40,6 +40,16 @@ test('위험한 경로는 막는다', async () => {
   assert.equal((await j('/api/profile/없음')).status, 404);
   const r = await fetch(base + '/../../etc/passwd'); assert.equal(r.status, 404);
 });
+test('읽기전용 노트(교과서 폴더·readonly: true)는 쓰지도 지우지도 않는다', async () => {
+  const dir = path.join(tmp, '개인', '01_지식', '교과서', '책'); fs.mkdirSync(dir, { recursive:true });
+  fs.writeFileSync(path.join(dir, '노트.md'), '---\ntype: textbook\nreadonly: true\n---\n\n원본\n');
+  fs.writeFileSync(path.join(tmp, '개인', '밖에 둔 원본.md'), '---\ntype: textbook\nreadonly: true   # 고치지 않음\n---\n\n원본\n');
+  for (const ch of [{ writes:{ '01_지식/교과서/책/노트.md':'바꿈' } }, { writes:{ '01_지식/교과서/책/새 노트.md':'새로' } }, { deletes:['01_지식/교과서/책/노트.md'] }, { writes:{ '밖에 둔 원본.md':'바꿈' } }, { writes:{ '00_인박스/같이.md':'x' }, deletes:['밖에 둔 원본.md'] }])
+    assert.equal((await post('/api/profile/개인/save', ch)).status, 403, JSON.stringify(ch));
+  assert.match(fs.readFileSync(path.join(dir, '노트.md'), 'utf8'), /원본/);
+  assert.ok(fs.existsSync(path.join(tmp, '개인', '밖에 둔 원본.md')));
+  assert.ok(!fs.existsSync(path.join(tmp, '개인', '00_인박스', '같이.md')), '하나라도 읽기전용이면 아무것도 쓰지 않는다');
+});
 test('화면 파일을 내보낸다', async () => {
   const r = await fetch(base + '/js/pkm-md.js'); assert.equal(r.status, 200); assert.match(r.headers.get('content-type'), /javascript/);
 });
@@ -99,4 +109,16 @@ test('다른 사이트에서 온 쓰기 요청은 거절', async () => {
   // 프록시 뒤라 Host가 달라도 브라우저가 same-origin이라고 하면 받는다
   const r3 = await fetch(base + '/api/plugins/inspect', { method:'POST', headers:{ 'content-type':'application/json', 'sec-fetch-site':'same-origin', origin:'https://mac.tail.ts.net:5270' }, body:'{}' });
   assert.equal(r3.status, 400);
+});
+
+test('교과서 원본을 고치면 서버가 다시 복제한다', async () => {
+  const { syncTextbooks } = await import('../server/index.js');
+  const { importBook } = await import('../server/textbook.js');
+  const src = path.join(tmp, '..', path.basename(tmp) + '-vault', '책');
+  fs.mkdirSync(src, { recursive:true }); fs.writeFileSync(path.join(src, '노트.md'), '# 노트\n처음\n');
+  importBook(src, path.join(tmp, '개인'));
+  fs.writeFileSync(path.join(src, '노트.md'), '# 노트\n고침\n');
+  await syncTextbooks();
+  assert.match(fs.readFileSync(path.join(tmp, '개인', '01_지식/교과서/책/노트.md'), 'utf8'), /고침/);
+  fs.rmSync(path.dirname(src), { recursive:true, force:true });
 });

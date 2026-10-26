@@ -70,3 +70,39 @@ test('메뉴 순서와 숨김이 왕복하고, 적힌 적 없으면 쓰지 않�
   assert.deepEqual(back.menu_order, ['time', 'now', 'action']);
   assert.deepEqual(back.menu_hidden, ['knowledge']);
 });
+
+test('교과서는 읽기전용 — 읽기만 하고 쓰지 않으며, 영구노트 출처로 이어진다', () => {
+  const tb = '01_지식/교과서/PKM 교과서';
+  const files = {
+    [`${tb}/00_MOC — PKM 교과서.md`]: '---\ntype: textbook\nid: Bmoc\nbook: PKM 교과서\nkind: moc\norder: 0\nreadonly: true\n---\n\n1. [[연결이 지식을 만든다]]\n',
+    [`${tb}/01 기초/연결이 지식을 만든다.md`]: '---\ntype: textbook\nid: Bn1\nbook: PKM 교과서\nkind: note\nchapter: 01 기초\norder: 1\nreadonly: true\n---\n\n# 내용\n본문\n',
+    [`${tb}/01 기초/프런트매터 없는 노트.md`]: '# 프런트매터 없는 노트\n본문\n',
+    '01_지식/영구노트/내 생각.md': '---\ntype: permanent\nid: P1\ntitle: 내 생각\ncreated: 2026-10-26\nlinks: []\nsources: ["[[연결이 지식을 만든다]]"]\n---\n\n내 말로\n'
+  };
+  const { db } = MD.parse(files);
+  assert.equal(db.textbooks.length, 3);
+  const n1 = db.textbooks.find(x => x.id === 'Bn1');
+  assert.deepEqual([n1.book, n1.kind, n1.chapter, n1.order, n1.path], ['PKM 교과서', 'note', '01 기초', 1, `${tb}/01 기초/연결이 지식을 만든다.md`]);
+  const loose = db.textbooks.find(x => x.title === '프런트매터 없는 노트');   // 교과서 폴더 안이면 type이 없어도 교과서
+  assert.equal(loose.book, 'PKM 교과서'); assert.match(loose.id, /^B[0-9a-z]+$/);
+  assert.deepEqual(db.perms[0].sources, ['Bn1']);
+  const out = MD.serialize({ db, settings });
+  assert.ok(!Object.keys(out).some(p => p.startsWith('01_지식/교과서/')), '교과서 파일을 쓰지 않는다');
+  assert.match(out['01_지식/영구노트/내 생각.md'], /sources: \["\[\[연결이 지식을 만든다\]\]"\]/);
+  const ch = MD.diff(MD.serialize({ db, settings }), out);   // 앱의 저장 = 정규화한 마지막 저장본과의 차이
+  assert.ok(!ch.deletes.some(p => p.startsWith('01_지식/교과서/')));
+});
+
+test('교과서 카드는 노트별 카드 묶음으로 읽고, 원본이 바뀌면 알 수 있다', () => {
+  const tb = '01_지식/교과서/PKM 교과서', note = '---\ntype: textbook\nid: Bn1\nbook: PKM 교과서\nkind: note\nreadonly: true\n---\n\n# 내용\n본문\n';
+  const card = '---\ntype: cards\nid: Cn1\ntitle: 연결이 지식을 만든다\nbook: PKM 교과서\nfrom: Bn1\nfrom_hash: HASH\nreadonly: true\n---\n\n## 연결이 지식을 만든다\n노트는 이어질 때 쓸모가 생긴다.\n\n## 링크는 이유와 함께 단다\n> [!question] 링크를 달 때 무엇을 같이 적나?\n\n왜 이어지는지 한 줄 적는다.\n';
+  const files = { [`${tb}/연결이 지식을 만든다.md`]: note, '01_지식/교과서 카드/PKM 교과서/연결이 지식을 만든다.md': card };
+  let { db } = MD.parse(files);
+  const n1 = db.textbooks[0], c = db.tbCards[0];
+  assert.deepEqual([c.from, c.cards.length, c.cards[1].title, c.cards[1].q, c.cards[1].body], ['Bn1', 2, '링크는 이유와 함께 단다', '링크를 달 때 무엇을 같이 적나?', '왜 이어지는지 한 줄 적는다.']);
+  assert.notEqual(c.fromHash, MD.textHash(n1.body));
+  files['01_지식/교과서 카드/PKM 교과서/연결이 지식을 만든다.md'] = card.replace('HASH', MD.textHash(n1.body));
+  ({ db } = MD.parse(files));
+  assert.equal(db.tbCards[0].fromHash, MD.textHash(db.textbooks[0].body), '같은 본문이면 같은 해시');
+  assert.ok(!Object.keys(MD.serialize({ db, settings })).some(p => p.startsWith('01_지식/교과서 카드/')), '카드 파일을 쓰지 않는다');
+});

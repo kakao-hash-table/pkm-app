@@ -24,6 +24,7 @@ import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
+import * as textbook from './textbook.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.PKM_DATA ? path.resolve(process.env.PKM_DATA) : path.join(ROOT, 'data');
@@ -73,8 +74,21 @@ async function versionOf(p){
 async function settingsOf(p){
   try { return MD.parseDoc(await fs.readFile(path.join(DATA, p, MD.SETTINGS), 'utf8')).fm || {}; } catch { return {}; }
 }
+// 읽기전용 노트(교과서 폴더 · 프런트매터 readonly: true)는 앱이 쓰거나 지우지 않는다 — 하나라도 있으면 아무것도 쓰기 전에 거절
+async function readonlyIn(p, rels){
+  const F = (await settingsOf(p)).folders || {}, tb = F.textbook || MD.DEFAULT_FOLDERS.textbook, cards = F.cards || MD.DEFAULT_FOLDERS.cards;
+  for (const rel of rels){
+    if (rel.startsWith(tb + '/') || rel.startsWith(cards + '/')) return rel;
+    const abs = inProfile(p, rel); if (!abs || !fss.existsSync(abs)) continue;
+    const head = (await fs.readFile(abs, 'utf8')).slice(0, 2000).match(/^---\n([\s\S]*?)\n---/);
+    if (head && /^readonly:\s*true\s*(#.*)?$/m.test(head[1])) return rel;
+  }
+  return null;
+}
 async function save(p, { writes = {}, deletes = [] }){
   const dir = path.join(DATA, p);
+  const ro = await readonlyIn(p, [...Object.keys(writes), ...deletes]);
+  if (ro) throw Object.assign(new Error(`읽기전용 노트라 앱에서 고칠 수 없어요: ${ro}`), { status:403 });
   for (const [rel, text] of Object.entries(writes)){
     const abs = inProfile(p, rel); if (!abs) throw Object.assign(new Error(`쓸 수 없는 경로: ${rel}`), { status:400 });
     await fs.mkdir(path.dirname(abs), { recursive:true });
@@ -145,6 +159,39 @@ async function syncNow(p){
 setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다
   for (const pr of await listProfiles()) if (pr.storage === 'github' && !(SYNC[pr.name] || {}).running) syncNow(pr.name).catch(() => {});
 }, 120000).unref();
+
+/* ---------- 교과서: 원본(Obsidian)이 정본, 바뀌면 다시 복제 ---------- */
+// 책 폴더의 .source.json 이 가리키는 원본을 지켜본다. 놓친 변경은 5분마다 한 번 더 맞춘다.
+const TB = {};   // 원본 경로 → { watcher, timer, profile, tbFolder }
+const tbFolderOf = async p => ((await settingsOf(p)).folders || {}).textbook || MD.DEFAULT_FOLDERS.textbook;
+async function syncTextbook(p, src, tbFolder, vault){
+  const r = textbook.importBook(src, path.join(DATA, p), { tbFolder, vault });
+  const n = r.added.length + r.changed.length + r.removed.length;
+  if (n){
+    console.log(`${p}: 교과서 「${r.book}」 원본에서 새 노트 ${r.added.length} · 바뀜 ${r.changed.length} · 사라짐 ${r.removed.length}`);
+    if ((await settingsOf(p)).storage === 'github') scheduleSync(p);
+  }
+  return r;
+}
+async function syncTextbooks(){
+  for (const { name:p } of await listProfiles()){
+    const tbFolder = await tbFolderOf(p);
+    for (const b of textbook.linkedBooks(path.join(DATA, p), tbFolder)){
+      try { await syncTextbook(p, b.src, tbFolder, b.vault); } catch (e) { console.error(`${p}: 교과서 복제 실패 ${b.src}: ${e.message}`); }
+      if (TB[b.src] || !fss.existsSync(b.src)) continue;
+      const w = TB[b.src] = { profile:p };
+      try {
+        w.watcher = fss.watch(b.src, { recursive:true }, (ev, name) => {
+          if (name && String(name).split('/').some(s => s.startsWith('.'))) return;
+          clearTimeout(w.timer);   // 저장 한 번에 이벤트가 여러 번 온다 — 잠잠해지면 한 번만
+          w.timer = setTimeout(() => syncTextbook(p, b.src, tbFolder, b.vault).catch(e => console.error(`${p}: 교과서 복제 실패 ${b.src}: ${e.message}`)), 1500);
+        });
+        w.watcher.unref();   // 지켜보는 것만으로 서버가 끝나지 못하게 붙잡지 않는다
+        w.watcher.on('error', () => { w.watcher.close(); delete TB[b.src]; });   // 원본 폴더가 옮겨졌으면 다음 차례에 다시 찾는다
+      } catch { delete TB[b.src]; }
+    }
+  }
+}
 
 /* ---------- (선택) 허브로 돌아가는 줄 ---------- */
 // PKM_HUB_LINK 에 withHubLink(html, req) 를 내보내는 모듈 경로를 주면, 여러 사이트를 모아 보는 허브로 돌아가는 줄을 맨 위에 붙인다(선택).
@@ -220,6 +267,7 @@ const server = http.createServer(async (req, res) => {
 });
 if (process.argv[1] === fileURLToPath(import.meta.url)){
   for (const pr of await listProfiles()){ const n = await syncTemplates(pr.name); if (n) console.log(`${pr.name}: 템플릿 ${n}개를 앱 템플릿에 맞췄어요`); }
+  await syncTextbooks(); setInterval(() => syncTextbooks().catch(() => {}), 300000).unref();
   server.listen(PORT, HOST, () => console.log(`PKM: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/  (데이터: ${DATA})`));
 }
-export { server, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest };
+export { server, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };

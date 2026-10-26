@@ -180,7 +180,11 @@ main{padding:40px 40px 72px;min-width:0}
   .seg a{flex:1;padding:8px 8px 10px;font-size:1rem}
   .seg-compact a{padding:8px 4px 10px;min-width:0}.seg-compact a small{display:none}
   .seg-scroll a{flex:0 0 auto;min-width:max-content;padding:8px 12px 10px}
+  /* 탭이 많은 곳은 휴대폰에서 선택 상자로 — 옆으로 밀려 안 보이는 탭이 없게 */
+  .seg-pick .seg{display:none}
+  .seg-pick .seg-select{display:block}
 }
+.seg-select{display:none;width:100%;height:3rem;margin-bottom:24px;padding:0 40px 0 14px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 16px center;color:var(--text);font-size:1.0625rem;font-weight:700;appearance:none}
 
 .list{list-style:none;margin:0;padding:0;background:var(--surface);border-radius:var(--r-lg);overflow:hidden}
 .list>li+li{border-top:1px solid var(--line)}
@@ -410,6 +414,12 @@ a.row:hover{background:var(--fill)}
 .meta-dl dt{color:var(--text-3)}
 .meta-dl dd{margin:0}
 .doc-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:20px}
+.tb-card{margin-top:12px;min-height:min(46vh,420px);display:flex;flex-direction:column;gap:12px;padding:24px 20px}
+.tb-card h1{font-size:1.375rem;line-height:1.45;margin:0}
+.tb-card .md{font-size:1.0625rem;line-height:1.7;padding:0;background:none;border-radius:0}
+.tb-card-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.tb-card-nav .btn{min-height:52px;justify-content:center;white-space:normal;text-align:center}
+.tb-card-src{margin-top:16px;text-align:center}
 .state-bar{background:var(--surface);border-radius:var(--r-lg);padding:10px 10px 10px 16px;justify-content:space-between}
 .state-bar .t-acts{flex:1}
 .field-inline{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--text-2)}
@@ -422,10 +432,18 @@ a.row:hover{background:var(--fill)}
 .md{background:var(--surface);border-radius:var(--r-lg);padding:16px 20px}
 .md>*:first-child{margin-top:0}
 .md>*:last-child{margin-bottom:0}
-.md ul{margin:6px 0;padding-left:1.25em}
+.md ul,.md ol{margin:6px 0;padding-left:1.25em}
 .md li{margin:2px 0}
 .md p{margin:8px 0}
 .md .md-h{margin:16px 0 6px}
+.tb-ro{margin:8px 0 0}
+.md .callout{margin:10px 0;padding:4px 12px;background:var(--surface-2);border-left:3px solid var(--text-3);border-radius:8px}
+.md details.callout>summary::after{content:'펼치기';margin-left:auto;padding-left:12px;color:var(--text-3);font-weight:400;font-size:.875rem}
+.md details.callout[open]>summary::after{content:'접기'}
+.md hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+.md div.callout{padding:10px 12px}
+.md .callout-title{margin:0;font-weight:600}
+.md .callout-body>:first-child{margin-top:6px}.md .callout-body>:last-child{margin-bottom:0}
 .md blockquote{margin:8px 0;padding:4px 0 4px 14px;border-left:3px solid var(--line-strong);color:var(--text-2)}
 .md code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.875em;background:var(--surface-2);padding:1px 5px;border-radius:4px}
 .code-wrap{overflow-x:auto;background:var(--surface-2);border-radius:var(--r-md);margin:8px 0}
@@ -917,7 +935,7 @@ const WD = '일월화수목금토';
 
 /* ---------------- 샘플 데이터 (가상) ---------------- */
 function emptyDB(){
-  return { inbox:[], refs:[], fleeting:[], perms:[], ctxs:[], dailies:{}, kinds:[ { id:'meeting', name:'회의록', fields:[['agenda','안건'],['talk','논의'],['decisions','결정']], people:true, todos:true } ], meetings:[], tasks:[], longs:[], routines:[], appts:[], routineDone:{} };
+  return { inbox:[], refs:[], fleeting:[], perms:[], ctxs:[], textbooks:[], tbCards:[], dailies:{}, kinds:[ { id:'meeting', name:'회의록', fields:[['agenda','안건'],['talk','논의'],['decisions','결정']], people:true, todos:true } ], meetings:[], tasks:[], longs:[], routines:[], appts:[], routineDone:{} };
 }
 
 /* 프로필 = Obsidian 볼트 하나 = data/<이름>/. 데이터는 프로필마다 따로 — 불러온 것만 여기에 있다 */
@@ -1056,7 +1074,14 @@ async function poll(){
   try {
     const v = await STORE.version(n);
     if (v.sync){ SYNCST[n] = v.sync; document.querySelectorAll('.store-line').forEach(x => x.textContent = storeText(n)); }
-    if (v.version !== VER[n] && !saving && !saveTimer && !document.querySelector('dialog[open]')){ await loadProfile(n); render(); toast('다른 곳에서 바뀐 내용을 불러왔어요'); }
+    if (v.version !== VER[n] && !saving && !saveTimer && !document.querySelector('dialog[open]')){
+      const before = new Map((PROFILES[n].textbooks || []).map(x => [x.id, x.body]));
+      await loadProfile(n); render();
+      const tb = PROFILES[n].textbooks.filter(x => before.get(x.id) !== x.body);   // Obsidian 원본을 고치면 서버가 복제해 둔다
+      if (tb.length === 1) toast('원본에서 바뀐 교과서 노트를 불러왔어요', { label:'보기', fn:() => go(tbHref(tb[0])) });
+      else if (tb.length) toast(`원본에서 바뀐 교과서 노트 ${tb.length}개를 불러왔어요`, { label:'목록 보기', fn:() => go(`#/knowledge/tb/${tbBookId(tb[0].book)}`) });
+      else toast('다른 곳에서 바뀐 내용을 불러왔어요');
+    }
   } catch (e) { /* 서버가 잠깐 꺼졌으면 다음 차례에 다시 본다 */ }
 }
 window.addEventListener('beforeunload', e => { if (saving || saveTimer){ saveNow(); e.preventDefault(); e.returnValue = ''; } });
@@ -1146,11 +1171,14 @@ function areaLink(a){
   return L ? `<a href="#/action/long/${L.id}">${esc(a)}</a>` : esc(a);
 }
 function wikilink(t, alias){
-  const label = esc(alias || t);
+  const label = esc(alias || t); t = t.split('#')[0].trim();   // [[노트#제목]]은 노트로
+  // 교과서 안에서는 같은 책 노트가 먼저 — 같은 제목으로 다듬은 영구노트로 새지 않게. 내 노트에서는 교과서가 맨 끝
+  const tb = x => `<a class="wl" href="${tbHref(x)}">${label}</a>`, same = WL_BOOK && db().textbooks.find(x => x.book === WL_BOOK && x.title === t); if (same) return tb(same);
   const p = db().perms.find(x => x.title === t); if (p) return `<a class="wl" href="#/knowledge/perm/${p.id}">${label}</a>`;
   const r = db().refs.find(x => x.title === t); if (r) return `<a class="wl" href="#/knowledge/ref/${r.id}">${label}</a>`;
   const L = longByTitle(t); if (L) return `<a class="wl" href="#/action/long/${L.id}">${label}</a>`;
-  return `<span class="wl-missing" title="아직 없는 노트예요">${label}</span>`;
+  const b = (db().textbooks || []).find(x => x.title === t); if (b) return tb(b);
+  return `<span class="wl-missing" title="아직 없는 노트예요">${label}<span class="sr-only"> (아직 없는 노트)</span></span>`;
 }
 
 /* ---------------- 마크다운 (지원: 제목·목록(중첩)·인용·표·코드·[[링크]]·![[첨부]]·**굵게**·`코드`·[링크](url)) ---------------- */
@@ -1181,10 +1209,11 @@ function mdTable(rows){
   const body = rows.slice(1).filter(r => !/^\s*\|?\s*:?-{2,}/.test(r)).map(cells);
   return `<div class="table-wrap" tabindex="0" role="region" aria-label="표 — 옆으로 밀어 더 보기"><table><thead><tr>${head.map(h => `<th scope="col">${inline(h)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
+let mdKey = 0, mdShift = 2;   // 제목을 몇 단계 내릴지 — 교과서 본문은 h1 바로 아래라 한 단계만   // 접힌 칸마다 순서 번호 — 다시 그려도 열어 둔 칸을 그대로 연다(render)
 function md(src){
   if (!src || !src.trim()) return '';
-  const L = src.replace(/\r/g, '').split('\n'); let i = 0, out = '';
-  const isBlock = l => /^(```|\s*\||#{1,6}\s|>|\s*[-*]\s)/.test(l);
+  const L = src.replace(/\r/g, '').split('\n'); let i = 0, out = '', lastQ = '';
+  const isBlock = l => /^(```|\s*\||#{1,6}\s|>|\s*[-*]\s|\d+\.\s|-{3,}\s*$)/.test(l);
   while (i < L.length){
     const l = L[i];
     if (l.startsWith(FENCE)){
@@ -1195,7 +1224,21 @@ function md(src){
       continue;
     }
     if (/^\s*\|/.test(l)){ const rows = []; while (i < L.length && /^\s*\|/.test(L[i])) rows.push(L[i++]); out += mdTable(rows); continue; }
-    if (/^#{1,6}\s/.test(l)){ const n = Math.min(l.match(/^#+/)[0].length + 2, 6); out += `<h${n} class="md-h">${inline(l.replace(/^#+\s*/, ''))}</h${n}>`; i++; continue; }
+    if (/^-{3,}\s*$/.test(l)){ out += '<hr>'; i++; continue; }
+    if (/^#{1,6}\s*정답(표| 모음)/.test(l)){   // 정답표는 같은 단계의 다음 제목 전까지 접는다
+      const lv = l.match(/^#+/)[0].length, n = Math.min(lv + mdShift, 6), buf = []; i++;
+      while (i < L.length && !(L[i].match(/^(#{1,6})\s/) && L[i].match(/^#+/)[0].length <= lv)) buf.push(L[i++]);
+      out += `<details class="more" data-key="ans${mdKey++}"><summary>정답표 펼치기</summary><h${n} class="md-h">${inline(l.replace(/^#+\s*/, ''))}</h${n}>${md(buf.join('\n'))}</details>`; continue; }
+    if (/^#{1,6}\s/.test(l)){ lastQ = (l.replace(/^#+\s*/, '').match(/^(Q\S+?)\.?(\s|$)/) || [])[1] || ''; const n = Math.min(l.match(/^#+/)[0].length + mdShift, 6); out += `<h${n} class="md-h">${inline(l.replace(/^#+\s*/, ''))}</h${n}>`; i++; continue; }
+    // Obsidian 콜아웃 — "> [!success]- 정답과 해설"은 접힌 채로(문제은행 정답이 먼저 보이지 않게), "+"는 펼친 채로, 접미사 없으면 박스만
+    const co = l.match(/^>\s*\[!(\w+)\]([-+]?)\s*(.*)$/);
+    if (co){ const buf = []; i++; while (i < L.length && /^>/.test(L[i])) buf.push(L[i++].replace(/^>\s?/, ''));
+      const type = co[1].toLowerCase(), title = inline(co[3] || (['success', 'check'].includes(type) ? '정답과 해설' : type === 'question' ? '질문' : '더 보기'));
+      const q = lastQ ? `<span class="sr-only"> (${esc(lastQ)})</span>` : '', inner = `<div class="callout-body">${md(buf.join('\n'))}</div>`;
+      out += co[2] ? `<details class="more callout" data-key="co${mdKey++}"${co[2] === '+' ? ' open' : ''}><summary>${title}${q}</summary>${inner}</details>` : `<div class="callout"><p class="callout-title">${title}</p>${inner}</div>`; continue; }
+    if (/^\d+\.\s/.test(l)){ const items = [];
+      while (i < L.length && (/^\d+\.\s/.test(L[i]) || (items.length && /^\s{2,}[-*]\s/.test(L[i])))){ const n = L[i++]; if (/^\d+\.\s/.test(n)) items.push({ t:n.replace(/^\d+\.\s/, ''), sub:[] }); else items[items.length - 1].sub.push(n.replace(/^\s{2,}/, m => ' '.repeat(Math.max(0, m.length - 3)))); }
+      out += `<ol>${items.map(it => `<li>${inline(it.t)}${it.sub.length ? mdList(it.sub) : ''}</li>`).join('')}</ol>`; continue; }
     if (/^>/.test(l)){ const buf = []; while (i < L.length && /^>/.test(L[i])) buf.push(L[i++].replace(/^>\s?/, '')); out += `<blockquote>${buf.map(inline).join('<br>')}</blockquote>`; continue; }
     if (/^\s*[-*]\s/.test(l)){ const buf = []; while (i < L.length && /^\s*[-*]\s/.test(L[i])) buf.push(L[i++]); out += mdList(buf); continue; }
     if (!l.trim()){ i++; continue; }
@@ -1228,15 +1271,21 @@ function conflictBanner(){
   if (S.mode !== 'conflict') return '';
   return `<div class="banner" role="alert"><h2>최신 내용으로 다시 열어 주세요</h2><p>Obsidian에서 이 노트를 방금 고쳤어요. 여기서 고친 내용은 지우지 않고 노트 아래에 따로 붙여 둘게요.</p><button class="btn btn-primary btn-sm" type="button" data-act="reload">최신 내용 불러오기</button></div>`;
 }
-function seg(items, current, cls = ''){
-  return `<nav aria-label="보기 전환"><div class="seg ${cls}">${items.map(([key, href, label, sub]) =>
-    `<a href="${href}" ${key === current ? 'aria-current="page"' : ''}><span>${label}</span>${sub !== undefined ? `<small>${sub}</small>` : ''}</a>`).join('')}</div></nav>`;
+// pick: 휴대폰에서는 탭 대신 선택 상자(탭이 많아 한 줄에 안 들어가는 곳)
+function seg(items, current, cls = '', pick = ''){
+  const tabs = `<div class="seg ${cls}">${items.map(([key, href, label, sub]) =>
+    `<a href="${href}" ${key === current ? 'aria-current="page"' : ''}><span>${label}</span>${sub !== undefined ? `<small>${sub}</small>` : ''}</a>`).join('')}</div>`;
+  if (!pick) return `<nav aria-label="보기 전환">${tabs}</nav>`;
+  const text = h => h.replace(/<[^>]+>/g, '');   // 라벨은 이미 이스케이프된 HTML — 태그만 뺀다
+  return `<nav class="seg-pick" aria-label="보기 전환">${tabs}<select class="seg-select" data-act="seg-go" aria-label="${pick}">${items.map(([key, href, label, sub]) =>
+    `<option value="${href}" ${key === current ? 'selected' : ''}>${text(label)}${sub ? ` · ${sub}` : ''}</option>`).join('')}</select></nav>`;
 }
+document.addEventListener('change', e => { if (e.target.matches && e.target.matches('select[data-act="seg-go"]')) go(e.target.value); });
 function empty(title, body, btn = '', smile = ''){
   return `<div class="empty"><h2>${title}</h2><p>${body}</p>${btn}${smile && S.humor ? `<p class="smile">${smile}</p>` : ''}</div>`;
 }
 const autoTag = t => `<span class="auto-tag">자동화 자리 · ${t}</span>`;
-const obsBtn = () => `<button class="btn btn-ghost btn-sm" type="button" data-act="obsidian">Obsidian에서 편집</button>`;
+const obsBtn = (label = 'Obsidian에서 편집') => `<button class="btn btn-ghost btn-sm" type="button" data-act="obsidian">${label}</button>`;
 const statusBadge = s => `<span class="badge b-${s}">${s}</span>`;
 const T_STATUS = ['대기','진행','기다림','완료'];
 const T_TO = { '대기':'대기로', '진행':'진행으로', '기다림':'기다림으로', '완료':'완료로' };
@@ -1882,11 +1931,19 @@ function takeInbox(id, label, undoMore){
 const firstLine = t => t.split('\n')[0].trim().slice(0, 80);
 
 /* ---------------- 화면: 지식 ---------------- */
+// 아래 메뉴의 '지식'은 마지막으로 본 칸을 연다. 처음이면 노트가 있는 첫 칸 — 교과서만 있는 프로필이 빈 참조노트로 열리지 않게
+const K_TABS = ['ref','fleeting','perm','ctx','tb'];
+function kTabStart(){
+  const last = LS.get(`pkm:v1:k-tab:${S.profile}`, ''); if (K_TABS.includes(last)) return last;
+  const D = db(), n = { ref:D.refs.length, fleeting:D.fleeting.length, perm:D.perms.length, ctx:D.ctxs.length, tb:tbBooks().length };
+  return K_TABS.find(k => n[k]) || 'ref';
+}
 function vKnowledge(tab){
   const D = db();
+  LS.set(`pkm:v1:k-tab:${S.profile}`, tab);
   const head = `<header class="page-head"><h1 tabindex="-1">지식</h1>
     ${tab === 'ref' ? `<button class="btn btn-primary" type="button" data-act="new-ref">참조노트 만들기</button>` : ''}</header>
-    ${seg([['ref','#/knowledge/ref',`참조노트 <span class="num">${D.refs.length}</span>`,'남의 글'],['fleeting','#/knowledge/fleeting',`임시노트 <span class="num">${D.fleeting.length}</span>`,'빠른 메모'],['perm','#/knowledge/perm',`영구노트 <span class="num">${D.perms.length}</span>`,'언제든 통하는 생각'],['ctx','#/knowledge/ctx',`맥락노트 <span class="num">${D.ctxs.length}</span>`,'회사·시스템에 묶인 정리']], tab, 'seg-compact')}
+    ${seg([['ref','#/knowledge/ref',`참조노트 <span class="num">${D.refs.length}</span>`,'남의 글'],['fleeting','#/knowledge/fleeting',`임시노트 <span class="num">${D.fleeting.length}</span>`,'빠른 메모'],['perm','#/knowledge/perm',`영구노트 <span class="num">${D.perms.length}</span>`,'언제든 통하는 생각'],['ctx','#/knowledge/ctx',`맥락노트 <span class="num">${D.ctxs.length}</span>`,'회사·시스템에 묶인 정리'],['tb','#/knowledge/tb',`교과서 <span class="num">${tbBooks().length}</span>`,'읽기만 하는 책']], tab, 'seg-compact', '지식 보기')}
     ${tip('knowledge', '읽은 것은 <strong>참조노트</strong>에, 떠오른 생각은 <strong>임시노트</strong>에 담아요. 다듬을 때 회사·시스템을 떠나도 통하면 <strong>영구노트</strong>, 특정 맥락에 묶여 있으면 <strong>맥락노트</strong>로 보내요.')}`;
   let body = '';
   if (tab === 'ref'){
@@ -1909,6 +1966,8 @@ function vKnowledge(tab){
           <button class="btn btn-text btn-sm" type="button" data-act="inline-edit" data-id="${f.id}">고치기</button>
           <a class="btn btn-tonal btn-sm" href="#/refine/fleeting/${f.id}">다듬기</a></div>`}</article>`).join('')}
         ${autoTag('메모마다 이어질 영구노트를 미리 찾아 둠')}</div>`;
+  } else if (tab === 'tb'){
+    body = vTbBooks();
   } else if (tab === 'ctx'){
     body = D.ctxs.length ? `<ul class="list">${D.ctxs.slice().sort((a, b) => b.updated.localeCompare(a.updated)).map(c => `<li><a class="row" href="#/knowledge/ctx/${c.id}"><span class="body"><span class="title">${esc(c.title)}</span><span class="meta"><span>${staleText(c.updated)}</span><span>바뀐 기록 <span class="num">${c.history.length}</span></span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`
       : empty('아직 맥락노트가 없어요', '배포 프로세스·팀 업무 흐름처럼 특정 회사·시스템·시점에 묶인 정리를 두는 곳이에요. 임시노트를 다듬을 때 맥락노트를 고르면 여기에 쌓여요.', `<a class="btn btn-tonal" href="#/knowledge/fleeting">임시노트 보러 가기</a>`);
@@ -1923,6 +1982,114 @@ function vKnowledge(tab){
 }
 let humorIdx = 0;
 function humorLine(){ const L = ['메모함이 지금 집에서 제일 깔끔한 곳이에요.', '다음 생각이 들어올 자리가 생겼어요.']; return L[(humorIdx++) % L.length]; }
+
+/* ---------------- 화면: 교과서 (읽기전용, SPEC §0-1) ---------------- */
+let WL_BOOK = '';   // 교과서를 그리는 동안 그 책 이름 — [[링크]]를 같은 책에서 먼저 찾는다
+const tbChanged = d => `${d === TODAY ? '오늘' : md2(d)} 원본에서 바뀜`;
+const TB_LINE = (refine = true) => `<p class="faint tb-ro">교과서는 여기서 읽기만 하고, 고치는 건 Obsidian 원본에서 해요.${refine ? ' 내 생각은 영구노트로 다듬어 남겨요.' : ''}</p>`;
+const tbDocs = book => db().textbooks.filter(x => x.book === book);
+const tbMoc = book => tbDocs(book).find(x => x.kind === 'moc');
+// 읽는 순서 — 개념 노트를 목차 순서로, 문제은행·용어집은 그 뒤
+const tbSeq = book => tbDocs(book).filter(x => x.kind !== 'moc').sort((a, b) => (a.kind === 'note' ? 0 : 1) - (b.kind === 'note' ? 0 : 1) || a.order - b.order || a.path.localeCompare(b.path));
+const tbBookId = book => (tbMoc(book) || tbSeq(book)[0]).id;
+const tbHref = x => x.kind === 'moc' ? `#/knowledge/tb/${x.id}` : `#/knowledge/tb/${tbBookId(x.book)}/${x.id}`;
+const tbName = book => { const [a, ...b] = book.split(' — '); return { title:a, sub:b.join(' — ') }; };
+const tbBooks = () => [...new Set(db().textbooks.map(x => x.book))].sort((a, b) => a.localeCompare(b, 'ko'));
+const tbOfId = id => db().textbooks.find(x => x.id === id);
+const tbRefined = x => [...db().perms.filter(p => p.sources.includes(x.id)), ...(db().ctxs || []).filter(c => (c.sources || []).some(v => String(v).replace(/^\[\[|\]\]$/g, '') === x.title))];
+const tbBody = x => { const m = x.body.match(/^#\s+(.*)\n?/); return m && m[1].trim() === x.title ? x.body.slice(m[0].length) : x.body; };   // 원본에 남은 제목 줄은 h1과 겹친다
+const tbLast = () => LS.get(`pkm:v1:tb-last:${S.profile}`, {});
+// 교과서 카드(SPEC §0-2) — 노트 하나를 짧은 카드 여러 장으로 다시 쓴 것. 휴대폰에서 한 장씩 넘겨 본다
+const tbCardsOf = x => (db().tbCards || []).find(c => c.from === x.id);
+const tbCardSeq = book => tbSeq(book).filter(x => x.kind === 'note' && tbCardsOf(x));
+const tbCardCount = book => tbCardSeq(book).reduce((n, x) => n + tbCardsOf(x).cards.length, 0);
+const tbCardHref = (x, i = 0, peek = false) => `#/knowledge/tb/${tbBookId(x.book)}/c/${x.id}/${i}${peek ? '/n' : ''}`;   // peek: 노트 화면에서 잠깐 연 것 — 책의 이어 볼 곳을 바꾸지 않는다
+const tbCardLast = () => LS.get(`pkm:v1:tb-card:${S.profile}`, {});
+function tbCardResume(book){
+  const v = String(tbCardLast()[tbBookId(book)] || ''); if (v === 'done') return { done:true };
+  const seq = tbCardSeq(book), [id, i] = v.split('/'), x = seq.find(y => y.id === id);
+  return x ? { x, i:Number(i) || 0, href:tbCardHref(x, Number(i) || 0) } : null;
+}
+function tbCardMark(bookId, v){ const L = tbCardLast(); L[bookId] = v; LS.set(`pkm:v1:tb-card:${S.profile}`, L); }
+function vTbCard(bookId, noteId, idx, peek){
+  const b = tbOfId(bookId); if (!b) return vNotFound();
+  const seq = tbCardSeq(b.book); if (!seq.length) return vNotFound();
+  const x = seq.find(y => y.id === noteId) || seq[0], C = tbCardsOf(x), n = seq.indexOf(x);
+  const i = Math.min(Math.max(Number(idx) || 0, 0), C.cards.length - 1), card = C.cards[i], lastOfNote = i === C.cards.length - 1;
+  if (peek !== 'n') tbCardMark(bookId, `${x.id}/${i}`);
+  const pv = seq[n - 1], nx = seq[n + 1];
+  const prev = i > 0 ? tbCardHref(x, i - 1) : pv ? tbCardHref(pv, tbCardsOf(pv).cards.length - 1) : '';
+  const next = !lastOfNote ? tbCardHref(x, i + 1) : nx ? tbCardHref(nx, 0) : '';
+  WL_BOOK = x.book; mdShift = 2;
+  return `<div class="page tb-card-page">
+    <a class="back" href="#/knowledge/tb/${bookId}"><span aria-hidden="true">‹</span> ${esc(tbName(x.book).title)}</a>
+    <p class="eyebrow">${x.chapter ? `${esc(x.chapter)} · ` : ''}노트 <span class="num">${n + 1}/${seq.length}</span></p>
+    <article class="card tb-card">
+      <p class="meta tb-card-of">카드 <span class="num">${i + 1}/${C.cards.length}</span>${i === 0 ? ` · ${esc(x.title)}` : ''}</p>
+      <h1 tabindex="-1">${esc(card.title)}</h1>
+      <div class="md">${md(card.body)}</div>
+    </article>
+    ${C.fromHash !== PKMMD.textHash(x.body) ? `<p class="faint">노트가 바뀌어 이 카드는 예전 내용일 수 있어요 · <a href="${tbHref(x)}">원문 노트 보기</a></p>` : ''}
+    <nav class="tb-card-nav" aria-label="카드 넘기기">
+      ${prev ? `<a class="btn btn-tonal" href="${prev}" rel="prev" data-replace><span aria-hidden="true">‹</span> 이전</a>` : '<span></span>'}
+      ${next ? `<a class="btn btn-primary" href="${next}" rel="next" data-replace>${lastOfNote ? '다음 노트' : '다음'} <span aria-hidden="true">›</span></a>` : `<a class="btn btn-primary" href="#/knowledge/tb/${bookId}" data-act="tb-card-done" data-id="${bookId}">다 봤어요 · 목차로</a>`}
+    </nav>
+    <p class="tb-card-src"><a href="${tbHref(x)}">원문 노트 보기</a></p>
+  </div>`;
+}
+function vTbBooks(){
+  const books = tbBooks();
+  if (!books.length) return empty('아직 가져온 교과서가 없어요', 'data의 교과서 폴더에 책 폴더를 넣으면 여기에 보여요.', `<button class="btn btn-tonal" type="button" data-act="reload">다시 불러오기</button>`);
+  return `<ul class="list">${books.map(b => {
+    const n = tbSeq(b), done = n.filter(x => tbRefined(x).length).length, nm = tbName(b);
+    return `<li><a class="row" href="#/knowledge/tb/${tbBookId(b)}"><span class="body"><span class="title">${esc(nm.title)}</span><span class="meta">${nm.sub ? `<span>${esc(nm.sub)}</span>` : ''}<span>노트 <span class="num">${n.length}</span></span>${tbCardSeq(b).length ? `<span>카드 <span class="num">${tbCardCount(b)}</span></span>` : ''}${done ? `<span>다듬은 노트 <span class="num">${done}</span></span>` : ''}${n.some(x => x.kind === 'quiz') ? '<span>문제은행</span>' : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
+  }).join('')}</ul>`;
+}
+const tbRows = arr => `<ul class="list">${arr.map(x => `<li><a class="row" href="${tbHref(x)}"><span class="body"><span class="title">${esc(x.title)}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`;
+function vTbBook(id){
+  const x = tbOfId(id); if (!x) return vNotFound();
+  const book = x.book, moc = tbMoc(book), seq = tbSeq(book), nm = tbName(book);
+  const last = seq.find(y => y.id === tbLast()[tbBookId(book)]);
+  const cardSeq = tbCardSeq(book), resume = tbCardResume(book);
+  const since = new Date(Date.now() - 14 * 864e5).toLocaleDateString('sv-SE');
+  const fresh = tbDocs(book).filter(y => y.updated && y.updated >= since).sort((a, b) => b.updated.localeCompare(a.updated) || a.order - b.order);   // 2주 안에 원본에서 고친 것
+  const freshRow = y => `<li><a class="row" href="${tbHref(y)}"><span class="body"><span class="meta"><span>${tbChanged(y.updated)}</span></span><span class="title">${esc(y.title)}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
+  WL_BOOK = book; mdShift = 1;
+  let body;
+  if (moc){
+    const linked = new Set([...moc.body.matchAll(/\[\[([^\]|#]+)/g)].map(m => m[1].trim())), loose = seq.filter(y => !linked.has(y.title));
+    body = `<div class="md">${md(tbBody(moc))}</div>` + (loose.length ? `<details class="more" data-key="loose"><summary>목차에 없는 노트 ${loose.length}개</summary>${tbRows(loose)}</details>` : '');
+  } else {
+    const ch = [...new Set(seq.map(y => y.chapter))];
+    body = `<p class="faint">목차 노트가 없어 폴더 순서로 보여 줘요</p>` + ch.map(c => section(esc(c || '책 바로 아래'), tbRows(seq.filter(y => y.chapter === c).sort((a, b) => a.path.localeCompare(b.path))))).join('');
+  }
+  return `<div class="page">
+    <a class="back" href="#/knowledge/tb"><span aria-hidden="true">‹</span> 교과서</a>
+    <p class="eyebrow">교과서 · 노트 ${seq.length}</p><h1 tabindex="-1">${esc(nm.title)}</h1>${nm.sub ? `<p class="meta">${esc(nm.sub)}</p>` : ''}
+    <div class="doc-actions">${cardSeq.length ? `<a class="btn btn-primary" href="${resume && !resume.done ? resume.href : tbCardHref(cardSeq[0])}">${!resume ? '카드로 공부하기' : resume.done ? '카드 처음부터 다시 보기' : '카드 이어 보기'}</a>` : ''}${seq.length ? `<a class="btn ${cardSeq.length ? 'btn-tonal' : 'btn-primary'}" href="${tbHref(last || seq[0])}">${cardSeq.length ? '원문 ' : ''}${last ? '이어 읽기' : '처음부터 읽기'}</a>` : ''}${moc ? obsBtn(moc.source ? 'Obsidian 원본 열기' : 'Obsidian에서 열기') : ''}</div>
+    ${cardSeq.length ? `<p class="meta">${resume && resume.done ? `카드 <span class="num">${tbCardCount(book)}</span>장을 다 봤어요` : `카드 <span class="num">${tbCardCount(book)}</span>장${cardSeq.length < seq.filter(y => y.kind === 'note').length ? ` · 노트 <span class="num">${cardSeq.length}</span>개를 카드로 만들었어요` : ''}${resume ? ` · 이어 볼 곳: ${esc(resume.x.title)}` : ''}`}</p>${resume && !resume.done ? `<a class="btn btn-text" href="${tbCardHref(cardSeq[0])}">카드 처음부터 보기</a>` : ''}` : ''}
+    ${last ? `<p class="meta">원문 ${seq.indexOf(last) + 1}/${seq.length} · ${esc(last.title)}</p>` : ''}
+    ${TB_LINE()}
+    ${fresh.length ? section(`2주 안에 바뀐 노트 <span class="count num">${fresh.length}</span>`, `<ul class="list">${fresh.slice(0, 3).map(freshRow).join('')}</ul>${fresh.length > 3 ? `<details class="more" data-key="fresh"><summary>${fresh.length - 3}개 더 보기</summary><ul class="list">${fresh.slice(3).map(freshRow).join('')}</ul></details>` : ''}`) : ''}
+    ${body}
+  </div>`;
+}
+function vTbNote(bookId, id){
+  const x = tbOfId(id); if (!x) return vNotFound();
+  const seq = tbSeq(x.book), i = seq.indexOf(x), prev = seq[i - 1], next = seq[i + 1], nm = tbName(x.book), mine = tbRefined(x);
+  const L = tbLast(); L[tbBookId(x.book)] = x.id; LS.set(`pkm:v1:tb-last:${S.profile}`, L);
+  WL_BOOK = x.book; mdShift = 1;
+  const navRow = (y, rel, label) => `<li><a class="row" href="${tbHref(y)}" rel="${rel}">${rel === 'prev' ? '<span class="chev" aria-hidden="true">‹</span>' : ''}<span class="body"><span class="meta"><span>${label} · ${seq.indexOf(y) + 1}/${seq.length}</span></span><span class="title">${esc(y.title)}</span></span>${rel === 'next' ? '<span class="chev" aria-hidden="true">›</span>' : ''}</a></li>`;
+  return `<div class="page">
+    <a class="back" href="#/knowledge/tb/${tbBookId(x.book)}"><span aria-hidden="true">‹</span> ${esc(nm.title)}</a>
+    <p class="eyebrow">교과서${x.chapter ? ` · ${esc(x.chapter)}` : ''}</p><h1 tabindex="-1">${esc(x.title)}</h1>${x.updated ? `<p class="meta">${tbChanged(x.updated)}</p>` : ''}
+    <div class="doc-actions">${tbCardsOf(x) ? `<a class="btn btn-primary" href="${tbCardHref(x, 0, true)}">카드 ${tbCardsOf(x).cards.length}장으로 보기</a>` : ''}${x.kind === 'note' ? `<a class="btn btn-tonal" href="#/refine/tb/${tbBookId(x.book)}/${x.id}">영구노트로 다듬기</a>` : ''}${obsBtn(x.source ? 'Obsidian 원본 열기' : 'Obsidian에서 열기')}</div>
+    ${TB_LINE(x.kind === 'note')}
+    <div class="md">${md(tbBody(x))}</div>
+    ${mine.length ? section(`내가 다듬은 영구노트 <span class="count num">${mine.length}</span>`, `<ul class="list">${mine.map(p => `<li><a class="row" href="#/knowledge/${p.history ? 'ctx' : 'perm'}/${p.id}"><span class="body"><span class="title">${esc(p.title)}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : ''}
+    <nav class="section" aria-label="교과서 순서"><ul class="list">${prev ? navRow(prev, 'prev', '이전 노트') : ''}${next ? navRow(next, 'next', '다음 노트') : `<li><a class="row" href="#/knowledge/tb/${tbBookId(x.book)}"><span class="body"><span class="title">${esc(nm.title)} 목차로</span></span><span class="chev" aria-hidden="true">›</span></a></li>`}</ul></nav>
+  </div>`;
+}
 
 function vRef(id){
   const r = find('refs', id); if (!r) return vNotFound();
@@ -1955,7 +2122,7 @@ function vPerm(id){
   const D = db(); const p = find('perms', id); if (!p) return vNotFound();
   const out = p.links.map(l => find('perms', l)).filter(Boolean);
   const back = D.perms.filter(x => x.links.includes(p.id));
-  const src = p.sources.map(s => find('refs', s)).filter(Boolean);
+  const src = p.sources.map(s => find('refs', s) || tbOfId(s)).filter(Boolean);
   const linkList = arr => arr.length ? `<ul class="list">${arr.map(x => `<li><a class="row" href="#/knowledge/perm/${x.id}"><span class="body"><span class="title">${esc(x.title)}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>` : '<p class="md none">아직 없어요</p>';
   return `<div class="page">
     <a class="back" href="#/knowledge/perm"><span aria-hidden="true">‹</span> 영구노트</a>
@@ -1965,28 +2132,32 @@ function vPerm(id){
     ${section('내 말로', `<div class="md">${md(p.body)}</div>`)}
     ${section('이어지는 생각', linkList(out) + autoTag('본문과 비슷한 영구노트를 연결 후보로 제안'))}
     ${section('이 노트를 가리키는 노트', linkList(back))}
-    ${src.length ? section('출처', `<ul class="list">${src.map(r => `<li><a class="row" href="#/knowledge/ref/${r.id}"><span class="body"><span class="title">${esc(r.title)}</span><span class="meta"><span class="kind">${r.type}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : ''}
+    ${src.length ? section('출처', `<ul class="list">${src.map(r => `<li><a class="row" href="${r.book ? tbHref(r) : `#/knowledge/ref/${r.id}`}"><span class="body"><span class="title">${esc(r.title)}</span><span class="meta"><span class="kind">${r.book ? `교과서 · ${esc(tbName(r.book).title)}` : r.type}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : ''}
   </div>`;
 }
 
 function vRefine(kind, id, idx){
   const D = db(); let srcText = '', srcLabel = '', back = '#/knowledge/fleeting', backLabel = '임시노트';
+  let tbx = null;
   if (kind === 'fleeting'){ const f = find('fleeting', id); if (!f) return vNotFound(); srcText = f.text; srcLabel = `임시노트 · ${relTime(f.created)}`; }
+  else if (kind === 'tb'){ tbx = tbOfId(id); if (!tbx) return vNotFound(); srcText = tbx.title; srcLabel = `교과서 · ${tbName(tbx.book).title}${tbx.chapter ? ` · ${tbx.chapter}` : ''}`; back = tbHref(tbx); backLabel = tbx.title.length > 24 ? tbx.title.slice(0, 24) + '…' : tbx.title; WL_BOOK = tbx.book; }
   else { const r = find('refs', id); if (!r || !r.ideas[idx]) return vNotFound(); srcText = r.ideas[idx].text; srcLabel = `참조노트 · ${r.title}`; back = `#/knowledge/ref/${r.id}`; backLabel = r.title; }
   const words = srcText.split(/\s+/).filter(w => w.length > 1);
   const sugg = D.perms.filter(p => words.some(w => p.title.includes(w.slice(0, 2)))).slice(0, 4);
-  const pool = sugg.length ? sugg : D.perms.slice(0, 3);
+  // 교과서 본문이 링크한 영구노트를 연결 후보 맨 앞에
+  const linked = tbx ? [...new Set([...tbx.body.matchAll(/\[\[([^\]|#]+)/g)].map(m => m[1].trim()))].map(t => D.perms.find(p => p.title === t)).filter(Boolean) : [];
+  const pool = [...new Set([...linked, ...(sugg.length ? sugg : D.perms.slice(0, 3))])].slice(0, 6);
   return `<div class="page">
     <a class="back" href="${back}"><span aria-hidden="true">‹</span> ${esc(backLabel)}</a>
     <h1 tabindex="-1">다듬기</h1>
-    <section class="section"><h2>원래 메모</h2><div class="md"><p class="faint" style="margin:0 0 4px">${esc(srcLabel)}</p><p style="margin:0">${esc(srcText)}</p></div></section>
+    <section class="section"><h2>${tbx ? '원래 노트' : '원래 메모'}</h2><div class="md"><p class="faint" style="margin:0 0 4px">${esc(srcLabel)}</p><p style="margin:0">${esc(srcText)}</p>${tbx ? `<details class="more"><summary>본문 펼치기</summary>${md(tbBody(tbx))}</details>` : ''}</div></section>
     <form class="section stack" data-form="refine" data-kind="${kind}" data-id="${id}" data-idx="${idx ?? ''}" novalidate>
       <fieldset class="choice"><legend>어디에 둘까요 <span class="faint">— 회사·시스템을 떠나도 통하나요?</span></legend>
         <label><input type="radio" name="to" value="perm" checked><span><b>영구노트</b><small>네, 언제 어디서든 통해요</small></span></label>
         <label><input type="radio" name="to" value="ctx"><span><b>맥락노트</b><small>아니요, 특정 회사·시스템·시점에 묶여 있어요</small></span></label>
       </fieldset>
-      <label class="field"><span id="rf-label">한 문장으로 쓴 생각 <span class="hint">제목이 돼요. 제목만 읽어도 무슨 말인지 알 수 있게요.</span></span>
-        <input name="title" id="rf-title" value="${esc(srcText.split(/[.。]/)[0].slice(0, 60))}" aria-describedby="rf-err"></label>
+      <label class="field"><span id="rf-label">한 문장으로 쓴 생각 <span class="hint">${tbx ? '제목이 돼요. 교과서 문장 대신 내 말로 써요.' : '제목이 돼요. 제목만 읽어도 무슨 말인지 알 수 있게요.'}</span></span>
+        <input name="title" id="rf-title" value="${tbx ? '' : esc(srcText.split(/[.。]/)[0].slice(0, 60))}" aria-describedby="rf-err"></label>
       <p class="err" id="rf-err" hidden>한 문장을 적어 주세요</p>
       <label class="field"><span id="rf-body">내 말로 풀어 쓰기 <span class="hint">선택</span></span><textarea name="body"></textarea></label>
       ${pool.length ? `<fieldset class="choice" data-only="perm"><legend>이어지는 생각 <span class="faint">— 고르면 서로 연결해요</span></legend>
@@ -2025,7 +2196,7 @@ function vTime(tab, date){
   const days = Object.keys(D.dailies).filter(d => d <= TODAY && (d === TODAY || hasDay(D, d))).sort().reverse();   // 계획만 열어 본 빈 날은 목록에 넣지 않는다
   const head = `<header class="page-head"><h1 tabindex="-1">시간</h1>
       <span class="doc-actions" style="margin:0">${k ? `<button class="btn btn-ghost btn-sm" type="button" data-act="kind-edit" data-kind="${k.id}">종류 편집</button><button class="btn btn-primary" type="button" data-act="new-record" data-kind="${k.id}">${esc(k.name)} 쓰기</button>` : ''}</span></header>
-    ${seg([['plan', '#/time/plan', '계획', '하루 시간표'], ['daily', '#/time/daily', '데일리', '하루 기록'], ['review', '#/time/review', '돌아보기', '여러 날'], ...D.kinds.map(x => [x.id, `#/time/${x.id}`, `${esc(x.name)} <span class="num">${D.meetings.filter(m => (m.kind || 'meeting') === x.id).length}</span>`, ''])], tab, 'seg-compact seg-scroll')}
+    ${seg([['plan', '#/time/plan', '계획', '하루 시간표'], ['daily', '#/time/daily', '데일리', '하루 기록'], ['review', '#/time/review', '돌아보기', '여러 날'], ...D.kinds.map(x => [x.id, `#/time/${x.id}`, `${esc(x.name)} <span class="num">${D.meetings.filter(m => (m.kind || 'meeting') === x.id).length}</span>`, ''])], tab, 'seg-compact seg-scroll', '시간 보기')}
     ${tab === 'plan' ? '' : `<p style="margin:-12px 0 16px;display:flex;justify-content:flex-end"><button class="btn btn-text btn-sm" type="button" data-act="kind-new" style="color:var(--primary)">+ 기록 종류 만들기</button></p>`}`;
   let body = '';
   if (tab === 'plan') body = vPlan(date);
@@ -2500,7 +2671,7 @@ const ICONS = {
   time:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   action:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>'
 };
-const NAV = [['now','지금','#/now'],['inbox','인박스','#/inbox'],['knowledge','지식','#/knowledge/ref'],['time','시간','#/time/plan'],['action','행동','#/action/short']];
+const NAV = [['now','지금','#/now'],['inbox','인박스','#/inbox'],['knowledge','지식','#/knowledge'],['time','시간','#/time/plan'],['action','행동','#/action/short']];
 /* 메뉴 순서·숨김은 프로필 설정(_설정.md의 menu_order·menu_hidden). 적힌 순서에 없는 메뉴는 뒤에 붙는다 */
 function menuItems(){
   const P = PSET[S.profile] || {}, order = (P.menu_order || []).filter(k => NAV.some(n => n[0] === k));
@@ -2534,8 +2705,8 @@ function route(p){
   switch (p[0]){
     case 'now': return vNow();
     case 'inbox': return vInbox();
-    case 'knowledge': if (p[2]) return p[1] === 'ref' ? vRef(p[2]) : p[1] === 'ctx' ? vCtx(p[2]) : vPerm(p[2]); return vKnowledge(['ref','fleeting','perm','ctx'].includes(p[1]) ? p[1] : 'ref');
-    case 'refine': return vRefine(p[1], p[2], p[3]);
+    case 'knowledge': if (p[1] === 'tb' && p[3] === 'c') return vTbCard(p[2], p[4], p[5], p[6]); if (p[1] === 'tb' && p[3]) return vTbNote(p[2], p[3]); if (p[2]) return p[1] === 'ref' ? vRef(p[2]) : p[1] === 'ctx' ? vCtx(p[2]) : p[1] === 'tb' ? vTbBook(p[2]) : vPerm(p[2]); return vKnowledge(K_TABS.includes(p[1]) ? p[1] : kTabStart());
+    case 'refine': return p[1] === 'tb' ? vRefine('tb', p[3]) : vRefine(p[1], p[2], p[3]);
     case 'time': if (p[1] === 'plan') return vTime('plan', /^\d{4}-\d{2}-\d{2}$/.test(p[2] || '') ? p[2] : TODAY);
       if (p[2]) return p[1] === 'daily' ? vDaily(p[2]) : vRecord(p[2]); return vTime(p[1] || 'daily');
     case 'action': {
@@ -2557,11 +2728,14 @@ function render(){
   document.querySelectorAll('.profile-name').forEach(x => x.textContent = S.profile);
   document.querySelectorAll('.store-line').forEach(x => x.textContent = storeText(S.profile));
   document.querySelectorAll('.profile-btn').forEach(x => x.setAttribute('aria-label', `프로필 바꾸기, 지금 ${S.profile}`));
+  const openKeys = navChanged ? [] : [...main.querySelectorAll('details[data-key][open]')].map(d => d.dataset.key);
+  mdKey = 0; mdShift = 2; WL_BOOK = '';
   main.innerHTML = S.mode === 'connect' ? vConnect() : S.mode === 'loading' ? vLoading() : S.mode === 'error' ? vError() : route(p);
   if (S.mode === 'connect' && PKMStore.github.auth() && !GH.repos.length && !GH.loading){
     GH.loading = true; PKMStore.github.repos().then(r => { GH.repos = r; GH.loading = false; render(); }).catch(e => { GH.loading = false; toast(e.message); });
   }
-  const cur = main.querySelector('.seg-scroll a[aria-current]'); if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - 8;
+  openKeys.forEach(k => { const d = main.querySelector(`details[data-key="${k}"]`); if (d) d.open = true; });
+  const cur = main.querySelector('.seg-scroll a[aria-current]'); if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - 48;   // 왼쪽 탭이 반쯤 보이게 — 옆에 탭이 더 있다는 단서
   const wd0 = main.querySelector('.week a.day[aria-current]'); if (wd0){ const ol = wd0.closest('ol'); if (ol.scrollWidth > ol.clientWidth) ol.scrollLeft = wd0.parentElement.offsetLeft - ol.clientWidth / 2; }   // 큰 글씨에서도 고른 날이 보이게   // 기록 종류가 많아도 지금 탭이 보이게
   const h1 = main.querySelector('h1');
   document.title = (h1 ? h1.textContent.trim() : 'pkm') + ' · pkm';
@@ -2589,6 +2763,19 @@ function toast(msg, action){
   el.addEventListener('mouseleave', () => { t = setTimeout(() => el.remove(), 3000); });
 }
 const go = h => { location.hash = h; };
+// 교과서 카드 넘기기 — 기록을 쌓지 않아(뒤로 가기는 책으로) 옆으로 밀거나 ←/→ 로도 넘긴다
+document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[data-replace]'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); location.replace(a.getAttribute('href')); });
+const cardNav = rel => document.querySelector(`.tb-card-nav a[rel="${rel}"]`);
+let swipe = null;
+document.addEventListener('touchstart', e => { swipe = e.target.closest && e.target.closest('.tb-card') && e.touches.length === 1 ? { x:e.touches[0].clientX, y:e.touches[0].clientY } : null; }, { passive:true });
+document.addEventListener('touchend', e => {
+  if (!swipe) return; const t = e.changedTouches[0], dx = t.clientX - swipe.x, dy = t.clientY - swipe.y; swipe = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy) && !String(getSelection())) cardNav(dx < 0 ? 'next' : 'prev')?.click();
+});
+document.addEventListener('keydown', e => {
+  if (!['ArrowRight', 'ArrowLeft'].includes(e.key) || !document.querySelector('.tb-card-page') || e.metaKey || e.ctrlKey || e.altKey || (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]'))) return;
+  const a = cardNav(e.key === 'ArrowRight' ? 'next' : 'prev'); if (a){ e.preventDefault(); a.click(); }
+});
 
 /* ---------------- 다이얼로그 ---------------- */
 function openDlg(id){ const d = $('#' + id); d.querySelectorAll('.err').forEach(e => e.hidden = true); d.querySelectorAll('[aria-invalid]').forEach(e => e.removeAttribute('aria-invalid')); lockScroll();
@@ -2806,9 +2993,12 @@ document.addEventListener('click', e => {
     case 'short-tab': S.shortTab = b.dataset.to; render(); break;
     case 'dismiss-tip': S.dismissed[id] = true; LS.set('pkm:v1:dismissed', S.dismissed); render(); $('#main').focus(); break;
     case 'reload': if (!PROFILES[S.profile] && STORE){ openProfile(S.profile); } else if (STORE) reloadProfile(); else boot(); break;
+    case 'tb-card-done': tbCardMark(id, 'done'); break;   // 링크는 그대로 목차로 간다 — 다음에 책을 열면 '처음부터 다시 보기'
     case 'obsidian': {
       if (STORE.kind !== 'server'){ toast('GitHub에 저장된 노트예요. Obsidian에서는 Obsidian Git으로 같은 저장소를 받아 열어 주세요'); break; }
-      const key = parse()[2], file = key && (IDX[S.profile] || {})[key];
+      const pp = parse(), key = pp[1] === 'tb' ? pp[3] || pp[2] : pp[2], file = key && ((IDX[S.profile] || {})[key] || ((db().textbooks || []).find(x => x.id === key) || {}).path);   // 교과서는 저장 목록에 없으니 읽어 온 경로로
+      const tb = pp[1] === 'tb' && (db().textbooks || []).find(x => x.id === key);
+      if (tb && tb.source){ location.href = `obsidian://open?file=${encodeURIComponent(tb.source.replace(/\.md$/, ''))}`; break; }   // 교과서는 Obsidian 원본이 정본 — 원본 볼트에서 연다
       if (!file){ toast('아직 파일로 저장되지 않았어요. 잠시 뒤 다시 눌러 주세요'); break; }
       location.href = `obsidian://open?vault=${encodeURIComponent(S.profile)}&file=${encodeURIComponent(file.replace(/\.md$/, ''))}`;
       break;
@@ -3065,9 +3255,10 @@ document.addEventListener('submit', e => {
       : { id:uid('p'), title, created:TODAY, links, sources:[], body:f.body.value.trim() || title };
     let undo;
     if (f.dataset.kind === 'fleeting'){ const i = D.fleeting.findIndex(x => x.id === f.dataset.id); const [gone] = D.fleeting.splice(i, 1); undo = () => D.fleeting.splice(i, 0, gone); }
+    else if (f.dataset.kind === 'tb'){ const x = tbOfId(f.dataset.id); p.sources = toCtx ? [`[[${x.title}]]`] : [x.id]; undo = () => {}; }   // 교과서는 읽기전용 — 출처로만 잇고 건드리지 않는다
     else { const r = find('refs', f.dataset.id); const it = r.ideas[+f.dataset.idx]; it[toCtx ? 'ctx' : 'perm'] = p.id; p.sources = [r.id]; undo = () => { it.perm = null; it.ctx = null; }; }
     D[col].push(p); go(`#/knowledge/${toCtx ? 'ctx' : 'perm'}/${p.id}`);
-    toast(f.dataset.kind === 'fleeting' ? `${name}를 만들고 임시노트는 지웠어요` : `${name}를 만들었어요`, { label:'되돌리기', fn:() => { D[col] = D[col].filter(x => x.id !== p.id); undo(); go(f.dataset.kind === 'fleeting' ? '#/knowledge/fleeting' : `#/knowledge/ref/${f.dataset.id}`); } });
+    toast(f.dataset.kind === 'fleeting' ? `${name}를 만들고 임시노트는 지웠어요` : `${name}를 만들었어요`, { label:'되돌리기', fn:() => { D[col] = D[col].filter(x => x.id !== p.id); undo(); go(f.dataset.kind === 'fleeting' ? '#/knowledge/fleeting' : f.dataset.kind === 'tb' ? tbHref(tbOfId(f.dataset.id)) : `#/knowledge/ref/${f.dataset.id}`); } });
   } else if (kind === 'record'){
     const L = find('longs', f.dataset.id); const raw = parseFloat(f.amt.value);
     if (!(raw > 0)) return invalid(f.amt, `rec-err-${L.id}`);

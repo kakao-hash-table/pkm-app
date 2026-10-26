@@ -14,7 +14,7 @@
   const toVal = (p, k) => (k == null || k === '' ? k : p.k2v[k] || k);
 
   const DEFAULT_FOLDERS = {
-    inbox:'00_인박스', reference:'01_지식/참조노트', fleeting:'01_지식/임시노트', permanent:'01_지식/영구노트', context:'01_지식/맥락노트',
+    inbox:'00_인박스', reference:'01_지식/참조노트', fleeting:'01_지식/임시노트', permanent:'01_지식/영구노트', context:'01_지식/맥락노트', textbook:'01_지식/교과서', cards:'01_지식/교과서 카드',
     daily:'02_시간/데일리', project:'03_행동/단기보드', area:'03_행동/장기보드', routine:'03_행동/루틴보드', appointment:'03_행동/약속보드',
     templates:'_템플릿'
   };
@@ -164,12 +164,13 @@
       files[place(`${F.reference}/${r.type}`, r.title, r.id)] = writeDoc(fm, [['한 줄 요약', r.summary], ['핵심 내용', Array.isArray(r.points) ? r.points.join('\n') : r.points], [quotesTitle, r.quotes], ['내 생각 → 영구노트 후보', ideas]]);
     });
     sortById(D.perms).forEach(p => {
-      files[place(F.permanent, p.title, p.id)] = writeDoc({ type:'permanent', id:p.id, title:p.title, created:p.created, links:(p.links || []).map(id => byId(D.perms, id)).filter(Boolean).map(x => link(x.title)), sources:(p.sources || []).map(id => byId(D.refs, id)).filter(Boolean).map(x => link(x.title)) }, [], p.body);
+      files[place(F.permanent, p.title, p.id)] = writeDoc({ type:'permanent', id:p.id, title:p.title, created:p.created, links:(p.links || []).map(id => byId(D.perms, id)).filter(Boolean).map(x => link(x.title)), sources:(p.sources || []).map(id => byId(D.refs, id) || byId(D.textbooks, id)).filter(Boolean).map(x => link(x.title)) }, [], p.body);
     });
     sortById(D.ctxs).forEach(c => {
       const hist = ['| 날짜 | 무엇이 바뀌었나 | 왜 |', '|---|---|---|', ...(c.history || []).slice().sort((a, b) => a.date.localeCompare(b.date)).map(h => `| ${h.date} | ${cell(h.what)} | ${cell(h.why)} |`)].join('\n');
       files[place(F.context, c.title, c.id)] = writeDoc({ type:'context', id:c.id, topic:c.title, created:c.created, updated:c.updated, sources:c.sources || [] }, [['한 줄 요약', c.summary], ['내용', c.body], ['바뀐 기록', hist]]);
     });
+    // 교과서(D.textbooks)는 읽기전용이라 쓰지 않는다 — 파일 지도에 없으니 저장이 고치지도 지우지도 않는다
     // 데일리 — 계획·메모·회고·체크한 루틴이 있을 때만 파일을 만든다
     const days = new Set([...Object.keys(D.dailies || {}), ...Object.keys(D.routineDone || {})]);
     [...days].sort().forEach(d => {
@@ -235,7 +236,7 @@
   }
 
   /* ---------- 읽기: 파일 지도 → 프로필 하나 ---------- */
-  function emptyDb(){ return { inbox:[], refs:[], fleeting:[], perms:[], ctxs:[], dailies:{}, kinds:[], meetings:[], tasks:[], longs:[], routines:[], appts:[], routineDone:{}, formats:['책', '아티클', '영상'] }; }
+  function emptyDb(){ return { inbox:[], refs:[], fleeting:[], perms:[], ctxs:[], textbooks:[], tbCards:[], dailies:{}, kinds:[], meetings:[], tasks:[], longs:[], routines:[], appts:[], routineDone:{}, formats:['책', '아티클', '영상'] }; }
   let seq = 0;
   const newId = p => p + Date.now().toString(36).slice(-4) + (seq++).toString(36);
 
@@ -267,8 +268,10 @@
     const kindByName = n => D.kinds.find(k => k.name === n);
     const paths = {};   // id → 읽어 온 파일 경로 (사용자가 Obsidian에서 이름을 바꿨으면 저장 때 옛 파일을 정리한다)
     const later = [];   // 제목 링크는 모두 읽은 뒤에 id로 바꾼다
+    const tbDir = ((settings.folders || {}).textbook || DEFAULT_FOLDERS.textbook) + '/';
+    const cardDir = ((settings.folders || {}).cards || DEFAULT_FOLDERS.cards) + '/';
     for (const d of docs){
-      const f = d.fm, S = d.sections, type = f.type;
+      const f = d.fm, S = d.sections, type = d.path.startsWith(tbDir) ? 'textbook' : d.path.startsWith(cardDir) ? 'cards' : f.type;
       const id = f.id != null ? String(f.id) : null;
       const n0 = Object.values(D).reduce((a, v) => a + (Array.isArray(v) ? v.length : 0), 0);
       if (type === 'inbox') D.inbox.push({ id:id || newId('i'), text:d.body, created:String(f.captured || f.created || '') });
@@ -283,7 +286,7 @@
       }
       else if (type === 'permanent'){
         const p = { id:id || newId('p'), title:String(f.title || base(d.path)), created:String(f.created || ''), links:[], sources:[], body:d.body };
-        later.push(() => { p.links = (f.links || []).map(unlink).map(t => (D.perms.find(x => same(x.title, t)) || {}).id).filter(Boolean); p.sources = (f.sources || []).map(unlink).map(t => (D.refs.find(x => same(x.title, t)) || {}).id).filter(Boolean); });
+        later.push(() => { p.links = (f.links || []).map(unlink).map(t => (D.perms.find(x => same(x.title, t)) || {}).id).filter(Boolean); p.sources = (f.sources || []).map(unlink).map(t => (D.refs.find(x => same(x.title, t)) || D.textbooks.find(x => same(x.title, t)) || {}).id).filter(Boolean); });
         D.perms.push(p);
       }
       else if (type === 'context'){
@@ -340,6 +343,17 @@
       else if (type === 'routine'){
         D.routines.push({ id:id || newId('R'), title:String(f.title || base(d.path)), enabled:f.enabled !== false, cron:String(f.cron || '0 9 * * *'), duration:Number(f.duration) || 30, block:f.block || null, area:unlink(f.area), amount:f.amount == null ? null : Number(f.amount), content:S['루틴 내용'] || '' });
       }
+      else if (type === 'textbook'){
+        // 읽기전용(SPEC §0-1) — 읽어서 보여 주기만 하고 serialize 는 쓰지 않는다. 경로를 그대로 들고 있는다
+        const rel = d.path.startsWith(tbDir) ? d.path.slice(tbDir.length) : d.path;
+        D.textbooks.push({ id:id || 'B' + pathId(rel), title:String(f.title || base(d.path)), book:String(f.book || rel.split('/')[0]), kind:String(f.kind || 'note'), chapter:f.chapter == null ? '' : String(f.chapter),
+          order:f.order == null ? 9999 : Number(f.order), path:d.path, source:f.source ? String(f.source) : '', updated:f.updated ? String(f.updated).slice(0, 10) : '', body:d.body });
+      }
+      else if (type === 'cards'){
+        // 교과서 노트 하나를 짧은 카드 여러 장으로 다시 쓴 것(SPEC §0-2) — 읽기전용, `## 카드 제목` 하나가 카드 한 장
+        const cards = [...('\n' + d.body).matchAll(/\n## +(.+)\n([\s\S]*?)(?=\n## |$)/g)].map(m => { const q = m[2].match(/^\s*> \[!question\] *(.+)\n?/); return { title:m[1].trim(), q:q ? q[1].trim() : '', body:(q ? m[2].slice(q[0].length) : m[2]).trim() }; });   // 카드 바로 아래 > [!question] 줄 = 복습 질문
+        D.tbCards.push({ id:id || 'C' + pathId(d.path), from:String(f.from || ''), fromHash:String(f.from_hash || ''), title:String(f.title || base(d.path)), book:String(f.book || ''), path:d.path, cards });
+      }
       else if (type === 'appointment'){
         D.appts.push({ id:id || newId('a'), title:String(f.title || base(d.path)), start:String(f.start || ''), end:String(f.end || f.start || ''), location:f.location ? String(f.location) : '', attendees:(f.attendees || []).map(String), gcal_id:f.gcal_id ? String(f.gcal_id) : '', memo:S['메모'] || '' });
       }
@@ -364,6 +378,7 @@
     return { db:D, settings, paths };
   }
   const base = p => p.split('/').pop().replace(/\.md$/, '');
+  const pathId = p => { let h = 2166136261; for (const c of p) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h.toString(36); };   // id 없는 교과서 파일 — 경로가 같으면 같은 id
   function tableRows(s){
     return String(s || '').split('\n').filter(l => /^\s*\|/.test(l) && !/^\s*\|\s*-/.test(l)).slice(1).map(l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
   }
@@ -376,7 +391,8 @@
     return { writes, deletes, empty:!Object.keys(writes).length && !deletes.length };
   }
 
-  const api = { FORMAT_VERSION, serialize, parse, diff, parseDoc, writeDoc, parseYaml, emptyDb, DEFAULT_FOLDERS, SETTINGS, STATUS, RSTATUS, FORMAT, UNIT };
+  const textHash = pathId;   // 카드가 만들어진 뒤 원본 노트가 바뀌었는지 — 같은 함수를 브라우저와 Node가 함께 쓴다
+  const api = { FORMAT_VERSION, textHash, serialize, parse, diff, parseDoc, writeDoc, parseYaml, emptyDb, DEFAULT_FOLDERS, SETTINGS, STATUS, RSTATUS, FORMAT, UNIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMMD = api;
 })(typeof self !== 'undefined' ? self : this);
