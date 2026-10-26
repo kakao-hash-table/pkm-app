@@ -9,7 +9,7 @@
   const STATUS = pair({ todo:'대기', doing:'진행', waiting:'기다림', done:'완료' });
   const RSTATUS = pair({ to_read:'읽을것', reading:'읽는중', processed:'정리완료' });
   const FORMAT = pair({ book:'책', article:'아티클', video:'영상' });
-  const UNIT = pair({ hours:'시간', books:'권', times:'회' });
+  const UNIT = pair({ hours:'시간', books:'권', times:'회', entries:'기록만' });   // 그 밖의 값은 사용자가 직접 적은 단위(이름 그대로)
   const toKey = (p, v) => (v == null || v === '' ? v : p.v2k[v] || v);
   const toVal = (p, k) => (k == null || k === '' ? k : p.k2v[k] || k);
 

@@ -106,3 +106,31 @@ test('교과서 카드는 노트별 카드 묶음으로 읽고, 원본이 바뀌
   assert.equal(db.tbCards[0].fromHash, MD.textHash(db.textbooks[0].body), '같은 본문이면 같은 해시');
   assert.ok(!Object.keys(MD.serialize({ db, settings })).some(p => p.startsWith('01_지식/교과서 카드/')), '카드 파일을 쓰지 않는다');
 });
+test('장기 단위 기록만·직접 입력이 왕복한다', () => {
+  const db = { ...seed, longs:[
+    { id:'L-perf', title:'성과관리', metric:'성과 근거', unit:'기록만', why:'', retro:'', records:[{ date:'2026-10-20', amt:1, memo:'3분기 리뷰 피드백', src:'직접' }] },
+    { id:'L-run', title:'달리기', metric:'거리', unit:'km', why:'', retro:'', records:[{ date:'2026-10-21', amt:5.2, memo:'', src:'직접' }] },
+  ] };
+  const files = MD.serialize({ db, settings });
+  const perf = Object.entries(files).find(([p]) => p.includes('성과관리'))[1];
+  assert.match(perf, /unit: entries/);
+  const back = MD.parse(files).db.longs;
+  const P = back.find(L => L.id === 'L-perf'), R = back.find(L => L.id === 'L-run');
+  assert.equal(P.unit, '기록만'); assert.equal(P.records[0].amt, 1); assert.equal(P.records[0].memo, '3분기 리뷰 피드백');
+  assert.equal(R.unit, 'km'); assert.equal(R.records[0].amt, 5.2);
+});
+test('장기 기록을 메모 앞 이름으로 묶는다', () => {
+  const app = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const fn = name => { const i = app.indexOf(`function ${name}(`); let depth = 0, j = app.indexOf('{', i); for (; j < app.length; j++){ if (app[j] === '{') depth++; else if (app[j] === '}' && --depth === 0) break; } return app.slice(i, j + 1); };
+  const { splitTag, lrGroups } = new Function(`${fn('splitTag')}; ${fn('lrGroups')}; return { splitTag, lrGroups };`)();
+  assert.deepEqual(splitTag('A: 장애 대응 주도'), { tag:'A', text:'장애 대응 주도' });
+  assert.deepEqual(splitTag('결제 개편：배포 자동화'), { tag:'결제 개편', text:'배포 자동화' });
+  assert.equal(splitTag('https://example.com 참고').tag, '');
+  assert.equal(splitTag('그냥 메모').tag, '');
+  const g = lrGroups([
+    { date:'2026-03-02', memo:'B: 리뷰 꼼꼼함' }, { date:'2026-01-10', memo:'A: 온보딩 도움' },
+    { date:'2026-02-01', memo:'이름 없는 기록' }, { date:'2026-04-01', memo:'A: 장애 대응' },
+  ]);
+  assert.deepEqual(g.map(x => x.tag), ['A', 'B', '']);
+  assert.deepEqual(g[0].items.map(x => x.text), ['온보딩 도움', '장애 대응']);
+});

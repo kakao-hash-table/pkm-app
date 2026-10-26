@@ -20,6 +20,10 @@
 // GET  /api/profile/:p/plugins/:id/machine 이 컴퓨터의 승인·비밀값 상태     POST …/approve  승인     POST …/secret {name, value|null}
 // POST /api/profile/:p/plugins/:id/local {settings, auto}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
 // GET  /api/profile/:p/plugins/:id/scripts  가져오는 스크립트 내용(승인 전에 보여 준다)
+// GET  /api/profile/:p/gcal              구글 캘린더 연결 상태
+// GET  /api/profile/:p/gcal/connect      구글 로그인으로 보낸다(302) — 돌아오는 곳은 /api/gcal/callback
+// POST /api/profile/:p/gcal/sync         지금 맞추기 · POST …/gcal/disconnect 연결 끊기
+// POST /api/gcal/client {client_id, client_secret}   내 구글 OAuth 클라이언트 등록(토큰과 함께 ~/.pkm-app/gcal.json, 데이터 폴더 밖)
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -41,6 +45,7 @@ const PORT = Number(process.env.PORT || 5270);
 const HOST = process.env.HOST || '127.0.0.1';
 const MD = createRequire(import.meta.url)('../web/js/pkm-md.js');
 const run = promisify(execFile);
+const { createGcal } = await import('./gcal.js');
 
 /* ---------- 안전한 경로 ---------- */
 const validProfile = n => typeof n === 'string' && n.length > 0 && n.length <= 60 && !/[\\/:]/.test(n) && !n.startsWith('_') && !n.startsWith('.') && n !== '..';
@@ -92,7 +97,7 @@ async function readonlyIn(p, rels){
   }
   return null;
 }
-async function save(p, { writes = {}, deletes = [] }){
+async function save(p, { writes = {}, deletes = [] }, { fromGcal = false } = {}){
   const dir = path.join(DATA, p);
   const ro = await readonlyIn(p, [...Object.keys(writes), ...deletes]);
   if (ro) throw Object.assign(new Error(`읽기전용 노트라 앱에서 고칠 수 없어요: ${ro}`), { status:403 });
@@ -109,6 +114,7 @@ async function save(p, { writes = {}, deletes = [] }){
     await fs.mkdir(path.dirname(to), { recursive:true }); await fs.rename(abs, to);
   }
   if ((await settingsOf(p)).storage === 'github') scheduleSync(p);
+  if (!fromGcal) touchesAppointments(p, [...Object.keys(writes), ...deletes]).then(yes => yes && gcal.schedule(p)).catch(() => {});
   return { version:await versionOf(p) };
 }
 async function createProfile(name){
@@ -202,6 +208,19 @@ async function syncTextbooks(){
     }
   }
 }
+/* ---------- 구글 캘린더 (server/gcal.js) ---------- */
+// 돌아오는 주소는 이 서버의 실제 포트로 — 구글 "데스크톱 앱" 클라이언트는 127.0.0.1의 아무 포트나 받아 준다
+const gcal = createGcal({
+  MD, read:async p => (await readProfile(p)).files, write:(p, ch) => save(p, ch, { fromGcal:true }),
+  redirectUri:() => `http://127.0.0.1:${server.address()?.port || PORT}/api/gcal/callback`, log:m => console.log(m),
+});
+async function touchesAppointments(p, rels){
+  const folder = ((await settingsOf(p)).folders || {}).appointment || MD.DEFAULT_FOLDERS.appointment;
+  return rels.some(r => r.startsWith(folder + '/'));
+}
+setInterval(() => { for (const p of gcal.connectedProfiles()) if (fss.existsSync(path.join(DATA, p))) gcal.sync(p).catch(() => {}); }, 120000).unref();
+const page = (title, text) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><body style="font:16px/1.5 -apple-system,system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 24px;color:#1b1d21"><h1 style="font-size:20px">${title}</h1><p>${text}</p></body>`;
+const escHtml = v => String(v).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
 /* ---------- (선택) 허브로 돌아가는 줄 ---------- */
 // PKM_HUB_LINK 에 withHubLink(html, req) 를 내보내는 모듈 경로를 주면, 여러 사이트를 모아 보는 허브로 돌아가는 줄을 맨 위에 붙인다(선택).
@@ -230,6 +249,15 @@ async function api(req, res, url){
   }
   if (parts[0] === 'plugins' && parts[1] === 'bundled' && req.method === 'GET') return send(res, 200, { plugins:await plugins.bundled(path.join(ROOT, 'plugins')) });
   if (parts[0] === 'plugins' && parts[1] === 'inspect' && req.method === 'POST') return send(res, 200, await plugins.inspect(await body(req)));
+  if (parts[0] === 'gcal'){
+    if (parts[1] === 'client' && req.method === 'POST'){ gcal.setClient(await body(req)); return send(res, 200, { ok:true }); }
+    if (parts[1] === 'callback' && req.method === 'GET'){
+      try {
+        const r = await gcal.callback(Object.fromEntries(url.searchParams));
+        return send(res, 200, page('구글 캘린더를 연결했어요', `${escHtml(r.email || '구글 계정')}의 캘린더를 프로필 "${escHtml(r.profile)}"의 약속과 맞추기 시작했어요. 이 창은 닫아도 돼요.`), 'text/html; charset=utf-8');
+      } catch (e) { return send(res, 400, page('연결하지 못했어요', escHtml(e.message)), 'text/html; charset=utf-8'); }
+    }
+  }
   if (parts[0] === 'profiles'){
     if (req.method === 'GET') return send(res, 200, { profiles:await listProfiles() });
     if (req.method === 'POST') return send(res, 201, await createProfile(String((await body(req)).name || '').trim()));
@@ -260,6 +288,16 @@ async function api(req, res, url){
       if (req.method === 'GET' && !parts[3]) return send(res, 200, { plugins:await plugins.list(dir) });
       if (req.method === 'POST' && !parts[3]){ const r = await plugins.install(dir, String((await body(req)).stage || '')); if ((await settingsOf(p)).storage === 'github') scheduleSync(p); return send(res, 201, r); }
       if (req.method === 'DELETE' && parts[3]){ const r = await plugins.remove(dir, parts[3]); if ((await settingsOf(p)).storage === 'github') scheduleSync(p); return send(res, 200, r); }
+    }
+    if (sub === 'gcal'){
+      const act = parts[3] || '';
+      if (req.method === 'GET' && !act) return send(res, 200, gcal.status(p));
+      if (req.method === 'GET' && act === 'connect'){
+        try { res.writeHead(302, { location:gcal.connectUrl(p), 'cache-control':'no-store' }); return res.end(); }
+        catch (e) { return send(res, 400, page('연결하지 못했어요', escHtml(e.message)), 'text/html; charset=utf-8'); }
+      }
+      if (req.method === 'POST' && act === 'sync'){ await gcal.sync(p); return send(res, 200, gcal.status(p)); }
+      if (req.method === 'POST' && act === 'disconnect'){ await gcal.disconnect(p); return send(res, 200, gcal.status(p)); }
     }
     if (sub === 'sync'){
       if (req.method === 'POST'){ const s = await syncNow(p); return send(res, 200, { state:s.state, at:s.at, error:s.error }); }
@@ -316,4 +354,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)){
   runner.start();
   server.listen(PORT, HOST, () => console.log(`PKM: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/  (데이터: ${DATA})`));
 }
-export { server, runner, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };
+export { server, runner, gcal, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };
