@@ -183,6 +183,8 @@ main{padding:40px 40px 72px;min-width:0}
   /* 탭이 많은 곳은 휴대폰에서 선택 상자로 — 옆으로 밀려 안 보이는 탭이 없게 */
   .seg-pick .seg{display:none}
   .seg-pick .seg-select{display:block}
+  .grp-pick .chip-bar{display:none}
+  .grp-pick .grp-select{display:block;margin-bottom:12px}
 }
 .seg-select{display:none;width:100%;height:3rem;margin-bottom:24px;padding:0 40px 0 14px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 16px center;color:var(--text);font-size:1.0625rem;font-weight:700;appearance:none}
 
@@ -233,6 +235,23 @@ a.row:hover{background:var(--fill)}
 
 /* 자동화 자리 표시 (목업 보기 전용) */
 .auto-tag{display:none}
+.chip-bar{display:flex;flex-wrap:wrap;gap:8px;padding:2px;margin:0 0 12px}
+.grp-select{display:none}
+@media (hover:none){.hover-only{display:none}}
+.grp-note{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0 0 12px;color:var(--text-2)}
+.chip-btn{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:36px;padding:0 14px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);color:var(--text-2);font:inherit;font-weight:600;font-size:.875rem;cursor:pointer}
+.chip-btn:hover{background:var(--fill)}
+.chip-btn[aria-pressed="true"]{border:2px solid var(--primary);padding:0 13px;background:var(--primary-weak);color:var(--on-primary-weak)}
+.row .snip{display:block;margin-top:4px;font-size:.875rem;color:var(--text-2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+mark{background:var(--primary-weak);color:inherit;font-weight:700;border-radius:3px;padding:0 1px}
+.search-form{display:flex;gap:8px;margin:0 0 16px}
+.search-form input[type=search]{font-size:1.0625rem}
+.ai-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 0}
+.ai-out{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
+.ai-out .ai-out-h{margin:0 0 8px;font-size:.8125rem;font-weight:700;color:var(--text-2)}
+.recall{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.recall h3{margin:0;font-size:1.0625rem}
+.off-note{margin:0 0 12px;padding:10px 14px;border-radius:10px;background:var(--fill);color:var(--text-2)}
 .show-auto .auto-tag{display:inline-flex;align-items:center;gap:4px;font-size:.75rem;font-weight:700;color:var(--auto);border:1px dashed var(--auto);border-radius:6px;padding:0 6px;margin:2px 0;white-space:normal}
 .show-auto .auto-zone{outline:2px dashed var(--auto);outline-offset:4px;border-radius:var(--r-md)}
 
@@ -641,6 +660,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
     <button class="btn btn-tonal btn-block" type="button" data-act="capture">
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>메모하기
     </button>
+    <a class="btn btn-text btn-sm" href="#/search" style="justify-content:flex-start;margin-top:-8px">찾기 <span class="faint" aria-hidden="true">/</span></a>
     <nav aria-label="영역">
       <ul class="nav" id="nav-side"></ul>
     </nav>
@@ -649,9 +669,9 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
   <div style="min-width:0">
     <header class="topbar">
       <button class="profile-btn" type="button" data-act="profiles" aria-haspopup="dialog"><span class="brand">pkm</span><span class="profile-name"></span><span aria-hidden="true">▾</span></button>
-      <button class="btn btn-tonal btn-sm" type="button" data-act="capture">
+      <span style="display:flex;gap:8px"><a class="btn btn-ghost btn-sm" href="#/search">찾기</a><button class="btn btn-tonal btn-sm" type="button" data-act="capture">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>메모하기
-      </button>
+      </button></span>
     </header>
     <main id="main" tabindex="-1"></main>
   </div>
@@ -660,6 +680,15 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 <nav class="tabbar" aria-label="영역"><ul id="nav-tab"></ul></nav>
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<!-- 복사하기(클립보드를 못 쓸 때) -->
+<dialog id="dlg-copy" aria-labelledby="copy-title">
+  <form method="dialog" class="stack">
+    <div><h2 id="copy-title">복사할 글</h2><p class="faint" style="margin:4px 0 0">여기서는 바로 복사할 수 없어요. 글을 길게 눌러(또는 ⌘C로) 복사해 주세요.</p></div>
+    <label class="field"><span class="sr-only">복사할 글</span><textarea id="copy-text" readonly style="min-height:200px"></textarea></label>
+    <div class="dlg-actions"><button class="btn btn-primary" type="button" data-act="close-dlg">닫기</button></div>
+  </form>
+</dialog>
 
 <!-- 메모하기 -->
 <dialog id="dlg-capture" aria-labelledby="cap-title">
@@ -745,6 +774,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
     <p class="faint" style="margin:0">지금 프로필의 데이터 위치 <button class="btn btn-text btn-sm" type="button" data-act="storage" style="padding:0 6px">저장 위치 바꾸기</button></p>
     <p class="faint" style="margin:-12px 0 0">메뉴 순서와 보이는 메뉴 <button class="btn btn-text btn-sm" type="button" data-act="menu-edit" aria-haspopup="dialog" style="padding:0 6px">메뉴 편집하기</button></p>
     <p class="faint" style="margin:-12px 0 0"><span class="ai-line-t">AI 연결 안 됨</span> <button class="btn btn-text btn-sm" type="button" data-act="ai" data-ai-open aria-haspopup="dialog" style="padding:0 6px">AI 연결하기</button></p>
+    <p class="faint" style="margin:-12px 0 0">정한 때마다 AI에게 맡길 일 <button class="btn btn-text btn-sm" type="button" data-act="jobs-open" style="padding:0 6px">AI 예약 작업</button></p>
     <p class="faint" style="margin:-12px 0 0" id="pf-plugins"><span id="pf-pl-t">플러그인</span> <button class="btn btn-text btn-sm" type="button" data-act="plugins-manage" style="padding:0 6px">플러그인 관리하기</button></p>
     <label class="field"><span>새 프로필 이름</span><input name="name" id="pf-name" autocomplete="off" placeholder="예: 사이드 프로젝트" aria-describedby="pf-err"></label>
     <p class="err" id="pf-err" hidden></p>
@@ -821,6 +851,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
       <div id="day-rows" style="display:flex;flex-direction:column;gap:8px"></div>
       <button class="btn btn-text btn-sm" type="button" data-act="day-add-row" style="align-self:flex-start">+ 비워 둘 시간 추가</button>
     </fieldset>
+    <label class="field"><span>쉬는 날 <span class="hint">한 줄에 하나 — 예: 2026-08-14 휴가, 여러 날은 2026-08-14~2026-08-17 여름휴가. 이날은 평일 루틴과 평일에 비워 둔 시간이 빠져요</span></span><textarea name="offdays" id="day-off" style="min-height:72px" aria-describedby="day-err"></textarea></label>
     <div class="form-row">
       <label class="field" style="flex:1 1 140px"><span>빈 시간 채우는 비율</span><select name="fill_ratio"></select></label>
       <label class="field" style="flex:1 1 140px"><span>블록 최대 길이</span><select name="max_block"></select></label>
@@ -1027,7 +1058,7 @@ function emptyDB(){
 const PROFILES = {};
 let PLIST = [];   // [{ name, storage, repo }] — 불러오지 않은 프로필도 이름은 안다
 /* 프로필마다 하루·저장 설정 — data/<프로필>/_설정.md */
-const DEF_SET = () => ({ storage:'device', week_start:1, day_start:'09:00', day_end:'18:00', blocked:[], fill_ratio:0.75, max_block:120, default_block:60, onboarded:false });
+const DEF_SET = () => ({ storage:'device', week_start:1, day_start:'09:00', day_end:'18:00', blocked:[], offdays:[], fill_ratio:0.75, max_block:120, default_block:60, onboarded:false });
 const PSET = {};
 const pset = () => PSET[S.profile] || (PSET[S.profile] = DEF_SET());
 const GH = { login:null, repos:[] };   // 서버 없이 GitHub에 저장할 때만(토큰)
@@ -1221,6 +1252,8 @@ const dayDiff = (a, b) => dnum(a) - dnum(b);
 const wd = s => WD[new Date(s.slice(0,10) + 'T00:00:00').getDay()];
 const md2 = s => { const [, m, d] = s.slice(0,10).split('-').map(Number); return `${m}월 ${d}일`; };
 const fmtDate = s => `${md2(s)} (${wd(s)})`;
+const fmtDateY = s => `${s.slice(0, 4) !== TODAY.slice(0, 4) ? s.slice(0, 4) + '년 ' : ''}${fmtDate(s)}`;   // 올해가 아니면 연도까지
+const recTime = m => m.time && m.time !== '00:00' ? ' ' + m.time : '';   // 옮겨 온 기록처럼 시각을 모르면 비운다
 const hm = s => s.slice(11, 16);
 const DISPLAY_STATUS = { '읽을것':'읽을 것', '읽는중':'읽는 중', '정리완료':'정리 완료' };
 function relTime(iso){
@@ -1282,9 +1315,12 @@ function cronText(c){
   return c;
 }
 const cronTime = c => cronTimes(c)[0];
+/* 쉬는 날(휴가·공휴일) — 평일에만 도는 루틴과 비워 둘 시간이 그날은 쉰다. 매일·주말 것은 그대로 */
+const offOf = date => (pset().offdays || []).find(o => o.date === date);
 function runsOn(c, date){
   const [, , dom, , dow] = c.split(' ');
   const day = new Date(date + 'T00:00:00').getDay();
+  if (dow !== '*' && !/[06]/.test(dow) && offOf(date)) return false;
   const dd = +date.slice(8, 10);
   if (dom !== '*' && +dom !== dd) return false;
   if (dow === '*') return true;
@@ -1312,6 +1348,10 @@ function wikilink(t, alias){
   const r = db().refs.find(x => x.title === t); if (r) return `<a class="wl" href="#/knowledge/ref/${r.id}">${label}</a>`;
   const L = longByTitle(t); if (L) return `<a class="wl" href="#/action/long/${L.id}">${label}</a>`;
   const b = (db().textbooks || []).find(x => x.title === t); if (b) return tb(b);
+  const c = db().ctxs.find(x => x.title === t); if (c) return `<a class="wl" href="#/knowledge/ctx/${c.id}">${label}</a>`;
+  const m = db().meetings.find(x => `${x.date} ${x.title}` === t || x.title === t); if (m) return `<a class="wl" href="${recHref(m)}">${label}</a>`;
+  const k = db().tasks.find(x => x.title === t); if (k) return `<a class="wl" href="#/action/short/${k.id}">${label}</a>`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t) && db().dailies[t]) return `<a class="wl" href="#/time/daily/${t}">${label}</a>`;
   return `<span class="wl-missing" title="아직 없는 노트예요">${label}<span class="sr-only"> (아직 없는 노트)</span></span>`;
 }
 
@@ -1352,6 +1392,7 @@ function md(src){
   const isBlock = l => /^(```|\s*\||#{1,6}\s|>|\s*[-*]\s|\d+\.\s|-{3,}\s*$)/.test(l);
   while (i < L.length){
     const l = L[i];
+    if (/^\s*<!--/.test(l)){ while (i < L.length && !L[i].includes('-->')) i++; i++; continue; }
     if (l.startsWith(FENCE)){
       const lang = l.slice(3).trim(); i++; const buf = [];
       while (i < L.length && !L[i].startsWith(FENCE)) buf.push(L[i++]);
@@ -1416,11 +1457,38 @@ function seg(items, current, cls = '', pick = ''){
   return `<nav class="seg-pick" aria-label="보기 전환">${tabs}<select class="seg-select" data-act="seg-go" aria-label="${pick}">${items.map(([key, href, label, sub]) =>
     `<option value="${href}" ${key === current ? 'selected' : ''}>${text(label)}${sub ? ` · ${sub}` : ''}</option>`).join('')}</select></nav>`;
 }
-document.addEventListener('change', e => { if (e.target.matches && e.target.matches('select[data-act="seg-go"]')) go(e.target.value); });
+document.addEventListener('change', e => { if (e.target.matches && e.target.matches('select[data-act="seg-go"]')) go(e.target.value);
+  if (e.target.matches && e.target.matches('select[data-act="k-group-sel"]')){ LS.set(`pkm:v1:kg:${S.profile}:${e.target.dataset.tab}`, e.target.value); render(); } });
 function empty(title, body, btn = '', smile = ''){
   return `<div class="empty"><h2>${title}</h2><p>${body}</p>${btn}${smile && S.humor ? `<p class="smile">${smile}</p>` : ''}</div>`;
 }
 const autoTag = t => `<span class="auto-tag">자동화 자리 · ${t}</span>`;
+const chipBar = (items, cur, act, label, extra = '') => `<div class="chip-bar" role="group" aria-label="${label}">${items.map(([v, l, n]) => `<button class="chip-btn" type="button" data-act="${act}" data-v="${esc(v)}" ${extra} aria-pressed="${v === cur}">${esc(l)}${n != null ? ` <span class="num">${n}</span>` : ''}</button>`).join('')}</div>`;
+/* AI로 더 하기 — pkm-ai-server에 연결돼 있을 때만 버튼이 보인다. 없어도 모든 화면은 그대로 쓸 수 있다 */
+const AIR = {};   // 화면마다 AI 결과 { state:'run'|'ok'|'err', text, data, msg }
+const aiReady = () => !!(PKMAI.conn() && PKMAI.prefs().provider);
+function aiJSON(t){ const m = String(t || '').match(/[\[{][\s\S]*[\]}]/); if (!m) return null; try { return JSON.parse(m[0]); } catch (e) { return null; } }
+async function aiAsk(key, prompt, json = false){
+  if (AIR[key] && AIR[key].state === 'run') return;
+  AIR[key] = { state:'run' }; render();
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 180000);
+  let text = '';
+  try {
+    const job = await PKMAI.run({ prompt, tag:`pkm-${key.split(':')[0]}`, signal:ac.signal, onText:x => { text += x; } });
+    if (job.status !== 'done') throw new Error(job.error || '답을 받지 못했어요');
+    const out = String((job.result && job.result.text) || text).trim(), data = json ? ((job.result && job.result.structured) || aiJSON(out)) : null;
+    if (json && !data) throw new Error('AI 답을 읽지 못했어요. 다시 시도해 주세요');
+    AIR[key] = { state:'ok', text:out, data };
+  } catch (e) { AIR[key] = { state:'err', msg:e.name === 'AbortError' ? '3분 안에 답이 오지 않아 그만뒀어요' : e.code === 'guard' ? `${e.message} — 사이드바의 AI 연결에서 확인해 주세요` : e.message }; }
+  clearTimeout(tm); render();
+  const r = AIR[key]; toast(r.state === 'ok' ? 'AI 답이 왔어요' : `AI 요청이 실패했어요 — ${r.msg}`);
+}
+function aiBtn(key, label, act, attrs = ''){
+  if (!aiReady()) return '';
+  const r = AIR[key], run = r && r.state === 'run';
+  return `<div class="ai-row"><button class="btn btn-ghost btn-sm" type="button" data-act="${act}" ${attrs} ${run ? 'disabled aria-busy="true"' : ''}>${run ? 'AI가 쓰는 중…' : label}</button>${r && r.state === 'err' ? `<p class="err" role="alert" style="margin:0">${esc(r.msg)}</p>` : ''}</div>`;
+}
+const aiOut = (title, inner, acts = '') => `<div class="ai-out" role="region" aria-label="${title}"><p class="ai-out-h">${title}</p>${inner}${acts ? `<div class="ai-row">${acts}</div>` : ''}</div>`;
 const obsBtn = (label = 'Obsidian에서 편집') => `<button class="btn btn-ghost btn-sm" type="button" data-act="obsidian">${label}</button>`;
 const statusBadge = s => `<span class="badge b-${s}">${s}</span>`;
 const T_STATUS = ['대기','진행','기다림','완료'];
@@ -1450,7 +1518,7 @@ const toHM = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 6
 const fmtMin = m => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return (h ? `${h}시간` : '') + (h && r ? ' ' : '') + (r ? `${r}분` : '') || '0분'; };
 let NOW_MIN = toMin(nowHM());
 const DAYS = [['*', '매일'], ['1-5', '평일'], ['0,6', '주말']];
-const onDay = (spec, date) => { const d = new Date(date + 'T00:00:00').getDay(); return spec === '*' || (spec === '1-5' ? d >= 1 && d <= 5 : d === 0 || d === 6); };
+const onDay = (spec, date) => { const d = new Date(date + 'T00:00:00').getDay(); return spec === '*' || (spec === '1-5' ? d >= 1 && d <= 5 && !offOf(date) : d === 0 || d === 6); };
 const estOf = t => t.estimate || pset().default_block;
 /* 시간표를 그리는 날 — '지금'은 오늘, 시간 › 계획은 고른 날. 지난 날은 모두 지났고 앞날은 아직 오지 않았다 */
 let PD = TODAY;
@@ -1653,6 +1721,9 @@ function vNow(){
     <section class="section" style="margin-top:0" aria-labelledby="now-h"><h2 id="now-h" tabindex="-1">지금 할 것${todo ? ` <span class="count">${todo}</span>` : ''}</h2>${cards.length ? `<ul class="now-list">${cards.join('')}</ul>` : quietCard}${nextLine}</section>
     ${missed.length ? `<section class="section" aria-labelledby="missed-h"><h2 id="missed-h">지나간 루틴 <span class="count">${missed.length}</span></h2><p class="faint" style="margin:-4px 0 12px">했으면 [했어요], 못 했으면 [건너뛰기]를 눌러요. 건너뛴 것은 실패로 세지 않아요.</p>
       <ul class="now-list">${missed.map(x => nowCard(x.r.block ? `tl-kind blk-${x.r.block}` : '', `${x.r.block ? BLOCKS[x.r.block].label : '루틴'} · ${span(x)}`, esc(kName(x)), '', routineBtns(x))).join('')}</ul></section>` : ''}
+    ${(() => { const dis = S.recDismiss || [], kindFor = a => D.kinds.find(x => a.title.toLowerCase().includes(x.name.toLowerCase())) || D.kinds[0], k = D.kinds[0], ended = k ? D.appts.filter(a => a.start.slice(0, 10) === TODAY && a.end.slice(0, 10) === TODAY && toMin(hm(a.end)) <= NOW_MIN && NOW_MIN - toMin(hm(a.end)) <= 180 && !D.meetings.some(m => m.appt === a.id) && !dis.includes(a.id)) : [];
+      return ended.length ? `<section class="section" aria-labelledby="ended-h"><h2 id="ended-h">방금 끝난 약속 <span class="count">${ended.length}</span></h2><p class="faint" style="margin:-4px 0 12px">잊기 전에 기록을 남길 수 있어요. 날짜와 함께한 사람은 약속에서 채워요.</p>
+        <ul class="now-list">${ended.map(a => nowCard('', `약속 · <span class="num">${hm(a.start)}–${hm(a.end)}</span>`, `<a href="#/action/appt/${a.id}">${esc(a.title)}</a>`, '', `<button class="btn btn-ghost btn-sm" type="button" data-act="rec-dismiss" data-id="${a.id}" aria-label="${esc(a.title)} 기록 안 남기기">안 남겨요</button><button class="btn btn-tonal btn-sm" type="button" data-act="rec-from-appt" data-id="${a.id}" data-kind="${kindFor(a).id}" aria-label="${esc(a.title)} ${esc(kindFor(a).name)} 쓰기">${esc(kindFor(a).name)} 쓰기</button>`)).join('')}</ul></section>` : ''; })()}
     ${carryN ? `<div class="fill-bar" style="margin-top:24px"><p><b>지나간 블록에 못 끝낸 할 일 ${carryN}개</b><span class="faint">남은 빈 시간으로 옮길 수 있어요</span></p><button class="btn btn-tonal btn-sm" type="button" data-act="fill-blocks">남은 빈 시간 채우기</button></div>` : ''}`}
     ${waits || plNowLinks() ? `<p class="now-links">${waits ? `<button class="btn btn-text btn-sm" type="button" data-act="go-waiting">기다리는 중 ${waits}개 ›</button>` : ''}${plNowLinks()}</p>` : ''}
   </div>`;
@@ -2032,10 +2103,120 @@ function openDay(){
   $('#day-sub').textContent = `${S.profile} 프로필 · data/${S.profile}/_설정.md`;
   f.day_start.value = P.day_start; f.day_end.value = P.day_end; f.week_start.value = String(P.week_start ?? 1);
   $('#day-rows').innerHTML = P.blocked.map(dayRow).join('');
+  f.offdays.value = (P.offdays || []).filter(o => o.date >= addDays(TODAY, -31)).slice().sort((a, b) => a.date.localeCompare(b.date)).reduce((acc, o) => { const last = acc[acc.length - 1]; if (last && last.label === o.label && addDays(last.to, 1) === o.date) last.to = o.date; else acc.push({ from:o.date, to:o.date, label:o.label }); return acc; }, []).map(r => `${r.from}${r.to !== r.from ? '~' + r.to : ''}${r.label ? ' ' + r.label : ''}`).join('\n');   // 지난 지 한 달이 넘은 날은 접어 둔다(설정에는 남는다)
   f.fill_ratio.innerHTML = RATIOS.map(r => `<option value="${r}" ${r === P.fill_ratio ? 'selected' : ''}>${Math.round(r * 100)}%</option>`).join('');
   f.max_block.innerHTML = MAXB.map(([v, l]) => `<option value="${v}" ${v === (P.max_block || 0) ? 'selected' : ''}>${l}</option>`).join('');
   f.default_block.innerHTML = DEFB.map(v => `<option value="${v}" ${v === P.default_block ? 'selected' : ''}>${fmtMin(v)}</option>`).join('');
   openDlg('dlg-day'); focusEl(f.day_start);
+}
+
+/* ---------------- 화면: 찾기 ----------------
+   모든 노트·할 일·기록·교과서에서 제목과 본문을 찾는다(이 브라우저 안에서, AI 없이). 띄어 쓴 낱말이 모두 들어간 것만.
+   AI에 연결돼 있으면 찾은 노트를 근거로 물어볼 수 있다 */
+const SR_KIND = [['perm','영구노트'],['ctx','맥락노트'],['ref','참조노트'],['tb','교과서'],['fleeting','임시노트'],['inbox','인박스'],['task','단기'],['rec','기록'],['daily','데일리'],['appt','약속'],['long','장기'],['routine','루틴']];
+const SR_NAME = Object.fromEntries(SR_KIND);
+const line1 = s => String(s || '').split('\n').find(l => l.trim()) || '';
+const dd = s => /^\d{4}-\d{2}-\d{2}/.test(s || '') ? md2(s) : '';
+function searchDocs(){
+  const D = db(), out = [], add = (k, title, text, href, sub) => out.push({ k, title:String(title || ''), text:String(text || ''), href, sub:sub || '' });
+  D.perms.forEach(x => add('perm', x.title, x.body, `#/knowledge/perm/${x.id}`, (x.group || '').replace(/\//g, ' › ')));
+  D.ctxs.forEach(x => add('ctx', x.title, `${x.summary}\n${x.body}`, `#/knowledge/ctx/${x.id}`, (x.group || '').replace(/\//g, ' › ')));
+  D.refs.forEach(x => add('ref', x.title, [x.author, x.channel, x.summary, x.points, x.quotes, x.ideas.map(i => i.text).join('\n')].join('\n'), `#/knowledge/ref/${x.id}`, x.type));
+  (D.textbooks || []).forEach(x => add('tb', x.title, x.body, tbHref(x), tbName(x.book).title));
+  D.fleeting.forEach(x => add('fleeting', line1(x.text), x.text, '#/knowledge/fleeting', dd(x.created)));
+  D.inbox.forEach(x => add('inbox', line1(x.text), x.text, '#/inbox', dd(x.created)));
+  D.tasks.forEach(x => add('task', x.title, [x.memo, x.result, (x.todos || []).map(t => t.t).join('\n'), (x.done || []).join('\n')].join('\n'), `#/action/short/${x.id}`, x.status));
+  D.meetings.forEach(m => { const k = recKind(m); add('rec', m.title, [...k.fields.map(([f]) => m[f] || ''), (m.attendees || []).join(' '), m.todos.map(t => t.t).join('\n')].join('\n'), recHref(m), `${k.name} · ${dd(m.date)}`); });
+  Object.entries(D.dailies).forEach(([d, x]) => { if (x.memo || x.retro) add('daily', `${d.slice(0, 4)}년 ${md2(d)} 데일리`, `${x.memo}\n${x.retro}`, `#/time/daily/${d}`, ''); });
+  D.appts.forEach(a => add('appt', a.title, `${a.location}\n${a.memo}`, `#/action/appt/${a.id}`, dd(a.start)));
+  D.longs.forEach(L => add('long', L.title, `${L.metric}\n${L.why}\n${L.retro}`, `#/action/long/${L.id}`, ''));
+  D.routines.forEach(r => add('routine', r.title, r.content, `#/action/routine/${r.id}`, cronText(r.cron)));
+  return out;
+}
+const srTerms = q => String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
+function searchRun(q){
+  const terms = srTerms(q); if (!terms.length) return [];
+  const res = [];
+  for (const d of searchDocs()){
+    const t = d.title.toLowerCase(), b = d.text.toLowerCase();
+    if (!terms.every(w => t.includes(w) || b.includes(w))) continue;
+    res.push({ ...d, score:terms.reduce((n, w) => n + (t.includes(w) ? 20 : 0) + Math.min(5, b.split(w).length - 1), 0) });
+  }
+  return res.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'ko'));
+}
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function markTerms(text, q){ const t = srTerms(q).map(w => reEsc(esc(w))); return t.length ? esc(text).replace(new RegExp(`(${t.join('|')})`, 'gi'), '<mark>$1</mark>') : esc(text); }
+function snip(text, q){
+  const terms = srTerms(q), flat = text.replace(/^\s*(#{1,6}|[-*+]|>|\d+\.)\s+/gm, '').replace(/\[\[(?:[^\]|]*\|)?([^\]]+)\]\]/g, '$1').replace(/\*\*|==|`/g, '').replace(/\s+/g, ' ').trim(), low = flat.toLowerCase(), at = Math.min(...terms.map(w => { const i = low.indexOf(w); return i < 0 ? Infinity : i; }));
+  if (!isFinite(at)) return '';
+  const from = Math.max(0, at - 40);
+  return (from ? '…' : '') + markTerms(flat.slice(from, from + 160), q) + (from + 160 < flat.length ? '…' : '');
+}
+function searchResults(){
+  const q = (S.q || '').trim();
+  if (!q) return `<p class="faint">노트·할 일·기록·교과서를 한 번에 찾아요. 띄어 쓴 낱말이 모두 들어간 것만 보여요.<span class="hover-only"> 어디서든 <kbd>/</kbd>를 누르면 이 화면이 열려요.</span></p>`;
+  const all = searchRun(q);
+  if (!all.length) return empty(`'${esc(q)}'로 찾은 것이 없어요`, '낱말을 하나 줄이거나 다른 말로 찾아보세요.', '');
+  const kind = S.qk && all.some(r => r.k === S.qk) ? S.qk : '*', list = kind === '*' ? all : all.filter(r => r.k === kind), shown = list.slice(0, 80);
+  const counts = SR_KIND.map(([k, n]) => [k, n, all.filter(r => r.k === k).length]).filter(x => x[2]);
+  const r = AIR['search:' + q];
+  return `${counts.length > 1 ? chipBar([['*', '전체', all.length], ...counts], kind, 'q-kind', '종류로 거르기') : ''}
+    <p class="faint" role="status" style="margin:0 0 8px">${list.length}개 찾았어요${list.length > shown.length ? ` · 앞의 ${shown.length}개만 보여요` : ''}</p>
+    ${r && r.state === 'ok' ? aiOut('찾은 노트로 AI가 요약한 것', `<div class="md">${md(r.text)}</div>`, `<button class="btn btn-text btn-sm" type="button" data-act="ai-clear" data-key="search:${esc(q)}">닫기</button>`) : aiBtn('search:' + q, `찾은 노트 ${Math.min(8, all.length)}개로 AI 요약 받기`, 'ai-search')}
+    <ul class="list" style="margin-top:12px">${shown.map(x => `<li><a class="row" href="${x.href}"><span class="body"><span class="title">${markTerms(x.title, q)}</span><span class="meta"><span class="kind">${SR_NAME[x.k]}</span>${x.sub ? `<span>${esc(x.sub)}</span>` : ''}</span>${srTerms(q).every(w => x.title.toLowerCase().includes(w)) ? '' : `<span class="snip">${snip(x.text, q)}</span>`}</span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`;
+}
+function vSearch(){
+  return `<div class="page"><header class="page-head"><h1 tabindex="-1">찾기</h1></header>
+    <form data-form="search" role="search" class="search-form" novalidate><label class="field" style="flex:1"><span class="sr-only">찾을 말</span><input type="search" id="q" name="q" value="${esc(S.q || '')}" placeholder="예: 습관 신호" autocomplete="off" enterkeyhint="search"></label></form>
+    <div id="q-res">${searchResults()}</div></div>`;
+}
+
+/* ---------------- 화면: AI 예약 작업 ----------------
+   정한 때마다 AI에게 일을 맡기고 결과를 인박스에 남긴다. 일은 프로필 설정(ai_jobs)에, 실행은 돌리는 컴퓨터의 pkm 서버(server/jobs.js)가 */
+const JOB_MODE = { chat:['대화만', '노트를 보지 않고 적은 글로만 답해요'], read:['노트 읽기', '이 프로필의 노트를 읽고 답해요. 고치지 않아요'], auto:['노트 고치기', '노트를 읽고 고칠 수도 있어요. 무엇을 고쳤는지 결과 노트에 적게 해요. 앱에서 되돌리는 기능은 없고, GitHub에 저장하는 프로필은 자동 저장 기록으로 되돌릴 수 있어요'] };
+const JOBS = { p:null, st:null, error:null, loading:false, at:0 };
+async function jobsLoad(force){
+  if (!STORE || STORE.kind !== 'server' || JOBS.loading || (!force && JOBS.p === S.profile && JOBS.st && Date.now() - JOBS.at < 15000)) return;
+  JOBS.loading = true;
+  try { JOBS.st = await papi('/jobs'); JOBS.p = S.profile; JOBS.error = null; JOBS.at = Date.now(); } catch (e) { JOBS.error = e.message; }
+  JOBS.loading = false; if (parse()[0] === 'jobs') render();
+}
+const jobStatusText = s => !s ? '아직 돈 적 없어요' : s.status === 'running' ? 'AI가 하는 중' : s.status === 'waiting' ? 'AI 한도·로그인 문제로 기다리는 중' : s.status === 'error' ? `실패 — ${s.error || ''}` : `${plTime(s.finished)}에 끝남`;
+function vJobs(edit){
+  const set = pset(), list = set.ai_jobs || [], server = STORE && STORE.kind === 'server';
+  if (server) jobsLoad();
+  const st = (JOBS.p === S.profile && JOBS.st) || null, here = st && st.here;
+  const runner = !server ? '<p class="md none" style="margin:0">로컬 서버(npm start)로 열었을 때만 돌릴 수 있어요. 여기서는 일을 적어 두기만 해요.</p>'
+    : !here ? `<p class="faint" style="margin:0">${JOBS.error ? esc(JOBS.error) : '이 컴퓨터의 상태를 확인하는 중…'}</p>`
+    : here.on ? `<p style="margin:0"><b>이 컴퓨터(${esc(here.host)})가 돌려요.</b> <span class="faint">브라우저를 닫아도 정한 때에 돌아요.</span></p>${here.ai ? '' : '<p class="err" style="margin:4px 0 0">이 컴퓨터의 AI 연결이 없어요. 아래 버튼으로 넣어 주세요.</p>'}`
+    : here.runner ? `<p style="margin:0">${esc(here.runner)} 컴퓨터가 돌려요. <span class="faint">결과는 동기화로 이 인박스에 와요.</span></p>`
+    : '<p style="margin:0">예약 작업은 켜 둔 컴퓨터 한 대가 돌려요. 이 컴퓨터를 켜 둘 거면 여기서 돌려요.</p>';
+  const acts = !here ? '' : `${!here.on ? `<button class="btn btn-tonal btn-sm" type="button" data-act="jobs-runner">${here.runner ? '이 컴퓨터로 옮기기' : '이 컴퓨터에서 돌리기'}</button>` : ''}${here.on && !here.ai && PKMAI.conn() ? `<button class="btn btn-tonal btn-sm" type="button" data-act="use-ai">이 브라우저의 AI 연결 넣기</button>` : ''}`;
+  const row = j => { const s = st && st.jobs[j.id];
+    return `<li class="card stack" style="gap:8px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><h3 style="margin:0;font-size:1.0625rem">${esc(j.name)}</h3>
+      <p class="faint" style="margin:2px 0 0">${esc(cronText(j.cron))} · ${JOB_MODE[j.mode][0]}${j.on ? '' : ' · 꺼 둠'}</p></div>
+      <label class="check"><input type="checkbox" data-change="job-on" data-id="${j.id}" ${j.on ? 'checked' : ''}><span>켜기</span></label></div>
+      <p style="margin:0;white-space:pre-wrap;color:var(--text-2)">${esc(j.prompt.length > 160 ? j.prompt.slice(0, 160) + '…' : j.prompt)}</p>
+      ${server && st ? `<p class="faint" style="margin:0" role="status">${esc(jobStatusText(s))}${s && s.note ? ` · <a href="#/inbox">인박스에서 보기</a>` : ''}</p>` : ''}
+      <div class="dlg-actions" style="justify-content:flex-start">${here && here.on ? `<button class="btn btn-ghost btn-sm" type="button" data-act="job-run" data-id="${j.id}" ${s && ['running', 'waiting'].includes(s.status) ? 'disabled' : ''}>지금 돌리기</button>` : ''}<a class="btn btn-text btn-sm" href="#/jobs/${j.id}">고치기</a></div></li>`; };
+  const cur = edit === 'new' ? { id:'', name:'', prompt:'', cron:'0 9 * * 1-5', mode:'read', provider:(PKMAI.prefs().provider || 'claude'), on:true } : list.find(j => j.id === edit);
+  const form = cur ? `<form data-form="job" data-id="${cur.id}" class="card stack" novalidate aria-labelledby="job-h" style="margin-top:16px">
+      <h2 id="job-h" style="margin:0;font-size:1.125rem">${cur.id ? '예약 작업 고치기' : '예약 작업 만들기'}</h2>
+      <label class="field"><span>이름 <span class="hint">인박스 노트 제목이 돼요</span></span><input name="name" id="job-name" value="${esc(cur.name)}" placeholder="예: 아침 할 일 정리" aria-describedby="job-err"></label>
+      <label class="field"><span>AI에게 맡길 일</span><textarea name="prompt" id="job-prompt" style="min-height:120px" placeholder="예: 진행 중인 단기 중 2주 넘게 그대로인 것을 찾아, 다음 한 걸음을 하나씩 제안해 줘">${esc(cur.prompt)}</textarea></label>
+      <div class="form-row"><label class="field" style="flex:1 1 180px"><span>언제</span><select name="freq">${FREQS.map(([v, l]) => `<option value="${v}" ${v === freqOf(cur.cron) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label class="field" style="flex:1 1 9.5rem;min-width:9.5rem"><span>시각</span><input type="time" name="time" value="${cronTime(cur.cron)}"></label></div>
+      <fieldset class="choice" style="margin-top:8px"><legend>AI가 노트를 얼마나 볼까요</legend>${Object.entries(JOB_MODE).map(([k, [l, h]]) => `<label><input type="radio" name="mode" value="${k}" ${k === cur.mode ? 'checked' : ''}><span><b>${l}</b><small>${h}</small></span></label>`).join('')}</fieldset>
+      <label class="field"><span>쓸 AI</span><select name="provider">${['claude', 'codex', 'gemini'].map(v => `<option value="${v}" ${v === cur.provider ? 'selected' : ''}>${AI_NAME[v]}</option>`).join('')}</select></label>
+      <p class="err" id="job-err" hidden></p>
+      <div class="dlg-actions" style="justify-content:flex-start"><button class="btn btn-primary" type="submit">저장하기</button><a class="btn btn-text" href="#/jobs">취소</a>${cur.id ? `<button class="btn btn-ghost btn-danger" type="button" data-act="job-del" data-id="${cur.id}" style="margin-left:auto">지우기</button>` : ''}</div></form>` : '';
+  return `<div class="page"><header class="page-head"><div><h1 tabindex="-1">AI 예약 작업</h1><p class="sub">정한 때마다 AI에게 일을 맡기고, 결과를 인박스에 남겨요.</p></div>
+      ${edit ? '' : '<a class="btn btn-primary" href="#/jobs/new">만들기</a>'}</header>
+    <section class="section" style="margin-top:0"><div class="card stack" style="gap:8px">${runner}${acts ? `<div class="dlg-actions" style="justify-content:flex-start">${acts}</div>` : ''}</div></section>
+    ${form}
+    ${!edit ? (list.length ? `<ul class="stack" style="list-style:none;padding:0;margin:16px 0 0;gap:12px">${list.map(row).join('')}</ul>`
+      : empty('아직 예약 작업이 없어요', '예: 평일 아침 9시에 "진행 중인 단기와 오늘 약속을 보고 오늘 할 것 3가지를 추천해 줘". 결과는 인박스에 와요.', '<a class="btn btn-tonal" href="#/jobs/new">예약 작업 만들기</a>')) : ''}
+  </div>`;
 }
 
 /* ---------------- 화면: 인박스 ---------------- */
@@ -2069,7 +2250,7 @@ const firstLine = t => t.split('\n')[0].trim().slice(0, 80);
 
 /* ---------------- 화면: 지식 ---------------- */
 // 아래 메뉴의 '지식'은 마지막으로 본 칸을 연다. 처음이면 노트가 있는 첫 칸 — 교과서만 있는 프로필이 빈 참조노트로 열리지 않게
-const K_TABS = ['ref','fleeting','perm','ctx','tb'];
+const K_TABS = ['ref','fleeting','perm','ctx','tb','recall'];
 function kTabStart(){
   const last = LS.get(`pkm:v1:k-tab:${S.profile}`, ''); if (K_TABS.includes(last)) return last;
   const D = db(), n = { ref:D.refs.length, fleeting:D.fleeting.length, perm:D.perms.length, ctx:D.ctxs.length, tb:tbBooks().length };
@@ -2080,8 +2261,8 @@ function vKnowledge(tab){
   LS.set(`pkm:v1:k-tab:${S.profile}`, tab);
   const head = `<header class="page-head"><h1 tabindex="-1">지식</h1>
     ${tab === 'ref' ? `<button class="btn btn-primary" type="button" data-act="new-ref">참조노트 만들기</button>` : ''}</header>
-    ${seg([['ref','#/knowledge/ref',`참조노트 <span class="num">${D.refs.length}</span>`,'남의 글'],['fleeting','#/knowledge/fleeting',`임시노트 <span class="num">${D.fleeting.length}</span>`,'빠른 메모'],['perm','#/knowledge/perm',`영구노트 <span class="num">${D.perms.length}</span>`,'언제든 통하는 생각'],['ctx','#/knowledge/ctx',`맥락노트 <span class="num">${D.ctxs.length}</span>`,'회사·시스템에 묶인 정리'],['tb','#/knowledge/tb',`교과서 <span class="num">${tbBooks().length}</span>`,'읽기만 하는 책']], tab, 'seg-compact', '지식 보기')}
-    ${tip('knowledge', '읽은 것은 <strong>참조노트</strong>에, 떠오른 생각은 <strong>임시노트</strong>에 담아요. 다듬을 때 회사·시스템을 떠나도 통하면 <strong>영구노트</strong>, 특정 맥락에 묶여 있으면 <strong>맥락노트</strong>로 보내요.')}`;
+    ${seg([['ref','#/knowledge/ref',`참조노트 <span class="num">${D.refs.length}</span>`,'남의 글'],['fleeting','#/knowledge/fleeting',`임시노트 <span class="num">${D.fleeting.length}</span>`,'빠른 메모'],['perm','#/knowledge/perm',`영구노트 <span class="num">${D.perms.length}</span>`,'언제든 통하는 생각'],['ctx','#/knowledge/ctx',`맥락노트 <span class="num">${D.ctxs.length}</span>`,'회사·시스템에 묶인 정리'],['tb','#/knowledge/tb',`교과서 <span class="num">${tbBooks().length}</span>`,'읽기만 하는 책'],['recall','#/knowledge/recall','복습','오늘 떠올릴 3개']], tab, 'seg-compact seg-scroll', '지식 보기')}
+    ${tab === 'tb' || tab === 'recall' ? '' : tip('knowledge', '읽은 것은 <strong>참조노트</strong>에, 떠오른 생각은 <strong>임시노트</strong>에 담아요. 다듬을 때 회사·시스템을 떠나도 통하면 <strong>영구노트</strong>, 특정 맥락에 묶여 있으면 <strong>맥락노트</strong>로 보내요.')}`;
   let body = '';
   if (tab === 'ref'){
     if (!D.refs.length) body = empty('아직 담은 책·아티클·영상이 없어요', '읽고 싶은 것을 먼저 담아 두면 읽는 중·정리 완료로 옮겨 가며 볼 수 있어요.', `<button class="btn btn-tonal" type="button" data-act="new-ref">참조노트 만들기</button>`);
@@ -2105,17 +2286,59 @@ function vKnowledge(tab){
         ${autoTag('메모마다 이어질 영구노트를 미리 찾아 둠')}</div>`;
   } else if (tab === 'tb'){
     body = vTbBooks();
+  } else if (tab === 'recall'){
+    body = vRecall();
   } else if (tab === 'ctx'){
-    body = D.ctxs.length ? `<ul class="list">${D.ctxs.slice().sort((a, b) => b.updated.localeCompare(a.updated)).map(c => `<li><a class="row" href="#/knowledge/ctx/${c.id}"><span class="body"><span class="title">${esc(c.title)}</span><span class="meta"><span>${staleText(c.updated)}</span><span>바뀐 기록 <span class="num">${c.history.length}</span></span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`
+    const [bar, ctxs, gcur] = groupChips('ctx', D.ctxs);
+    body = D.ctxs.length ? bar + `<ul class="list">${ctxs.slice().sort((a, b) => b.updated.localeCompare(a.updated)).map(c => `<li><a class="row" href="#/knowledge/ctx/${c.id}"><span class="body"><span class="title">${esc(c.title)}</span><span class="meta">${grpPath(c.group, gcur) ? `<span>${esc(grpPath(c.group, gcur))}</span>` : ''}<span>${staleText(c.updated)}</span><span>바뀐 기록 <span class="num">${c.history.length}</span></span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`
       : empty('아직 맥락노트가 없어요', '배포 프로세스·팀 업무 흐름처럼 특정 회사·시스템·시점에 묶인 정리를 두는 곳이에요. 임시노트를 다듬을 때 맥락노트를 고르면 여기에 쌓여요.', `<a class="btn btn-tonal" href="#/knowledge/fleeting">임시노트 보러 가기</a>`);
   } else {
     if (!D.perms.length) body = empty('아직 영구노트가 없어요', '임시노트나 참조노트의 내 생각을 다듬으면 여기에 쌓여요.', `<a class="btn btn-tonal" href="#/knowledge/fleeting">임시노트 보러 가기</a>`);
-    else body = `<ul class="list">${D.perms.slice().sort((a, b) => b.created.localeCompare(a.created)).map(p => {
+    else { const [bar, perms, gcur] = groupChips('perm', D.perms); body = bar + `<ul class="list">${perms.slice().sort((a, b) => b.created.localeCompare(a.created)).map(p => {
       const back = D.perms.filter(x => x.links.includes(p.id)).length;
-      return `<li><a class="row" href="#/knowledge/perm/${p.id}"><span class="body"><span class="title">${esc(p.title)}</span><span class="meta"><span>연결 <span class="num">${p.links.length + back}</span></span><span>출처 <span class="num">${p.sources.length}</span></span><span>${md2(p.created)}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
-    }).join('')}</ul>`;
+      return `<li><a class="row" href="#/knowledge/perm/${p.id}"><span class="body"><span class="title">${esc(p.title)}</span><span class="meta">${grpPath(p.group, gcur) ? `<span>${esc(grpPath(p.group, gcur))}</span>` : ''}<span>연결 <span class="num">${p.links.length + back}</span></span><span>출처 <span class="num">${p.sources.length}</span></span><span>${md2(p.created)}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
+    }).join('')}</ul>`; }
   }
   return `<div class="page">${head}${body}</div>`;
+}
+/* 묶음(하위 폴더) — 맨 위 묶음으로 걸러 본다. 고른 묶음은 프로필마다 기억한다 */
+function groupChips(tab, arr){
+  const top = x => (x.group || '').split('/')[0], tops = new Map();
+  arr.forEach(x => tops.set(top(x), (tops.get(top(x)) || 0) + 1));
+  if (tops.size < 2) return ['', arr];
+  const saved = LS.get(`pkm:v1:kg:${S.profile}:${tab}`, '*'), cur = saved === '*' || tops.has(saved === '_none' ? '' : saved) ? saved : '*';
+  const items = [['*', '전체', arr.length], ...[...tops].sort((a, b) => (a[0] === '') - (b[0] === '') || a[0].localeCompare(b[0], 'ko')).map(([g, n]) => [g || '_none', g || '묶음 없음', n])];
+  const shown = cur === '*' ? arr : arr.filter(x => top(x) === (cur === '_none' ? '' : cur)), label = (items.find(i => i[0] === cur) || [])[1];
+  const pick = `<div class="grp-pick">${chipBar(items, cur, 'k-group', '묶음으로 보기', `data-tab="${tab}"`)}
+    <label class="grp-select"><span class="sr-only">묶음</span><select class="seg-select" data-act="k-group-sel" data-tab="${tab}" style="display:block;margin:0">${items.map(([v, l, n]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${v === '*' ? '묶음 전체' : esc(l)} · ${n}</option>`).join('')}</select></label></div>`;
+  return [pick + (cur !== '*' ? `<p class="grp-note" role="status">${esc(label)} ${shown.length}개만 보는 중 <button class="btn btn-text btn-sm" type="button" data-act="k-group" data-tab="${tab}" data-v="*">전체 보기</button></p>` : ''), shown, cur];
+}
+const grpPath = (g, cur) => { const p = String(g || '').split('/'); if (cur && cur !== '*' && p[0] === cur) p.shift(); return p.join(' › '); };
+/* 복습 — 오늘 떠올릴 영구노트 3개. 노트를 보기 전에 내 말로 한 줄 적고, 그다음 원래 노트와 맞춰 본다(인출 연습). 7일 안에 떠올린 노트는 쉰다 */
+const RECALL_H = '### 다시 쓴 한 줄';
+const recallLast = p => [...String(p.body || '').matchAll(/^- \((\d{4}-\d{2}-\d{2})\) /gm)].map(m => m[1]).sort().pop() || '';
+function recallPick(){
+  const D = db(), h = s => { let x = 2166136261; for (const c of s) x = Math.imul(x ^ c.charCodeAt(0), 16777619) >>> 0; return x; };
+  const skip = S.recallSkip || [], pool = D.perms.filter(p => !skip.includes(p.id) && !/^MOC(\/|$)/.test(p.group || '') && !/^(\d+_)?MOC[_ —]/.test(p.title) && (recallLast(p) === TODAY || !recallLast(p) || dayDiff(TODAY, recallLast(p)) >= 7));
+  return pool.sort((a, b) => (recallLast(b) === TODAY) - (recallLast(a) === TODAY) || h(TODAY + a.id) - h(TODAY + b.id)).slice(0, 3);
+}
+function vRecall(){
+  const D = db(); if (!D.perms.length) return empty('복습할 영구노트가 아직 없어요', '임시노트·참조노트를 다듬어 영구노트를 만들면, 여기서 하루 3개씩 떠올려 볼 수 있어요.', `<a class="btn btn-tonal" href="#/knowledge/fleeting">임시노트 보러 가기</a>`);
+  const list = recallPick(), done = list.filter(p => recallLast(p) === TODAY).length;
+  if (!list.length) return empty('오늘 떠올릴 노트를 다 봤어요', '7일 안에 떠올린 노트는 쉬어요. 내일 다시 3개가 와요.', '');
+  return `<p class="faint" style="margin:0 0 16px">노트를 펼치기 전에 제목만 보고 내 말로 한 줄 적어요. 적은 뒤에 원래 노트와 맞춰 봐요. 오늘 <span class="num">${done}</span>/${list.length}개.</p>
+    ${list.map(p => { const did = recallLast(p) === TODAY, line = did ? (String(p.body).match(new RegExp(`^- \\(${TODAY}\\) (.*)$`, 'm')) || [])[1] || '' : '', ai = AIR['recall-q:' + p.id], chk = AIR['recall-check:' + p.id];
+      return `<article class="card recall" aria-labelledby="rc-${p.id}">
+        ${p.group ? `<p class="eyebrow" style="margin:0">${esc(p.group.replace(/\//g, ' › '))}</p>` : ''}<h3 id="rc-${p.id}">${did ? `<a href="#/knowledge/perm/${p.id}">${esc(p.title)}</a>` : esc(p.title)}</h3>
+        ${ai && ai.state === 'ok' ? aiOut('AI가 낸 떠올리기 질문', `<p style="margin:0">${esc(ai.text)}</p>`) : did ? '' : aiBtn('recall-q:' + p.id, 'AI 질문으로 받기', 'ai-recall-q', `data-id="${p.id}"`)}
+        ${did ? `<p style="margin:0"><span class="faint">오늘 쓴 한 줄</span> ${esc(line)}</p>
+          <details class="more" open><summary>원래 노트와 맞춰 보기</summary><div class="md">${md(p.body.split(RECALL_H)[0])}</div></details>
+          ${chk && chk.state === 'ok' ? aiOut('AI가 맞춰 본 것', `<div class="md">${md(chk.text)}</div>`) : aiBtn('recall-check:' + p.id, 'AI에게 맞춰 보기', 'ai-recall-check', `data-id="${p.id}"`)}`
+        : `<form data-form="recall" data-id="${p.id}" class="stack" novalidate>
+            <label class="field"><span>내 말로 한 줄 <span class="hint">노트를 보지 않고 떠올려요. 적은 줄은 이 노트 맨 아래 '다시 쓴 한 줄'에 날짜와 함께 남아요</span></span><textarea name="line" id="rc-line-${p.id}" style="min-height:64px" aria-describedby="rc-err-${p.id}"></textarea></label>
+            <p class="err" id="rc-err-${p.id}" hidden>떠올린 것을 한 줄 적어 주세요</p>
+            <div class="dlg-actions" style="justify-content:flex-start"><button class="btn btn-primary btn-sm" type="submit">적고 노트와 맞춰 보기</button><button class="btn btn-text btn-sm" type="button" data-act="recall-skip" data-id="${p.id}">다른 노트로</button></div></form>`}
+      </article>`; }).join('')}`;
 }
 let humorIdx = 0;
 function humorLine(){ const L = ['메모함이 지금 집에서 제일 깔끔한 곳이에요.', '다음 생각이 들어올 자리가 생겼어요.']; return L[(humorIdx++) % L.length]; }
@@ -2264,15 +2487,22 @@ function vPerm(id){
   return `<div class="page">
     <a class="back" href="#/knowledge/perm"><span aria-hidden="true">‹</span> 영구노트</a>
     ${conflictBanner()}
-    <p class="eyebrow">영구노트 · ${md2(p.created)}</p><h1 tabindex="-1">${esc(p.title)}</h1>
+    <p class="eyebrow">영구노트${p.group ? ` · ${esc(p.group.replace(/\//g, ' › '))}` : ''}${p.created ? ` · ${md2(p.created)}` : ''}</p><h1 tabindex="-1">${esc(p.title)}</h1>
     <div class="doc-actions">${editBtn()}${obsBtn()}</div>
     ${section('내 말로', `<div class="md">${md(p.body)}</div>`)}
-    ${section('이어지는 생각', linkList(out) + autoTag('본문과 비슷한 영구노트를 연결 후보로 제안'))}
+    ${section('이어지는 생각', linkList(out) + aiLinkOut(p))}
     ${section('이 노트를 가리키는 노트', linkList(back))}
     ${src.length ? section('출처', `<ul class="list">${src.map(r => `<li><a class="row" href="${r.book ? tbHref(r) : `#/knowledge/ref/${r.id}`}"><span class="body"><span class="title">${esc(r.title)}</span><span class="meta"><span class="kind">${r.book ? `교과서 · ${esc(tbName(r.book).title)}` : r.type}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : ''}
   </div>`;
 }
 
+function aiLinkOut(p){
+  const r = AIR['link:' + p.id];
+  if (!r || r.state !== 'ok') return aiBtn('link:' + p.id, 'AI로 연결 후보 찾기', 'ai-links', `data-id="${p.id}"`);
+  const D = db(), list = (Array.isArray(r.data) ? r.data : []).map(x => ({ to:D.perms.find(y => y.title === String(x.title || '').trim()), reason:String(x.reason || '') })).filter(x => x.to && x.to.id !== p.id && !p.links.includes(x.to.id));
+  return aiOut('AI가 찾은 연결 후보', list.length ? `<ul class="list">${list.map(x => `<li class="idea"><p><a href="#/knowledge/perm/${x.to.id}">${esc(x.to.title)}</a><br><span class="faint">${esc(x.reason)}</span></p><button class="btn btn-tonal btn-sm" type="button" data-act="ai-link-add" data-id="${p.id}" data-to="${x.to.id}" data-reason="${esc(x.reason)}">연결하기</button></li>`).join('')}</ul>` : '<p class="md none" style="margin:0">더 이을 노트를 찾지 못했어요</p>',
+    `<button class="btn btn-text btn-sm" type="button" data-act="ai-clear" data-key="link:${p.id}">닫기</button>`);
+}
 function vRefine(kind, id, idx){
   const D = db(); let srcText = '', srcLabel = '', back = '#/knowledge/fleeting', backLabel = '임시노트';
   let tbx = null;
@@ -2304,14 +2534,14 @@ function vRefine(kind, id, idx){
   </div>`;
 }
 
-const staleText = d => { const n = dayDiff(TODAY, d); return n === 0 ? '오늘 고침' : n < 60 ? `${n}일 전에 고침` : `${Math.floor(n / 30)}달 전에 고침 · 지금도 맞는지 확인`; };
+const staleText = d => { const n = dayDiff(TODAY, d); if (!/^\d{4}-\d{2}-\d{2}/.test(d || '') || isNaN(n)) return '고친 날 모름'; return n === 0 ? '오늘 고침' : n < 60 ? `${n}일 전에 고침` : `${Math.floor(n / 30)}달 전에 고침 · 지금도 맞는지 확인`; };
 function vCtx(id){
   const c = find('ctxs', id); if (!c) return vNotFound();
   const hist = c.history.slice().sort((a, b) => b.date.localeCompare(a.date));
   return `<div class="page">
     <a class="back" href="#/knowledge/ctx"><span aria-hidden="true">‹</span> 맥락노트</a>
     ${conflictBanner()}
-    <p class="eyebrow">맥락노트 · ${staleText(c.updated)}</p><h1 tabindex="-1">${esc(c.title)}</h1>
+    <p class="eyebrow">맥락노트${c.group ? ` · ${esc(c.group.replace(/\//g, ' › '))}` : ''} · ${staleText(c.updated)}</p><h1 tabindex="-1">${esc(c.title)}</h1>
     <div class="doc-actions">${editBtn()}${obsBtn()}</div>
     ${section('한 줄 요약', c.summary ? `<p class="summary">${esc(c.summary)}</p>` : noneText)}
     ${section('내용', c.body ? `<div class="md">${md(c.body)}</div>` : noneText)}
@@ -2336,7 +2566,7 @@ function vTime(tab, date){
     ${seg([['plan', '#/time/plan', '계획', '하루 시간표'], ['daily', '#/time/daily', '데일리', '하루 기록'], ['review', '#/time/review', '돌아보기', '여러 날'], ...D.kinds.map(x => [x.id, `#/time/${x.id}`, `${esc(x.name)} <span class="num">${D.meetings.filter(m => (m.kind || 'meeting') === x.id).length}</span>`, ''])], tab, 'seg-compact seg-scroll', '시간 보기')}
     ${tab === 'plan' ? '' : `<p style="margin:-12px 0 16px;display:flex;justify-content:flex-end"><button class="btn btn-text btn-sm" type="button" data-act="kind-new" style="color:var(--primary)">+ 기록 종류 만들기</button></p>`}`;
   let body = '';
-  if (tab === 'plan') body = vPlan(date);
+  if (tab === 'plan'){ const o = offOf(date); body = (o ? `<p class="off-note">쉬는 날${o.label ? ` · ${esc(o.label)}` : ''} — 평일 루틴과 평일에 비워 둔 시간이 이날은 빠져요 <button class="btn btn-text btn-sm" type="button" data-act="off-edit">쉬는 날 고치기</button></p>` : '') + vPlan(date); }
   else if (tab === 'daily'){
     body = days.length ? `<ul class="list">${days.map(d => {
       const x = D.dailies[d]; const isToday = d === TODAY;
@@ -2373,7 +2603,7 @@ function vDaily(date){
     ${conflictBanner()}
     <header class="page-head"><div><p class="eyebrow">데일리${isToday ? ' · 오늘' : ''}</p><h1 tabindex="-1">${md2(date)} ${wd(date)}요일</h1></div>
       <nav aria-label="다른 날" class="doc-actions" style="margin:0">${prev ? `<a class="btn btn-text btn-sm" href="#/time/daily/${prev}">‹ ${md2(prev)}</a>` : ''}${next ? `<a class="btn btn-text btn-sm" href="#/time/daily/${next}">${md2(next)} ›</a>` : ''}</nav></header>
-    <div class="doc-actions" style="margin-top:0">${editBtn()}</div>
+    <div class="doc-actions" style="margin-top:0">${editBtn()}<button class="btn btn-ghost btn-sm" type="button" data-act="daily-share" data-date="${date}">공유용 글 복사</button></div>
     <section class="section auto-zone"><h2>이날 한 일 <span class="count">자동으로 모았어요</span></h2>${didHtml}${autoTag('완료한 단기·체크한 루틴·지난 약속·만든 노트·장기 기록을 모음')}</section>
     ${meets.length ? section('이날 쓴 기록', `<ul class="list">${meets.map(m => `<li><a class="row" href="${recHref(m)}"><span class="body"><span class="title">${esc(m.title)}</span><span class="meta"><span>${esc(recKind(m).name)}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : ''}
     ${x.plan && Object.values(x.plan).some(a => a.length) ? section('오늘 계획', `<ul class="list">${Object.keys(x.plan).sort().filter(k => x.plan[k].length).map(k => `<li style="padding:10px 16px"><span class="num faint">${k}~</span> ${x.plan[k].map(e => find('tasks', ent(e).id)).filter(Boolean).map(t => `<a href="#/action/short/${t.id}">${esc(t.title)}</a>${t.status === '완료' ? ' ✓' : ''}`).join(', ')}</li>`).join('')}</ul>`) : ''}
@@ -2441,7 +2671,7 @@ function vReview(){
         <label class="check opt rv-inc"><input type="checkbox" data-change="rv-inc" data-k="${k}" ${off[k] ? '' : 'checked'}><span>보고에 넣기</span></label></div>
       ${off[k] ? '' : body[k].length ? `<ul class="rv-list">${body[k].join('')}</ul>` : '<p class="md none">이 기간에는 없어요</p>'}</section>`).join('')}
     <div class="dlg-actions rv-actions" style="justify-content:flex-start;margin-top:24px"><button class="btn btn-primary" type="button" data-act="rv-save">보고 노트로 저장</button><button class="btn btn-ghost" type="button" data-act="rv-copy">복사하기</button></div>
-    ${autoTag('모은 재료로 보고 문장 초안 쓰기(회사 프로필 안에서만)')}`;
+    ${(() => { const key = `review:${x.r.from}:${x.r.to}`, r = AIR[key]; return r && r.state === 'ok' ? aiOut('AI가 쓴 보고 초안', `<div class="md">${md(r.text)}</div>`, `<button class="btn btn-ghost btn-sm" type="button" data-act="ai-copy" data-key="${key}">초안 복사하기</button><button class="btn btn-text btn-sm" type="button" data-act="ai-clear" data-key="${key}">닫기</button>`) : aiBtn(key, 'AI로 보고 초안 쓰기', 'ai-review', `data-key="${key}"`); })()}`;
 }
 
 /* 기록 = 시간 축의 사용자 정의 종류(회의록·여행·요리…). 데일리만 고정이고 나머지는 3층(§0) */
@@ -2453,7 +2683,7 @@ function vKind(kid){
   const recs = D.meetings.filter(m => (m.kind || 'meeting') === kid).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   return recs.length ? `<ul class="list">${recs.map(m => {
       const sent = m.todos.filter(t => t.task).length;
-      return `<li><a class="row" href="${recHref(m)}"><span class="body"><span class="title">${esc(m.title)}${m.draft ? ' <span class="faint">· 쓰는 중</span>' : ''}</span><span class="meta"><span class="num">${fmtDate(m.date)} ${m.time}</span>${k.people && m.attendees.length ? `<span>함께 <span class="num">${m.attendees.length}</span>명</span>` : ''}${k.todos && m.todos.length ? `<span>할 일 <span class="num">${m.todos.length}</span> · 단기로 보냄 <span class="num">${sent}</span></span>` : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`; }).join('')}</ul>`
+      return `<li><a class="row" href="${recHref(m)}"><span class="body"><span class="title">${esc(m.title)}${m.draft ? ' <span class="faint">· 쓰는 중</span>' : ''}</span><span class="meta"><span class="num">${fmtDateY(m.date)}${recTime(m)}</span>${k.people && m.attendees.length ? `<span>함께 <span class="num">${m.attendees.length}</span>명</span>` : ''}${k.todos && m.todos.length ? `<span>할 일 <span class="num">${m.todos.length}</span> · 단기로 보냄 <span class="num">${sent}</span></span>` : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`; }).join('')}</ul>`
     : empty(`아직 ${esc(k.name)} 기록이 없어요`, `[${esc(k.name)} 쓰기]로 바로 쓰거나, 약속 화면에서 <b>기록 쓰기</b>를 누르면 날짜·함께한 사람이 채워진 채로 시작해요.`, `<button class="btn btn-tonal" type="button" data-act="new-record" data-kind="${k.id}">${esc(k.name)} 쓰기</button>`);
 }
 function vRecord(id){
@@ -2468,15 +2698,24 @@ function vRecord(id){
     ${conflictBanner()}
     <p class="eyebrow">${esc(k.name)}</p>
     ${isNew ? `<label class="field"><span class="sr-only">제목</span><input class="title-input" id="mt-title" data-change="meeting-field" data-id="${m.id}" data-key="title" value="${esc(m.title)}"></label>` : `<h1 tabindex="-1">${esc(m.title)}</h1>`}
-    <dl class="meta-dl"><dt>일시</dt><dd class="num">${fmtDate(m.date)} ${m.time}</dd>${k.people ? `<dt>함께한 사람</dt><dd>${m.attendees.length ? m.attendees.map(esc).join(', ') : '나'}</dd>` : ''}${a ? `<dt>약속</dt><dd><a href="#/action/appt/${a.id}">${esc(a.title)}</a></dd>` : ''}</dl>
+    <dl class="meta-dl"><dt>일시</dt><dd class="num">${fmtDateY(m.date)}${recTime(m)}</dd>${k.people ? `<dt>함께한 사람</dt><dd>${m.attendees.length ? m.attendees.map(esc).join(', ') : '나'}</dd>` : ''}${a ? `<dt>약속</dt><dd><a href="#/action/appt/${a.id}">${esc(a.title)}</a></dd>` : ''}</dl>
     <div class="doc-actions">${isNew ? `<button class="btn btn-primary btn-sm" type="button" data-act="record-done" data-id="${m.id}">다 썼어요</button><span class="faint">적는 대로 저장해요</span>` : editBtn()}${obsBtn()}</div>
     ${k.fields.map(([key, l]) => block(l, key)).join('')}
     ${k.todos ? `<section class="section"><h2>할 일</h2>${todos}
       <form data-form="meeting-todo" data-id="${m.id}" class="form-row" style="margin-top:12px">
         <label class="field" style="flex:1 1 240px"><span class="sr-only">할 일</span><input name="t" id="mtodo-${m.id}" placeholder="여기서 나온 할 일"></label>
         <button class="btn btn-ghost" type="submit">할 일 추가하기</button></form>
-      ${autoTag('기록 내용에서 할 일을 뽑아 단기 후보로 제안')}</section>` : ''}
+</section>` : ''}
+    ${aiRecOut(m, k)}
   </div>`;
+}
+function aiRecOut(m, k){
+  const r = AIR['rec:' + m.id];
+  if (!r || r.state !== 'ok') return aiBtn('rec:' + m.id, k.todos ? 'AI로 칸 정리하고 할 일 뽑기' : 'AI로 칸 정리하기', 'ai-rec', `data-id="${m.id}"`);
+  const f = (r.data && r.data.fields) || {}, todos = k.todos ? ((r.data && r.data.todos) || []).map(String).filter(t => t.trim() && !m.todos.some(x => x.t === t.trim())) : [];
+  const ch = k.fields.filter(([key, l]) => typeof f[l] === 'string' && f[l].trim() && f[l].trim() !== (m[key] || '').trim()).length;
+  return aiOut('AI가 정리한 안 · 아직 바꾸지 않았어요', k.fields.map(([key, l]) => `<h3 class="md-h" style="font-size:1rem;margin:12px 0 4px">${esc(l)}</h3>${f[l] ? `<div class="md">${md(String(f[l]))}</div>` : '<p class="md none">비어 있어요 — 지금 적힌 것을 그대로 둬요</p>'}${m[key] ? `<details class="more"><summary>지금 적힌 것 보기</summary><div class="md">${md(m[key])}</div></details>` : ''}`).join('') + (todos.length ? `<h3 class="md-h" style="font-size:1rem;margin:12px 0 4px">새 할 일 ${todos.length}개</h3><ul>${todos.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''),
+    `<button class="btn btn-primary btn-sm" type="button" data-act="ai-rec-apply" data-id="${m.id}" ${ch || todos.length ? '' : 'disabled'}>${[ch ? `칸 ${ch}개 바꾸기` : '', todos.length ? `할 일 ${todos.length}개 더하기` : ''].filter(Boolean).join('·') || '바꿀 것이 없어요'}</button><button class="btn btn-text btn-sm" type="button" data-act="ai-clear" data-key="rec:${m.id}">그만두기</button>`);
 }
 /* 참조노트 형식 — 책·아티클·영상은 예시, 팟캐스트·강의처럼 늘릴 수 있다 */
 function fillFormats(sel){
@@ -2724,9 +2963,9 @@ const lines = v => Array.isArray(v) ? v.join('\n') : (v || '');
 const EDIT = {
   refs:{ name:'참조노트', back:id => `#/knowledge/ref/${id}`, list:'#/knowledge/ref', fields:[['title','제목'],['author','저자·채널'],['url','링크','url'],['summary','한 줄 요약'],['points','핵심 내용','area'],['quotes','인상 깊은 문장','area']],
     links:(D, x) => { const n = D.perms.filter(p => p.sources.includes(x.id)).length; return n ? `영구노트 ${n}개의 출처에서 이 참조노트가 빠져요.` : ''; } },
-  perms:{ name:'영구노트', back:id => `#/knowledge/perm/${id}`, list:'#/knowledge/perm', fields:[['title','제목 — 주장 한 문장'],['body','내 말로','area']],
+  perms:{ name:'영구노트', back:id => `#/knowledge/perm/${id}`, list:'#/knowledge/perm', fields:[['title','제목 — 주장 한 문장'],['group','묶음 — 폴더 이름, 하위 묶음은 /로 나눠요'],['body','내 말로','area']],
     links:(D, x) => { const n = D.perms.filter(p => p.links.includes(x.id)).length; return n ? `이 노트를 가리키는 영구노트 ${n}개의 연결이 끊겨요.` : ''; } },
-  ctxs:{ name:'맥락노트', back:id => `#/knowledge/ctx/${id}`, list:'#/knowledge/ctx', fields:[['title','주제'],['summary','한 줄 요약'],['body','내용','area']], touch:true,
+  ctxs:{ name:'맥락노트', back:id => `#/knowledge/ctx/${id}`, list:'#/knowledge/ctx', fields:[['title','주제'],['group','묶음 — 폴더 이름, 하위 묶음은 /로 나눠요'],['summary','한 줄 요약'],['body','내용','area']], touch:true,
     links:() => '바뀐 기록도 함께 지워져요.' },
   dailies:{ name:'데일리', back:id => `#/time/daily/${id}`, list:'#/time/daily', fields:[['memo','메모','area'],['retro','한 줄 회고']],
     links:() => '이날 한 일 목록은 단기·루틴·노트에서 자동으로 모은 것이라 지워지지 않아요.' },
@@ -2760,7 +2999,7 @@ function vEdit(kind, id){
         <label class="field wide"><span>메모</span><input name="rm${i}" value="${esc(r.memo)}"></label>
         <label class="check wide"><input type="checkbox" name="rx${i}"><span>이 기록 지우기</span></label></div>`).join('') : '<p class="faint">아직 기록이 없어요.</p>'}</fieldset>`;
     const val = type === 'list' ? (v || []).join(', ') : v ?? '';
-    return `<label class="field"><span>${label}${['url','number'].includes(type) || ['author','location','due'].includes(k) ? ' <span class="hint">선택</span>' : ''}</span><input id="${fid(k)}" name="${k}" type="${type === 'list' ? 'text' : type}" ${type === 'number' ? 'step="any" min="0"' : ''} value="${esc(val)}" autocomplete="off"></label>`;
+    return `<label class="field"><span>${label}${['url','number'].includes(type) || ['author','location','due','group'].includes(k) ? ' <span class="hint">선택</span>' : ''}</span><input id="${fid(k)}" name="${k}" type="${type === 'list' ? 'text' : type}" ${type === 'number' ? 'step="any" min="0"' : ''} value="${esc(val)}" autocomplete="off"></label>`;
   };
   const note = E.links(D, x);
   const title = kind === 'dailies' ? `${md2(id)} 데일리` : x.title;
@@ -3367,6 +3606,8 @@ function route(p){
   switch (p[0]){
     case 'now': return vNow();
     case 'inbox': return vInbox();
+    case 'search': return vSearch();
+    case 'jobs': return vJobs(p[1]);
     case 'knowledge': if (p[1] === 'tb' && p[3] === 'c') return vTbCard(p[2], p[4], p[5], p[6]); if (p[1] === 'tb' && p[3]) return vTbNote(p[2], p[3]); if (p[2]) return p[1] === 'ref' ? vRef(p[2]) : p[1] === 'ctx' ? vCtx(p[2]) : p[1] === 'tb' ? vTbBook(p[2]) : vPerm(p[2]); return vKnowledge(K_TABS.includes(p[1]) ? p[1] : kTabStart());
     case 'refine': return p[1] === 'tb' ? vRefine('tb', p[3]) : vRefine(p[1], p[2], p[3]);
     case 'time': if (p[1] === 'plan') return vTime('plan', /^\d{4}-\d{2}-\d{2}$/.test(p[2] || '') ? p[2] : TODAY);
@@ -3403,7 +3644,7 @@ function render(){
   const wd0 = main.querySelector('.week a.day[aria-current]'); if (wd0){ const ol = wd0.closest('ol'); if (ol.scrollWidth > ol.clientWidth) ol.scrollLeft = wd0.parentElement.offsetLeft - ol.clientWidth / 2; }   // 큰 글씨에서도 고른 날이 보이게   // 기록 종류가 많아도 지금 탭이 보이게
   const h1 = main.querySelector('h1');
   document.title = (h1 ? h1.textContent.trim() : 'pkm') + ' · pkm';
-  if (navChanged){ window.scrollTo(0, 0); if (booted && h1) h1.focus({ preventScroll:true }); }
+  if (navChanged){ window.scrollTo(0, 0); const q = p[0] === 'search' && $('#q'); if (booted && (q || h1)) (q || h1).focus({ preventScroll:true }); }
   else {
     window.scrollTo(0, y); const el = activeId && document.getElementById(activeId);
     if (el) focusEl(el, { preventScroll:true });
@@ -3544,6 +3785,29 @@ function openStart(){
   f.start.value = dayStart(PD); openDlg('dlg-start'); focusEl(f.start);
 }
 
+/* 복사 — 클립보드를 못 쓰는 곳(https가 아닌 주소 등)이면 글을 골라 둔 창을 연다 */
+function copyText(text, ok){
+  const fallback = () => { $('#copy-text').value = text; openDlg('dlg-copy'); setTimeout(() => $('#copy-text').select(), 30); };
+  if (!navigator.clipboard || !window.isSecureContext) return fallback();
+  navigator.clipboard.writeText(text).then(() => toast(ok), fallback);
+}
+/* 데일리 공유용 글 — 지난 근무일에 한 일과 이날 할 일(스탠드업·팀 데일리에 붙여 넣기) */
+function shareText(date){
+  const D = db(), prev = Object.keys(D.dailies).concat(Object.keys(D.routineDone)).filter(x => x < date).sort().reverse().find(x => todayDid(x).some(e => e.k !== '루틴'));
+  const did = prev ? todayDid(prev).filter(e => e.k !== '루틴') : [];
+  const plan = (D.dailies[date] || {}).plan || {}, ids = [...new Set(Object.values(plan).flat().map(e => ent(e).id))];
+  const todo = [...ids.map(i => find('tasks', i)).filter(Boolean), ...D.tasks.filter(t => t.status === '진행' && !ids.includes(t.id))];
+  const text = [prev ? `[${md2(prev)} 한 일]` : '[지난 한 일]', ...(did.length ? did.map(e => `- ${e.t}`) : ['- 없음']), '', `[${md2(date)} 할 일]`, ...(todo.length ? todo.map(t => `- ${t.title}`) : ['- 없음'])].join('\n');
+  return { text, did:did.length, todo:todo.length };
+}
+let qTimer = null;
+const onQ = e => { if (e.target.id !== 'q') return; clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value; $('#q-res').innerHTML = searchResults(); }, 150); };
+document.addEventListener('input', onQ); document.addEventListener('compositionend', onQ);   // 한글 입력은 조합이 끝날 때도
+document.addEventListener('keydown', e => {
+  const t = e.target, typing = t.closest && t.closest('input, textarea, select, [contenteditable="true"]');
+  if (((e.key === '/' && !typing) || (e.key === 'k' && (e.metaKey || e.ctrlKey))) && !document.querySelector('dialog[open]')){ e.preventDefault(); if (location.hash !== '#/search') go('#/search'); setTimeout(() => $('#q')?.focus(), 0); }
+});
+
 /* ---------------- 이벤트 ---------------- */
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -3563,6 +3827,39 @@ document.addEventListener('click', e => {
       db().formats = [...fm, n]; fillFormats(n); $('#ref-formats input:checked').focus(); toast(`${n} 형식을 추가했어요 · 참조노트_${n} 템플릿이 생겨요`); break;
     }
     case 'close-dlg': b.closest('dialog').close(); break;
+    case 'jobs-open': $('#dlg-profile').close(); go('#/jobs'); break;
+    case 'jobs-runner': plRunnerSet(true, PKMAI.conn() ? { url:PKMAI.conn().url, token:PKMAI.conn().token } : undefined).then(ok => { if (ok){ toast('이 컴퓨터에서 돌려요'); jobsLoad(true); } }); break;
+    case 'job-run': papi(`/jobs/${encodeURIComponent(id)}/run`, {}).then(() => { toast('AI에게 맡겼어요 · 끝나면 인박스에 남아요'); jobsLoad(true); }).catch(e => toast(e.message)); break;
+    case 'job-del': { const set = pset(), prev = (set.ai_jobs || []).slice(); set.ai_jobs = prev.filter(j => j.id !== id); go('#/jobs'); toast('예약 작업을 지웠어요', { label:'되돌리기', fn:() => { pset().ai_jobs = prev; render(); } }); break; }
+    case 'k-group': LS.set(`pkm:v1:kg:${S.profile}:${b.dataset.tab}`, b.dataset.v); render(); break;
+    case 'q-kind': S.qk = b.dataset.v; $('#q-res').innerHTML = searchResults(); $(`#q-res [data-act="q-kind"][data-v="${CSS.escape(b.dataset.v)}"]`)?.focus(); break;
+    case 'recall-skip': (S.recallSkip = S.recallSkip || []).push(id); render(); break;
+    case 'rec-dismiss': (S.recDismiss = S.recDismiss || []).push(id); render(); break;
+    case 'rec-from-appt': createRecord(b.dataset.kind, id); break;
+    case 'ai-clear': delete AIR[b.dataset.key]; render(); break;
+    case 'ai-copy': copyText((AIR[b.dataset.key] || {}).text || '', '복사했어요'); break;
+    case 'daily-share': { const x = shareText(b.dataset.date); copyText(x.text, `공유용 글을 복사했어요 · 한 일 ${x.did}개, 할 일 ${x.todo}개`); break; }
+    case 'off-edit': openDay(); setTimeout(() => $('#day-off')?.focus(), 50); break;
+    case 'ai-search': { const q = (S.q || '').trim(), top = searchRun(q).slice(0, 8);
+      aiAsk('search:' + q, `내 노트에서 '${q}'로 찾은 것들이야. 이 노트들이 '${q}'에 대해 하는 말을 한국어로 짧게 요약해 줘 — 핵심 3가지를 먼저, 노트끼리 다르게 말하는 곳이 있으면 따로. 노트에 없는 내용은 지어내지 마. 근거로 쓴 노트 제목을 [[제목]] 형식으로 답 끝에 적어.\n\n찾은 말: ${q}\n\n${top.map(x => `## [${SR_NAME[x.k]}] ${x.title}\n${x.text.slice(0, 1500)}`).join('\n\n')}`); break; }
+    case 'ai-links': { const p = find('perms', id), pool = D.perms.filter(x => x.id !== p.id && !p.links.includes(x.id));
+      aiAsk('link:' + id, `제텔카스텐 영구노트를 잇는 일을 도와줘. 아래 '이 노트'와 생각이 이어지는 노트를 '후보' 목록에서만 최대 5개 골라. 낱말이 겹치는 것보다 근거·반례·적용·더 큰 개념처럼 생각이 이어지는 것을 골라. 이유는 한국어 한 문장으로.\nJSON 배열로만 답해: [{"title":"후보 제목 그대로","reason":"이유"}]\n\n이 노트: ${p.title}\n${p.body.slice(0, 1500)}\n\n후보:\n${pool.map(x => '- ' + x.title).join('\n')}`, true); break; }
+    case 'ai-link-add': { const p = find('perms', id), to = find('perms', b.dataset.to); if (!p || !to) break;
+      const undo = snapshot(); p.links.push(to.id);
+      const line = `- [[${to.title}]]: ${b.dataset.reason}`, H = /^###? 연결\s*$/m;
+      p.body = H.test(p.body) ? p.body.replace(H, m => `${m}\n${line}`) : `${p.body.trim()}\n\n### 연결\n${line}`;
+      render(); toast(`${to.title}와 이었어요`, { label:'되돌리기', fn:undo }); break; }
+    case 'ai-rec': { const m = find('meetings', id), k = recKind(m);
+      aiAsk('rec:' + id, `기록 하나를 칸에 맞게 정리해 줘. 적힌 내용만 쓰고 새 사실은 더하지 마. 칸: ${k.fields.map(f => f[1]).join(', ')}.${k.todos ? ' 누가 무엇을 하기로 한 것은 할 일로 따로 뽑아.' : ''}\nJSON으로만 답해: {"fields":{${k.fields.map(f => `"${f[1]}":"마크다운"`).join(',')}}${k.todos ? ',"todos":["할 일 한 줄"]' : ''}}\n\n제목: ${m.title} (${m.date})\n${k.fields.map(([f, l]) => `## ${l}\n${m[f] || ''}`).join('\n\n')}${m.todos.length ? `\n\n## 이미 있는 할 일\n${m.todos.map(t => '- ' + t.t).join('\n')}` : ''}`, true); break; }
+    case 'ai-rec-apply': { const m = find('meetings', id), k = recKind(m), r = AIR['rec:' + id]; if (!m || !r || !r.data) break;
+      const undo = snapshot(), f = r.data.fields || {};
+      k.fields.forEach(([key, l]) => { if (typeof f[l] === 'string' && f[l].trim()) m[key] = f[l].trim(); });
+      if (k.todos) (r.data.todos || []).map(String).map(t => t.trim()).filter(t => t && !m.todos.some(x => x.t === t)).forEach(t => m.todos.push({ t, task:null }));
+      delete AIR['rec:' + id]; render(); toast('AI가 정리한 대로 바꿨어요', { label:'되돌리기', fn:undo }); break; }
+    case 'ai-review': aiAsk(b.dataset.key, `아래는 이 기간에 한 일을 모은 재료야. 이걸로 읽는 사람이 1분 안에 파악할 수 있는 보고 초안을 한국어로 써 줘. 결론(한 일의 핵심 3가지)을 먼저 쓰고, 그다음 항목별로 짧게. 재료에 없는 사실·숫자는 쓰지 마.\n\n${rvMarkdown()}`); break;
+    case 'ai-recall-q': { const p = find('perms', id); aiAsk('recall-q:' + id, `영구노트 하나로 떠올리기 질문을 하나만 만들어 줘. 답이 노트의 핵심 주장이 되도록, 제목의 말을 그대로 쓰지 말고 한국어 한 문장 질문으로만 답해.\n\n제목: ${p.title}\n${p.body.split(RECALL_H)[0].slice(0, 1500)}`); break; }
+    case 'ai-recall-check': { const p = find('perms', id), line = (String(p.body).match(new RegExp(`^- \\(${TODAY}\\) (.*)$`, 'm')) || [])[1] || '';
+      aiAsk('recall-check:' + id, `내가 노트를 보지 않고 떠올려 쓴 한 줄을 원래 노트와 맞춰 봐 줘. 맞게 떠올린 것, 빠진 핵심, 틀린 것을 각각 한 줄로. 칭찬이나 점수는 빼고 짧게 한국어로.\n\n떠올린 한 줄: ${line}\n\n원래 노트 — ${p.title}\n${p.body.split(RECALL_H)[0].slice(0, 2000)}`); break; }
     case 'task-move': moveTask(id, b.dataset.to); break;
     case 'sort-inbox': openSort(id); break;
     case 'profiles': openProfiles(); break;
@@ -3746,6 +4043,9 @@ document.addEventListener('change', e => {
   const D = db(), id = el.dataset.id;
   if (act === 'routine-check'){
     checkRoutine(id, el.checked, el.dataset.k || id);
+  } else if (act === 'job-on'){
+    const j = (pset().ai_jobs || []).find(x => x.id === id); if (!j) return; j.on = el.checked; render();
+    toast(j.on ? `${j.name}을(를) 켰어요` : `${j.name}을(를) 껐어요. 정한 때가 와도 돌지 않아요`);
   } else if (act === 'routine-toggle'){
     const r = find('routines', id); r.enabled = el.checked; render();
     toast(r.enabled ? `${r.title} 루틴을 켰어요` : `${r.title} 루틴을 껐어요. 계획과 지금 화면에 나오지 않아요`);
@@ -3779,6 +4079,22 @@ document.addEventListener('submit', e => {
       .then(() => { $('#gc-login').href = gcalUrl('/connect'); $('#gc-step1').hidden = true; $('#gc-step2').hidden = false; $('#gc-login').focus(); gcalRefresh(); })
       .catch(x => { $('#gc-err').textContent = x.message; $('#gc-err').hidden = false; });
     return;
+  }
+  if (kind === 'job'){
+    const name = f.elements.name.value.trim(), prompt = f.prompt.value.trim(), e = $('#job-err');
+    const bad = !name ? ['이름을 적어 주세요', f.elements.name] : !prompt ? ['AI에게 맡길 일을 적어 주세요', f.prompt] : !f.time.value ? ['시각을 정해 주세요', f.time] : null;
+    if (bad){ e.textContent = bad[0]; e.hidden = false; bad[1].setAttribute('aria-invalid', 'true'); bad[1].focus(); return; }
+    const set = pset(), list = set.ai_jobs = (set.ai_jobs || []).slice(), id = f.dataset.id || uid('j');
+    const job = { id, name, prompt, cron:buildCron(f.freq.value, f.time.value), mode:f.mode.value, provider:f.provider.value, on:true };
+    const i = list.findIndex(j => j.id === id); if (i >= 0) list[i] = { ...list[i], ...job, on:list[i].on }; else list.push(job);
+    go('#/jobs'); toast(i >= 0 ? '예약 작업을 고쳤어요' : `${name} — ${cronText(job.cron)} 돌려요`); return;
+  }
+  if (kind === 'search'){ S.q = f.q.value; $('#q-res').innerHTML = searchResults(); return; }
+  if (kind === 'recall'){
+    const p = find('perms', f.dataset.id), v = f.line.value.trim().replace(/\n+/g, ' '); if (!v) return invalid(f.line, `rc-err-${f.dataset.id}`);
+    const undo = snapshot(), ln = `- (${TODAY}) ${v}`;
+    p.body = p.body.trimEnd().split('\n').reverse().find(l => /^#{1,6}\s/.test(l)) === RECALL_H ? `${p.body.trimEnd()}\n${ln}` : `${p.body.trimEnd()}\n\n${RECALL_H}\n${ln}`;
+    render(); toast('노트에 한 줄 남겼어요 · 원래 노트와 맞춰 보세요', { label:'되돌리기', fn:undo }); return;
   }
   if (kind === 'capture'){
     const v = f.text.value.trim(); if (!v) return invalid(f.text, 'cap-err');
@@ -3851,12 +4167,14 @@ document.addEventListener('submit', e => {
     toast(v === P.day_start ? `${md2(PD)}은 기본 시각 ${v}에 시작해요` : `${md2(PD)}은 ${v}에 시작해요 · 루틴과 블록이 따라 움직여요`, { label:'되돌리기', fn:() => { if (prev) d.start = prev; else delete d.start; render(); } });
   } else if (kind === 'day'){
     const e = $('#day-err'), rows = [...f.querySelectorAll('[data-row]')].map(r => ({ days:r.querySelector('[name=days]').value, from:r.querySelector('[name=from]').value, to:r.querySelector('[name=to]').value, label:r.querySelector('[name=label]').value.trim() }));
-    const bad = !f.day_start.value || !f.day_end.value ? '하루 시작과 끝을 정해 주세요' : f.day_end.value <= f.day_start.value ? '하루 끝을 시작보다 뒤로 정해 주세요' : rows.some(r => !r.from || !r.to || r.to <= r.from) ? '비워 둘 시간의 끝을 시작보다 뒤로 정해 주세요' : '';
+    const offLines = f.offdays.value.split('\n').map(l => l.trim()).filter(Boolean), offBad = offLines.find(l => { const m = l.match(/^(\d{4}-\d{2}-\d{2})(?:\s*~\s*(\d{4}-\d{2}-\d{2}))?(\s|$)/); return !m || isNaN(new Date(m[1] + 'T00:00:00')) || (m[2] && (isNaN(new Date(m[2] + 'T00:00:00')) || m[2] < m[1] || dayDiff(m[2], m[1]) > 62)); });
+    const bad = offBad ? `쉬는 날은 2026-08-14 또는 2026-08-14~2026-08-17처럼 적어 주세요(여러 날은 두 달까지) — '${offBad.slice(0, 24)}'` : !f.day_start.value || !f.day_end.value ? '하루 시작과 끝을 정해 주세요' : f.day_end.value <= f.day_start.value ? '하루 끝을 시작보다 뒤로 정해 주세요' : rows.some(r => !r.from || !r.to || r.to <= r.from) ? '비워 둘 시간의 끝을 시작보다 뒤로 정해 주세요' : '';
     if (bad){ e.textContent = bad; e.hidden = false; return; }
     const prev = JSON.parse(JSON.stringify(pset())), delta = toMin(f.day_start.value) - toMin(prev.day_start);
     const moved = delta ? D.routines.map(r => [r, r.cron]) : [];   // 루틴은 하루 시작을 따라 움직인다 — 기본 시작을 바꾸면 루틴 시각도 같은 만큼
     moved.forEach(([r]) => { const e = cronEvery(r.cron); r.cron = buildCron(freqOf(r.cron), toHM(Math.min(Math.max(toMin(cronTime(r.cron)) + delta, 0), 1439)), e, e ? Math.min(Math.max(cronEnd(r.cron) + Math.round(delta / 60), 0), 23) : 23); });
-    Object.assign(pset(), { week_start:+f.week_start.value, day_start:f.day_start.value, day_end:f.day_end.value, blocked:rows, fill_ratio:+f.fill_ratio.value, max_block:+f.max_block.value, default_block:+f.default_block.value });
+    const keepOld = (prev.offdays || []).filter(o => o.date < addDays(TODAY, -31)), offdays = [...keepOld, ...offLines.flatMap(l => { const m = l.match(/^(\d{4}-\d{2}-\d{2})(?:\s*~\s*(\d{4}-\d{2}-\d{2}))?\s*(.*)$/), out = []; for (let d = m[1]; d <= (m[2] || m[1]); d = addDays(d, 1)) out.push({ date:d, label:m[3].trim() }); return out; })].filter((o, i, a) => a.findIndex(x => x.date === o.date) === i);
+    Object.assign(pset(), { offdays, week_start:+f.week_start.value, day_start:f.day_start.value, day_end:f.day_end.value, blocked:rows, fill_ratio:+f.fill_ratio.value, max_block:+f.max_block.value, default_block:+f.default_block.value });
     f.closest('dialog').close(); render();
     toast(moved.length ? `하루 설정을 바꿨어요 · 루틴 ${moved.length}개도 ${fmtMin(Math.abs(delta))} ${delta > 0 ? '뒤로' : '앞으로'} 옮겼어요` : '하루 설정을 바꿨어요', { label:'되돌리기', fn:() => { PSET[S.profile] = prev; moved.forEach(([r, c]) => r.cron = c); render(); } });
   } else if (kind === 'kind'){

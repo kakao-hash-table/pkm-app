@@ -134,3 +134,21 @@ test('장기 기록을 메모 앞 이름으로 묶는다', () => {
   assert.deepEqual(g.map(x => x.tag), ['A', 'B', '']);
   assert.deepEqual(g[0].items.map(x => x.text), ['온보딩 도움', '장애 대응']);
 });
+
+test('묶음(group)은 하위 폴더가 되고, 쉬는 날·AI 예약 작업은 설정에 남는다', () => {
+  const db = Object.assign(MD.emptyDb(), {
+    kinds:[{ id:'meeting', name:'회의록', fields:[['agenda', '안건'], ['talk', '논의'], ['decisions', '결정']], people:true, todos:true }],
+    perms:[{ id:'p1', title:'습관은 신호에서 시작한다', created:'2026-06-21', group:'인간운영체계/습관', links:[], sources:[], body:'### 내용\n- 한 줄' }],
+    ctxs:[{ id:'c1', title:'배포 순서', group:'맵/배포', created:'2026-01-01', updated:'2026-01-02', sources:[], summary:'', body:'```sh\n# 주석이지 칸 제목이 아니다\nnpm run build\n```\n본문', history:[] }]
+  });
+  const set = { ...settings, offdays:[{ date:'2026-09-30', label:'휴가 (9/30~10/2, 10/3 앞)' }], ai_jobs:[{ id:'j1', name:'아침 정리', cron:'0 9 * * 1-5', mode:'read', provider:'claude', on:false, prompt:'줄1, "인용"\n줄2: [x]' }] };
+  const files = MD.serialize({ db, settings:set });
+  assert.ok(files['01_지식/영구노트/인간운영체계/습관/습관은 신호에서 시작한다.md']);
+  assert.ok(files['01_지식/맥락노트/맵/배포/배포 순서.md']);
+  const back = MD.parse(files);
+  assert.equal(back.db.perms[0].group, '인간운영체계/습관');
+  assert.match(back.db.ctxs[0].body, /# 주석이지 칸 제목이 아니다/);   // 코드 블록 안의 '# '는 칸을 나누지 않는다
+  assert.deepEqual(back.settings.offdays, set.offdays);   // 쉼표가 든 값도 그대로
+  assert.deepEqual(back.settings.ai_jobs, set.ai_jobs);
+  assert.deepEqual(MD.serialize(back), files);
+});

@@ -24,6 +24,7 @@
 // GET  /api/profile/:p/gcal/connect      구글 로그인으로 보낸다(302) — 돌아오는 곳은 /api/gcal/callback
 // POST /api/profile/:p/gcal/sync         지금 맞추기 · POST …/gcal/disconnect 연결 끊기
 // POST /api/gcal/client {client_id, client_secret}   내 구글 OAuth 클라이언트 등록(토큰과 함께 ~/.pkm-app/gcal.json, 데이터 폴더 밖)
+// GET  /api/profile/:p/jobs               AI 예약 작업의 마지막 실행(이 컴퓨터) · POST …/jobs/:id/run  지금 돌리기(server/jobs.js)
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -36,6 +37,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
 import { createRunner } from './runner.js';
+import { createJobs } from './jobs.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.PKM_DATA ? path.resolve(process.env.PKM_DATA) : path.join(ROOT, 'data');
@@ -175,6 +177,8 @@ setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다
 
 /* ---------- 플러그인 실행기: 이 컴퓨터에서 돌리기를 켠 프로필만 ---------- */
 const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p, 30000); } });
+/* ---------- AI 예약 작업: 돌리는 컴퓨터가 정한 때에 AI에 맡기고 결과를 인박스로 ---------- */
+const jobs = createJobs({ DATA, listProfiles, settingsOf, here:p => runner.here(p), onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p); } });
 
 /* ---------- 교과서: 원본(Obsidian)이 정본, 바뀌면 다시 복제 ---------- */
 // 책 폴더의 .source.json 이 가리키는 원본을 지켜본다. 놓친 변경은 5분마다 한 번 더 맞춘다.
@@ -269,6 +273,8 @@ async function api(req, res, url){
     if (req.method === 'POST' && sub === 'save') return send(res, 200, await save(p, await body(req)));
     if (req.method === 'GET' && sub === 'image') return image(res, p, url.searchParams.get('name'));
     if (sub === 'runner' && req.method === 'POST') return send(res, 200, await runner.setRunner(p, await body(req)));
+    if (sub === 'jobs' && !parts[3] && req.method === 'GET') return send(res, 200, await jobs.status(p));
+    if (sub === 'jobs' && parts[3] && parts[4] === 'run' && req.method === 'POST') return send(res, 200, await jobs.runNow(p, parts[3]));
     if (sub === 'plugins' && parts[3] === 'state' && req.method === 'GET') return send(res, 200, await runner.status(p));
     if (sub === 'plugins' && parts[3] && parts[4]){
       const id = parts[3], what = parts[4];
@@ -351,7 +357,7 @@ const server = http.createServer(async (req, res) => {
 if (process.argv[1] === fileURLToPath(import.meta.url)){
   for (const pr of await listProfiles()){ const n = await syncTemplates(pr.name); if (n) console.log(`${pr.name}: 템플릿 ${n}개를 앱 템플릿에 맞췄어요`); }
   await syncTextbooks(); setInterval(() => syncTextbooks().catch(() => {}), 300000).unref();
-  runner.start();
+  runner.start(); jobs.start();
   server.listen(PORT, HOST, () => console.log(`PKM: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/  (데이터: ${DATA})`));
 }
-export { server, runner, gcal, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };
+export { server, runner, gcal, jobs, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };

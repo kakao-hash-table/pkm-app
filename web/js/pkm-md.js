@@ -30,7 +30,8 @@
     const s = String(v);
     return needsQuote(s) ? q(s) : s;
   }
-  const yFlowItem = v => (v && typeof v === 'object' && !Array.isArray(v)) ? `{ ${Object.entries(v).map(([k, x]) => `${k}: ${Array.isArray(x) ? yFlowList(x) : yScalar(x) || '""'}`).join(', ')} }` : (yScalar(v) || '""');
+  const yFlowScalar = v => { const t = yScalar(v); return typeof v === 'string' && t === v && /[,[\]{}]/.test(v) ? q(v) : t; };   // [a, b]·{k: v} 안의 쉼표·괄호는 따옴표로 감싸야 다시 읽힌다
+  const yFlowItem = v => (v && typeof v === 'object' && !Array.isArray(v)) ? `{ ${Object.entries(v).map(([k, x]) => `${k}: ${Array.isArray(x) ? yFlowList(x) : yFlowScalar(x) || '""'}`).join(', ')} }` : (yFlowScalar(v) || '""');
   const yFlowList = a => `[${a.map(yFlowItem).join(', ')}]`;
   function yLine(k, v, ind = ''){
     if (Array.isArray(v)) return v.length && v.some(x => x && typeof x === 'object') ? `${ind}${k}:\n${v.map(x => `${ind}  - ${yFlowItem(x)}`).join('\n')}` : `${ind}${k}: ${yFlowList(v)}`;
@@ -116,9 +117,11 @@
     const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
     if (m){ fm = parseYaml(m[1]); body = text.slice(m[0].length); }
     const sections = {}, order = [];
-    let cur = null, buf = [], pre = [];
+    let cur = null, buf = [], pre = [], fence = null;
     for (const line of body.split('\n')){
-      const h = line.match(/^# (.+?)\s*$/);
+      const f = line.match(/^\s*(```+|~~~+)/);   // 코드 블록 안의 '# '는 칸 제목이 아니다
+      if (f){ if (!fence) fence = f[1][0]; else if (f[1][0] === fence) fence = null; }
+      const h = !fence && !f && line.match(/^# (.+?)\s*$/);
       if (h){ if (cur !== null) sections[cur] = buf.join('\n').trim(); cur = h[1]; order.push(cur); buf = []; }
       else (cur === null ? pre : buf).push(line);
     }
@@ -133,7 +136,9 @@
 
   /* ---------- 파일 이름 ---------- */
   const clean = s => String(s || '').replace(/[\\/:*?"<>|#^[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || '제목 없음';
-  const link = t => (t ? `[[${clean(t)}]]` : '');   // 파일 이름과 같게 — Obsidian에서 바로 열린다
+  const link = t => (t ? `[[${clean(t)}]]` : '');
+  const cleanGroup = g => String(g || '').split('/').map(x => x.replace(/[\\:*?"<>|#^[\]]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60)).filter(x => x && x !== '.' && x !== '..').join('/');   // 묶음 = 하위 폴더(여러 단계 가능)
+  const inGroup = (dir, g) => { g = cleanGroup(g); return g ? `${dir}/${g}` : dir; };   // 파일 이름과 같게 — Obsidian에서 바로 열린다
   const same = (x, t) => { t = String(t).split('/').pop(); return x === t || clean(x) === t; };   // [[폴더/이름]]도 이름으로 맞춘다
   const linkIn = (dir, t) => `[[${dir}/${clean(t)}]]`;   // 이름이 겹칠 수 있는 기록·약속은 폴더까지 적는다
   const apptName = a => `${a.start.slice(0, 10)} ${a.title}`;
@@ -164,11 +169,11 @@
       files[place(`${F.reference}/${r.type}`, r.title, r.id)] = writeDoc(fm, [['한 줄 요약', r.summary], ['핵심 내용', Array.isArray(r.points) ? r.points.join('\n') : r.points], [quotesTitle, r.quotes], ['내 생각 → 영구노트 후보', ideas]]);
     });
     sortById(D.perms).forEach(p => {
-      files[place(F.permanent, p.title, p.id)] = writeDoc({ type:'permanent', id:p.id, title:p.title, created:p.created, links:(p.links || []).map(id => byId(D.perms, id)).filter(Boolean).map(x => link(x.title)), sources:(p.sources || []).map(id => byId(D.refs, id) || byId(D.textbooks, id)).filter(Boolean).map(x => link(x.title)) }, [], p.body);
+      files[place(inGroup(F.permanent, p.group), p.title, p.id)] = writeDoc({ type:'permanent', id:p.id, title:p.title, created:p.created, group:cleanGroup(p.group) || undefined, links:(p.links || []).map(id => byId(D.perms, id)).filter(Boolean).map(x => link(x.title)), sources:(p.sources || []).map(id => byId(D.refs, id) || byId(D.textbooks, id)).filter(Boolean).map(x => link(x.title)) }, [], p.body);
     });
     sortById(D.ctxs).forEach(c => {
       const hist = ['| 날짜 | 무엇이 바뀌었나 | 왜 |', '|---|---|---|', ...(c.history || []).slice().sort((a, b) => a.date.localeCompare(b.date)).map(h => `| ${h.date} | ${cell(h.what)} | ${cell(h.why)} |`)].join('\n');
-      files[place(F.context, c.title, c.id)] = writeDoc({ type:'context', id:c.id, topic:c.title, created:c.created, updated:c.updated, sources:c.sources || [] }, [['한 줄 요약', c.summary], ['내용', c.body], ['바뀐 기록', hist]]);
+      files[place(inGroup(F.context, c.group), c.title, c.id)] = writeDoc({ type:'context', id:c.id, topic:c.title, group:cleanGroup(c.group) || undefined, created:c.created, updated:c.updated, sources:c.sources || [] }, [['한 줄 요약', c.summary], ['내용', c.body], ['바뀐 기록', hist]]);
     });
     // 교과서(D.textbooks)는 읽기전용이라 쓰지 않는다 — 파일 지도에 없으니 저장이 고치지도 지우지도 않는다
     // 데일리 — 계획·메모·회고·체크한 루틴이 있을 때만 파일을 만든다
@@ -228,8 +233,10 @@
       reference_formats:(D.formats || ['책', '아티클', '영상']).map(f => toKey(FORMAT, f)),
       week_start:S.week_start ?? 1, day_start:S.day_start || '09:00', day_end:S.day_end || '18:00',
       blocked:(S.blocked || []).map(b => ({ days:b.days, from:b.from, to:b.to, label:b.label || '' })),
+      offdays:S.offdays && S.offdays.length ? S.offdays.slice().sort((a, b) => a.date.localeCompare(b.date)).map(o => ({ date:o.date, label:o.label || '' })) : undefined,
       fill_ratio:S.fill_ratio ?? 0.75, max_block:S.max_block ?? 120, default_block:S.default_block ?? 60,
       gcal_account:S.gcal_account || null, gcal_task_blocks:!!S.gcal_task_blocks, onboarded:S.onboarded !== false,
+      ai_jobs:S.ai_jobs && S.ai_jobs.length ? S.ai_jobs.map(j => ({ id:j.id, name:j.name, cron:j.cron, mode:j.mode || 'chat', provider:j.provider || 'claude', on:j.on !== false, prompt:j.prompt })) : undefined,
       menu_order:S.menu_order && S.menu_order.length ? S.menu_order : undefined, menu_hidden:S.menu_hidden && S.menu_hidden.length ? S.menu_hidden : undefined
     };
     return writeDoc(fm, []);
@@ -251,9 +258,11 @@
         storage:s.storage || 'device', repo:s.repo || '', locale:s.locale || 'ko', week_start:s.week_start ?? 1,
         day_start:s.day_start || '09:00', day_end:s.day_end || '18:00',
         blocked:(s.blocked || []).filter(b => b && typeof b === 'object').map(b => ({ days:String(b.days ?? '*'), from:String(b.from), to:String(b.to), label:b.label || '' })),
+        offdays:(Array.isArray(s.offdays) ? s.offdays : []).map(o => o && typeof o === 'object' ? { date:String(o.date || ''), label:o.label == null ? '' : String(o.label) } : { date:String(o || '').slice(0, 10), label:String(o || '').slice(10).trim() }).filter(o => /^\d{4}-\d{2}-\d{2}$/.test(o.date)),
         fill_ratio:s.fill_ratio ?? 0.75, max_block:s.max_block ?? 120, default_block:s.default_block ?? 60,
         gcal_account:s.gcal_account || '', gcal_task_blocks:!!s.gcal_task_blocks,
         onboarded:s.onboarded === false ? false : s.onboarded === true ? true : null,   // null = 적힌 적 없음(앱이 정한다)
+        ai_jobs:(Array.isArray(s.ai_jobs) ? s.ai_jobs : []).filter(j => j && typeof j === 'object' && j.id).map(j => ({ id:String(j.id), name:String(j.name || ''), cron:String(j.cron || ''), mode:['chat', 'read', 'auto'].includes(j.mode) ? j.mode : 'chat', provider:String(j.provider || 'claude'), on:j.on !== false, prompt:String(j.prompt || '') })),
         menu_order:Array.isArray(s.menu_order) ? s.menu_order.map(String) : [], menu_hidden:Array.isArray(s.menu_hidden) ? s.menu_hidden.map(String) : []
       });
       const folders = Object.assign({}, s.folders || {}); const recMap = folders.records || {}; delete folders.records;
@@ -285,12 +294,12 @@
         D.refs.push(r);
       }
       else if (type === 'permanent'){
-        const p = { id:id || newId('p'), title:String(f.title || base(d.path)), created:String(f.created || ''), links:[], sources:[], body:d.body };
+        const p = { id:id || newId('p'), title:String(f.title || base(d.path)), created:String(f.created || ''), group:f.group == null ? '' : String(f.group), links:[], sources:[], body:d.body };
         later.push(() => { p.links = (f.links || []).map(unlink).map(t => (D.perms.find(x => same(x.title, t)) || {}).id).filter(Boolean); p.sources = (f.sources || []).map(unlink).map(t => (D.refs.find(x => same(x.title, t)) || D.textbooks.find(x => same(x.title, t)) || {}).id).filter(Boolean); });
         D.perms.push(p);
       }
       else if (type === 'context'){
-        D.ctxs.push({ id:id || newId('c'), title:String(f.topic || f.title || base(d.path)), created:String(f.created || ''), updated:String(f.updated || f.created || ''), sources:f.sources || [], summary:S['한 줄 요약'] || '', body:S['내용'] || '',
+        D.ctxs.push({ id:id || newId('c'), title:String(f.topic || f.title || base(d.path)), group:f.group == null ? '' : String(f.group), created:String(f.created || ''), updated:String(f.updated || f.created || ''), sources:f.sources || [], summary:S['한 줄 요약'] || '', body:S['내용'] || '',
           history:tableRows(S['바뀐 기록']).map(([date, what, why]) => ({ date, what, why:why || '' })).filter(h => h.date) });
       }
       else if (type === 'daily'){
@@ -392,7 +401,7 @@
   }
 
   const textHash = pathId;   // 카드가 만들어진 뒤 원본 노트가 바뀌었는지 — 같은 함수를 브라우저와 Node가 함께 쓴다
-  const api = { FORMAT_VERSION, textHash, serialize, parse, diff, parseDoc, writeDoc, parseYaml, emptyDb, DEFAULT_FOLDERS, SETTINGS, STATUS, RSTATUS, FORMAT, UNIT };
+  const api = { cleanGroup, FORMAT_VERSION, textHash, serialize, parse, diff, parseDoc, writeDoc, parseYaml, emptyDb, DEFAULT_FOLDERS, SETTINGS, STATUS, RSTATUS, FORMAT, UNIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMMD = api;
 })(typeof self !== 'undefined' ? self : this);
