@@ -50,3 +50,13 @@ test('원본 폴더가 사라지면 복제본을 지우지 않는다', () => {
   assert.ok(fs.existsSync(out('01 기초/하나.md')));
   fs.renameSync(src + ' 옮김', src);
 });
+test('책 안의 그림은 그대로 옮기고, 원본에서 지우면 휴지통으로', () => {
+  put('_그림/곡선.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  const r = importBook(src, prof, { vault });
+  assert.ok(r.added.includes('_그림/곡선.svg'));
+  assert.equal(fs.readFileSync(out('_그림/곡선.svg'), 'utf8'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  assert.deepEqual(importBook(src, prof, { vault }).added, [], '같으면 다시 쓰지 않는다');
+  fs.rmSync(path.join(src, '_그림/곡선.svg'));
+  assert.ok(importBook(src, prof, { vault }).removed.includes('_그림/곡선.svg'));
+  assert.ok(!fs.existsSync(out('_그림/곡선.svg')));
+});

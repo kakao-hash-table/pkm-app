@@ -47,6 +47,18 @@ function sweep(){
   for (const [id, st] of STAGES) if (Date.now() - st.at > TTL){ STAGES.delete(id); fs.rm(st.dir, { recursive: true, force: true }).catch(() => {}); }
 }
 
+// 앱에 들어 있는 플러그인(plugins/*) — 화면에서 주소 없이 고를 수 있게 이름과 설명만
+export async function bundled(dir){
+  const out = [];
+  for (const e of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])){
+    if (!e.isDirectory()) continue;
+    const f = path.join(dir, e.name, 'plugin.md'); if (!fss.existsSync(f)) continue;
+    const r = P.validate([{ path: 'plugin.md', size: 1, text: await fs.readFile(f, 'utf8') }]);
+    if (r.manifest && r.manifest.id) out.push({ path: path.join(dir, e.name), id: r.manifest.id, name: r.manifest.name, version: r.manifest.version, description: r.manifest.description });
+  }
+  return out;
+}
+
 export async function inspect({ git, ref, local }){
   sweep();
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pkm-plugin-'));
@@ -61,6 +73,7 @@ export async function inspect({ git, ref, local }){
       commit = (await run('git', ['-C', dir, 'rev-parse', 'HEAD'])).stdout.trim();
       source = { type: 'git', url: git, ref: ref || null };
     } else if (local){
+      local = String(local).trim().replace(/^~(?=\/|$)/, os.homedir());
       if (!path.isAbsolute(local) || !fss.existsSync(local) || !fss.statSync(local).isDirectory()) throw fail(400, `폴더가 없거나 절대 경로가 아니에요: ${local}`);
       await fs.cp(local, dir, { recursive: true, filter: src => !/(^|[/\\])(\.git|node_modules)([/\\]|$)/.test(path.relative(local, src)) });
       source = { type: 'local', path: path.resolve(local) };
@@ -73,6 +86,7 @@ export async function inspect({ git, ref, local }){
     return {
       stage, ok: result.ok, errors: result.errors, warnings: result.warnings, manifest: result.manifest, source, commit,
       workflows: result.workflows.map(w => ({ name: w.name, file: w.file, steps: w.steps })),
+      feeds: result.feeds,
       files: files.map(f => ({ path: f.path, size: f.size, sha256: f.sha256 || null })),
       scripts: result.scripts.map(p => ({ path: p, sha256: hashOf(p), text: (files.find(f => f.path === p) || {}).text || '' }))
     };

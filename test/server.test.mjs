@@ -122,3 +122,10 @@ test('교과서 원본을 고치면 서버가 다시 복제한다', async () => 
   assert.match(fs.readFileSync(path.join(tmp, '개인', '01_지식/교과서/책/노트.md'), 'utf8'), /고침/);
   fs.rmSync(path.dirname(src), { recursive:true, force:true });
 });
+test('노트에 붙은 그림을 이름으로 찾아 준다 — 그림이 아닌 이름·경로는 막는다', async () => {
+  const dir = path.join(tmp, '개인', '01_지식', '교과서', '책', '_그림'); fs.mkdirSync(dir, { recursive:true });
+  fs.writeFileSync(path.join(dir, '곡선.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  const r = await fetch(base + '/api/profile/' + encodeURIComponent('개인') + '/image?name=' + encodeURIComponent('곡선.svg'));
+  assert.equal(r.status, 200); assert.equal(r.headers.get('content-type'), 'image/svg+xml'); assert.match(r.headers.get('content-security-policy'), /default-src 'none'/);
+  for (const n of ['../_설정.md', '_설정.md', 'a/곡선.svg', '없음.svg']) assert.notEqual((await fetch(base + '/api/profile/' + encodeURIComponent('개인') + '/image?name=' + encodeURIComponent(n))).status, 200, n);
+});

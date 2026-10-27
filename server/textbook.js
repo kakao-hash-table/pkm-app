@@ -28,6 +28,34 @@ export function walk(dir, rel = ''){
   }).sort((a, b) => a.localeCompare(b, 'ko'));
 }
 
+// 그림(책 안의 이미지)은 노트가 아니라 그대로 옮긴다 — ![[그림.svg]] 로 노트에 붙는다
+export const IMAGE_RE = /\.(svg|png|jpe?g|webp|gif)$/i;
+export function walkImages(dir, rel = ''){
+  return fs.readdirSync(path.join(dir, rel), { withFileTypes:true }).flatMap(e => {
+    if (e.name.startsWith('.')) return [];
+    const r = rel ? `${rel}/${e.name}` : e.name;
+    return e.isDirectory() ? walkImages(dir, r) : IMAGE_RE.test(e.name) ? [r] : [];
+  }).sort();
+}
+function copyImages(src, outDir, profileDir, trashDir){
+  const imgs = walkImages(src), added = [], changed = [];
+  for (const rel of imgs){
+    const from = fs.readFileSync(path.join(src, rel)), out = path.join(outDir, rel);
+    const old = fs.existsSync(out) ? fs.readFileSync(out) : null;
+    if (old && old.equals(from)) continue;
+    (old ? changed : added).push(rel);
+    fs.mkdirSync(path.dirname(out), { recursive:true });
+    const tmp = `${out}.${process.pid}.tmp`; fs.writeFileSync(tmp, from); fs.renameSync(tmp, out);
+  }
+  const removed = fs.existsSync(outDir) ? walkImages(outDir).filter(r => !imgs.includes(r)) : [];
+  for (const rel of removed){
+    let to = path.join(trashDir, rel);
+    if (fs.existsSync(to)) to = to.replace(IMAGE_RE, m => ` ${Date.now()}${m}`);
+    fs.mkdirSync(path.dirname(to), { recursive:true }); fs.renameSync(path.join(outDir, rel), to);
+  }
+  return { added, changed, removed };
+}
+
 function convert(text, kind){
   let lines = text.replace(/\r\n/g, '\n').replace(/^---\n[\s\S]*?\n---\n/, '').split('\n');
   while (lines.length && !lines[0].trim()) lines.shift();
@@ -81,6 +109,8 @@ export function importBook(src, profileDir, { tbFolder = MD.DEFAULT_FOLDERS.text
     if (fs.existsSync(to)) to = to.replace(/\.md$/, ` ${Date.now()}.md`);
     fs.mkdirSync(path.dirname(to), { recursive:true }); fs.renameSync(path.join(outDir, rel), to);
   }
+  const im = copyImages(src, outDir, profileDir, path.join(profileDir, '.trash', tbFolder, book));
+  added.push(...im.added); changed.push(...im.changed); removed.push(...im.removed);
   const manifest = JSON.stringify({ src, vault:vault ? path.resolve(vault) : '' }, null, 2) + '\n';
   if ((fs.existsSync(path.join(outDir, MANIFEST)) ? fs.readFileSync(path.join(outDir, MANIFEST), 'utf8') : '') !== manifest) fs.writeFileSync(path.join(outDir, MANIFEST), manifest);
   return { book, added, changed, removed };

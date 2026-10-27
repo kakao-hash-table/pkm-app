@@ -11,9 +11,15 @@
 // GET  /api/profile/:p/sync              git 동기화 상태
 // POST /api/profile/:p/sync              지금 동기화
 // POST /api/plugins/inspect {git, ref} | {local}   플러그인 가져와서 검사만(설치 안 함) → { stage, ok, errors, manifest, scripts… }
+// GET  /api/plugins/bundled              앱에 들어 있는 플러그인(plugins/*)
 // GET  /api/profile/:p/plugins            설치된 플러그인
 // POST /api/profile/:p/plugins {stage}    검사한 플러그인을 이 프로필에 설치
 // DELETE /api/profile/:p/plugins/:id      휴지통으로
+// GET  /api/profile/:p/plugins/state      피드·실행 기록과 이 컴퓨터의 실행기 상태(server/runner.js)
+// POST /api/profile/:p/runner {on, ai}     이 컴퓨터에서 돌리기 켜기·끄기, AI 연결 넣기
+// GET  /api/profile/:p/plugins/:id/machine 이 컴퓨터의 승인·비밀값 상태     POST …/approve  승인     POST …/secret {name, value|null}
+// POST /api/profile/:p/plugins/:id/local {settings, auto}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
+// GET  /api/profile/:p/plugins/:id/scripts  가져오는 스크립트 내용(승인 전에 보여 준다)
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -25,6 +31,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
+import { createRunner } from './runner.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.PKM_DATA ? path.resolve(process.env.PKM_DATA) : path.join(ROOT, 'data');
@@ -160,6 +167,9 @@ setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다
   for (const pr of await listProfiles()) if (pr.storage === 'github' && !(SYNC[pr.name] || {}).running) syncNow(pr.name).catch(() => {});
 }, 120000).unref();
 
+/* ---------- 플러그인 실행기: 이 컴퓨터에서 돌리기를 켠 프로필만 ---------- */
+const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p, 30000); } });
+
 /* ---------- 교과서: 원본(Obsidian)이 정본, 바뀌면 다시 복제 ---------- */
 // 책 폴더의 .source.json 이 가리키는 원본을 지켜본다. 놓친 변경은 5분마다 한 번 더 맞춘다.
 const TB = {};   // 원본 경로 → { watcher, timer, profile, tbFolder }
@@ -218,6 +228,7 @@ async function api(req, res, url){
     if (!site && req.headers.origin){ let host = ''; try { host = new URL(req.headers.origin).host; } catch {} cross = host !== req.headers.host && host !== req.headers['x-forwarded-host']; }
     if (cross) return send(res, 403, { error:'다른 사이트에서 온 요청이에요' });
   }
+  if (parts[0] === 'plugins' && parts[1] === 'bundled' && req.method === 'GET') return send(res, 200, { plugins:await plugins.bundled(path.join(ROOT, 'plugins')) });
   if (parts[0] === 'plugins' && parts[1] === 'inspect' && req.method === 'POST') return send(res, 200, await plugins.inspect(await body(req)));
   if (parts[0] === 'profiles'){
     if (req.method === 'GET') return send(res, 200, { profiles:await listProfiles() });
@@ -228,6 +239,22 @@ async function api(req, res, url){
     if (req.method === 'GET' && !sub) return send(res, 200, await readProfile(p));
     if (req.method === 'GET' && sub === 'version') return send(res, 200, { version:await versionOf(p), sync:SYNC[p] ? { state:SYNC[p].state, at:SYNC[p].at, error:SYNC[p].error } : null });
     if (req.method === 'POST' && sub === 'save') return send(res, 200, await save(p, await body(req)));
+    if (req.method === 'GET' && sub === 'image') return image(res, p, url.searchParams.get('name'));
+    if (sub === 'runner' && req.method === 'POST') return send(res, 200, await runner.setRunner(p, await body(req)));
+    if (sub === 'plugins' && parts[3] === 'state' && req.method === 'GET') return send(res, 200, await runner.status(p));
+    if (sub === 'plugins' && parts[3] && parts[4]){
+      const id = parts[3], what = parts[4];
+      if (what === 'machine' && req.method === 'GET') return send(res, 200, await runner.machine(p, id));
+      if (what === 'approve' && req.method === 'POST') return send(res, 200, { plugin:await runner.approve(p, id) });
+      if (what === 'secret' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.setSecret(p, id, String(b.name || ''), b.value == null ? null : String(b.value))); }
+      if (what === 'local' && req.method === 'POST') return send(res, 200, await runner.setLocal(p, id, await body(req)));
+      if (what === 'act' && req.method === 'POST') return send(res, 200, await runner.act(p, id, await body(req)));
+      if (what === 'scripts' && req.method === 'GET'){
+        const x = (await plugins.list(path.join(DATA, p))).find(x => x.id === id);
+        if (!x) return send(res, 404, { error:'설치된 플러그인이 아니에요' });
+        return send(res, 200, { scripts:await Promise.all(x.scripts.map(async s => ({ ...s, text:await fs.readFile(path.join(x.path, s.path), 'utf8').catch(() => '') }))) });
+      }
+    }
     if (sub === 'plugins'){
       const dir = path.join(DATA, p);
       if (req.method === 'GET' && !parts[3]) return send(res, 200, { plugins:await plugins.list(dir) });
@@ -240,6 +267,24 @@ async function api(req, res, url){
     }
   }
   send(res, 404, { error:'없는 경로예요' });
+}
+// 노트에 붙은 그림(![[이름.svg]]) — 이름이 같은 그림을 프로필 안에서 찾아 읽기만 한다. 교과서 그림은 import가 책 폴더로 옮겨 둔다
+async function findImage(dir, name, base = ''){
+  for (const e of await fs.readdir(path.join(dir, base), { withFileTypes:true }).catch(() => [])){
+    if (e.name.startsWith('.')) continue;
+    const rel = base ? `${base}/${e.name}` : e.name;
+    if (e.isDirectory()){ const r = await findImage(dir, name, rel); if (r) return r; }
+    else if (e.name === name) return path.join(dir, rel);
+  }
+  return null;
+}
+async function image(res, p, name){
+  if (typeof name !== 'string' || !textbook.IMAGE_RE.test(name) || /[\\/]/.test(name) || name.startsWith('.')) return send(res, 400, { error:'그림 이름이 아니에요' });
+  const abs = await findImage(path.join(DATA, p), name);
+  if (!abs) return send(res, 404, { error:'그림이 없어요' });
+  const ext = path.extname(name).toLowerCase(), type = { '.svg':'image/svg+xml', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.gif':'image/gif' }[ext];
+  res.writeHead(200, { 'content-type':type, 'cache-control':'no-cache', ...SEC(res.req), ...(ext === '.svg' ? { 'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'" } : {}) });
+  res.end(await fs.readFile(abs));
 }
 async function statics(req, res, url){
   let rel = decodeURIComponent(url.pathname);
@@ -268,6 +313,7 @@ const server = http.createServer(async (req, res) => {
 if (process.argv[1] === fileURLToPath(import.meta.url)){
   for (const pr of await listProfiles()){ const n = await syncTemplates(pr.name); if (n) console.log(`${pr.name}: 템플릿 ${n}개를 앱 템플릿에 맞췄어요`); }
   await syncTextbooks(); setInterval(() => syncTextbooks().catch(() => {}), 300000).unref();
+  runner.start();
   server.listen(PORT, HOST, () => console.log(`PKM: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/  (데이터: ${DATA})`));
 }
-export { server, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };
+export { server, runner, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };

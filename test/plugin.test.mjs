@@ -17,7 +17,7 @@ test('예시 플러그인을 받는다', () => {
   const r = P.validate(base());
   assert.equal(r.ok, true, r.errors.join('\n'));
   assert.equal(r.manifest.id, 'deploy-loop');
-  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'] });
+  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'], secrets: [] });
   assert.equal(r.workflows[0].steps.length, 5);
   assert.equal(r.workflows[0].steps[3].body, '이 카드의 경로에서 바뀐 파일을 읽고\n위험한 부분만 짧게 알려 줘');
 });
@@ -51,4 +51,19 @@ test('플러그인 폴더의 문서는 노트로 읽지 않는다', () => {
   const MD = require('../web/js/pkm-md.js');
   const r = MD.parse({ '_플러그인/deploy-loop/plugin.md': '---\ntype: inbox\n---\n몰래', '00_인박스/a.md': '---\ntype: inbox\n---\n진짜' });
   assert.deepEqual(r.db.inbox.map(x => x.text), ['진짜']);
+});
+
+test('피드·비밀값·단계 폴더 — 선언한 스크립트로만 가져오고, 비밀값은 이름만 받는다', () => {
+  const withSecrets = t => t.replace('bundled: [scripts/pr-body.mjs]', 'bundled: [scripts/pr-body.mjs]\n  secrets:\n    - { name: DEMO_TOKEN, label: 데모 토큰, url: "https://example.com/tokens" }\n    - OTHER_TOKEN');
+  const feed = body => withFile(manifest(withSecrets), 'feeds/목록.md', body);
+  const ok = P.validate(feed('## 내 할 일\n바뀐 것만 가져와요.\n- run: scripts/pr-body.mjs list {jira_project}\n- every: 30\n- days: weekdays\n- hours: 08:30-18:00\n- start: 배포\n- start_mode: auto\n'));
+  assert.equal(ok.ok, true, ok.errors.join('\n'));
+  assert.deepEqual(ok.manifest.permissions.secrets, ['DEMO_TOKEN', 'OTHER_TOKEN']);
+  assert.deepEqual(ok.manifest.secrets[0], { name: 'DEMO_TOKEN', label: '데모 토큰', hint: '', url: 'https://example.com/tokens' });
+  assert.deepEqual(ok.feeds[0], { name: '내 할 일', file: 'feeds/목록.md', description: '바뀐 것만 가져와요.', run: 'scripts/pr-body.mjs list {jira_project}', every: 30, days: 'weekdays', hours: '08:30-18:00', start: '배포', start_mode: 'auto', empty: '' });
+  assert.match(P.validate(feed('## a\n- run: scripts/none.mjs\n')).errors.join(), /선언하지 않은 스크립트 "scripts\/none.mjs"/);
+  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- every: 1\n- start: 없는것\n')).errors.join(), /every는 5~1440분[\s\S]*워크플로우 "없는것"가 없어요/);
+  assert.match(P.validate(manifest(t => t.replace('bundled: [scripts/pr-body.mjs]', 'bundled: [scripts/pr-body.mjs]\n  secrets: [token]'))).errors.join(), /영문 대문자/);
+  const wf = P.parseWorkflows('## a\n- [구현] 고치기 · agent(read) in {프로젝트.dir}: 고쳐 줘\n- [확인] 보기 · manual');
+  assert.deepEqual(wf[0].steps.map(s => [s.kind, s.mode, s.cwd, s.body]), [['agent', 'read', '{프로젝트.dir}', '고쳐 줘'], ['manual', null, null, '']]);
 });
