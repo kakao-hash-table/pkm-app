@@ -197,6 +197,14 @@ a.row:hover{background:var(--fill)}
 .row .meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;color:var(--text-2);font-size:.875rem;margin-top:4px}
 .row .chev{color:var(--text-3);align-self:center;font-size:1.25rem;line-height:1}
 @media (max-width:420px){.row{padding:14px 16px}}
+/* 모바일: 목록 줄을 왼쪽으로 밀면 오른쪽에서 [삭제]가 나온다 */
+@media (pointer:coarse){.list>li,.board .tcard{touch-action:pan-y pinch-zoom}}
+.sw{position:relative;overflow:hidden}
+.sw>*{transform:translateX(var(--sx,0));transition:transform .2s ease}
+.sw.sw-drag>*{transition:none}
+.sw.sw-open{--sx:-88px}
+.sw-del{position:absolute;top:0;bottom:0;left:100%;width:88px;border:0;background:#C4271D;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.sw>*{transition:none}}
 
 .badge{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:6px;font-size:.8125rem;font-weight:700;background:var(--s-wait-bg);color:var(--s-wait);white-space:nowrap}
 .b-대기{background:var(--s-wait-bg);color:var(--s-wait)}
@@ -749,7 +757,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 <!-- 단기 상태 바꾸기 -->
 <dialog id="dlg-status" aria-labelledby="st-head">
   <form data-form="status" novalidate>
-    <div><h2 id="st-head">상태 바꾸기</h2><p class="faint" id="st-title" style="margin:4px 0 0"></p></div>
+    <div><h2 id="st-head">상태 바꾸기·삭제</h2><p class="faint" id="st-title" style="margin:4px 0 0"></p></div>
     <fieldset class="choice">
       <legend class="sr-only">옮길 상태</legend>
       <label><input type="radio" name="to" value="대기"><span><b>대기</b><small>아직 시작 전이에요</small></span></label>
@@ -760,6 +768,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
     <label class="field" data-extra="wait"><span>누구의 답을 기다리나요 <span class="hint">선택</span></span><input name="waitOn" id="st-wait" list="wait-names" autocomplete="off" placeholder="예: 민지"></label>
     <datalist id="wait-names"></datalist>
     <div class="dlg-actions">
+      <button class="btn btn-text btn-danger" type="button" data-act="st-del" style="margin-right:auto">삭제</button>
       <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
       <button class="btn btn-primary" type="submit" id="st-submit">옮기기</button>
     </div>
@@ -1499,7 +1508,7 @@ function waitText(t){
   return `<span class="wait">${t.waitOn ? esc(t.waitOn) + ' · ' : ''}${d ? d + '일째 기다림' : '오늘부터 기다림'}</span>`;
 }
 /* 상태별 버튼: 다음 단계는 주 버튼 하나, 갈래는 보조 버튼, 나머지는 ⋯ */
-const moreBtn = t => `<button class="btn btn-text btn-sm more-btn" type="button" data-act="task-more" data-id="${t.id}" aria-label="${esc(t.title)} 상태 바꾸기">⋯</button>`;
+const moreBtn = t => `<button class="btn btn-text btn-sm more-btn" type="button" data-act="task-more" data-id="${t.id}" aria-label="${esc(t.title)} 상태 바꾸기·삭제">⋯</button>`;
 function taskActs(t, more = true){
   const btn = (to, label, cls) => `<button class="btn ${cls} btn-sm" type="button" data-act="${to === '기다림' ? 'task-wait' : 'task-move'}" data-id="${t.id}" data-to="${to}">${label}</button>`;
   const main = { '대기':btn('진행','시작하기','btn-tonal'),
@@ -3049,7 +3058,7 @@ function saveEdit(f){
   go(E.back(id));
   toast(E.gcal && gcalOn() ? '저장했어요 · 몇 초 안에 구글 캘린더에도 반영돼요' : '저장했어요', { label:'되돌리기', fn:undo });
 }
-function deleteItem(kind, id){
+function deleteItem(kind, id, stay){
   const D = db(), E = EDIT[kind], undo = snapshot(), x = editTarget(kind, id);
   if (kind === 'dailies') delete D.dailies[id];
   else D[kind] = D[kind].filter(y => y.id !== id);
@@ -3058,7 +3067,7 @@ function deleteItem(kind, id){
   if (kind === 'longs'){ D.tasks.forEach(t => { if (t.area === x.title) t.area = ''; }); D.routines.forEach(r => { if (r.area === x.title) r.area = ''; }); }
   if (kind === 'appts') D.meetings.forEach(m => { if (m.appt === id) m.appt = null; });
   if (kind === 'tasks') D.meetings.forEach(m => m.todos.forEach(t => { if (t.task === id) t.task = null; }));
-  go(typeof E.list === 'function' ? E.list(x) : E.list);
+  if (stay) render(); else go(typeof E.list === 'function' ? E.list(x) : E.list);
   toast(`${eul(E.name)} 휴지통으로 옮겼어요${E.gcal && gcalOn() ? ' · 구글 캘린더에서도 지워져요' : ''}`, { label:'되돌리기', fn:undo });
 }
 
@@ -3677,6 +3686,46 @@ document.addEventListener('touchend', e => {
   if (!swipe) return; const t = e.changedTouches[0], dx = t.clientX - swipe.x, dy = t.clientY - swipe.y; swipe = null;
   if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy) && !String(getSelection())) cardNav(dx < 0 ? 'next' : 'prev')?.click();
 });
+/* 모바일 목록 줄을 왼쪽으로 밀면 [삭제] — 상세·편집으로 들어가지 않고 바로 휴지통으로(토스트에서 되돌리기). 밀기 없이도 편집 화면 맨 아래에서 지울 수 있다 */
+const SW_KIND = [[/^#\/knowledge\/ref\/([^/]+)$/, 'refs'], [/^#\/knowledge\/perm\/([^/]+)$/, 'perms'], [/^#\/knowledge\/ctx\/([^/]+)$/, 'ctxs'], [/^#\/time\/daily\/(\d{4}-\d\d-\d\d)$/, 'dailies'],
+  [/^#\/action\/short\/([^/]+)$/, 'tasks'], [/^#\/action\/long\/([^/]+)$/, 'longs'], [/^#\/action\/routine\/([^/]+)$/, 'routines'], [/^#\/action\/appt\/([^/]+)$/, 'appts'], [/^#\/time\/[^/]+\/([^/]+)$/, 'meetings']];
+function swTarget(li){
+  const a = li.querySelector(':scope > a.row, :scope > .body > a, :scope > .t-head > a'), h = a && a.getAttribute('href') || '';
+  for (const [re, kind] of SW_KIND){ const m = h.match(re); if (m && editTarget(kind, m[1])) return { kind, id:m[1], name:a.querySelector('.title')?.textContent || a.textContent }; }
+  return null;
+}
+const SW_ROW = '.list > li, .board .tcard';
+let sw = null, swOpen = null, swAt = 0;
+const swClose = () => { const li = swOpen; swOpen = null; if (!li) return; li.classList.remove('sw-open'); setTimeout(() => { if (!li.classList.contains('sw-open')) li.querySelector('.sw-del')?.remove(); }, 220); };
+document.addEventListener('touchstart', e => {
+  sw = null; const li = e.target.closest && e.target.closest(SW_ROW);
+  if (swOpen && li !== swOpen) swClose();
+  if (!li || e.touches.length !== 1 || e.target.closest('input,select,textarea,button,label')) return;
+  const tg = swTarget(li); if (!tg) return;
+  sw = { li, tg, x:e.touches[0].clientX, y:e.touches[0].clientY, dir:null, dx:0, base:li === swOpen ? -88 : 0 };
+}, { passive:true });
+document.addEventListener('touchmove', e => {
+  if (!sw) return; const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+  if (!sw.dir){
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    sw.dir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'; if (sw.dir === 'v') return;
+    const { li, tg } = sw; li.classList.add('sw');
+    if (!li.querySelector('.sw-del')) li.insertAdjacentHTML('beforeend', `<button class="sw-del" type="button" data-act="swipe-del" data-kind="${tg.kind}" data-id="${esc(tg.id)}" aria-label="${esc(tg.name.trim())} 삭제">삭제</button>`);
+  }
+  if (sw.dir !== 'h') return;
+  sw.dx = Math.min(0, Math.max(-132, sw.base + dx)); sw.li.classList.add('sw-drag'); sw.li.style.setProperty('--sx', `${sw.dx}px`);
+}, { passive:true });
+document.addEventListener('touchend', () => {
+  const s = sw; sw = null; if (!s || s.dir !== 'h') return;
+  swAt = Date.now(); s.li.classList.remove('sw-drag'); s.li.style.removeProperty('--sx');
+  if (s.dx < -44){ swOpen = s.li; s.li.classList.add('sw-open'); } else { swOpen = s.li; swClose(); }
+});
+// 민 직후 손을 떼며 생기는 클릭과, 열린 줄을 다시 누르는 클릭은 상세로 넘어가지 않고 닫기만
+document.addEventListener('click', e => {
+  const li = e.target.closest && e.target.closest(SW_ROW);
+  if (Date.now() - swAt < 400 && li && li.classList.contains('sw') && !e.target.closest('.sw-del')){ e.preventDefault(); e.stopPropagation(); return; }
+  if (swOpen && li === swOpen && !e.target.closest('.sw-del')){ e.preventDefault(); e.stopPropagation(); swClose(); }
+}, true);
 document.addEventListener('keydown', e => {
   if (!['ArrowRight', 'ArrowLeft'].includes(e.key) || !document.querySelector('.tb-card-page') || e.metaKey || e.ctrlKey || e.altKey || (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]'))) return;
   const a = cardNav(e.key === 'ArrowRight' ? 'next' : 'prev'); if (a){ e.preventDefault(); a.click(); }
@@ -3930,6 +3979,8 @@ document.addEventListener('click', e => {
       break;
     }
     case 'delete-item': deleteItem(b.dataset.kind, id); break;
+    case 'st-del': { const tid = $('#dlg-status form').dataset.id; $('#dlg-status').close(); deleteItem('tasks', tid, true); break; }
+    case 'swipe-del': swOpen = null; deleteItem(b.dataset.kind, id, true); break;
     case 'inline-edit': S.inline = id; render(); { const t = document.getElementById('ie-' + id); t && t.focus(); } break;
     case 'inline-cancel': S.inline = null; render(); break;
     case 'menu-edit': $('#dlg-profile').close(); openMenuEdit(); break;
