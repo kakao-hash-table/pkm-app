@@ -71,9 +71,15 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     if (!x) throw fail(404, '설치된 플러그인이 아니에요');
     const files = Object.fromEntries((await fs.promises.readdir(path.join(x.path, 'feeds')).catch(() => [])).filter(f => f.endsWith('.md')).map(f => [f, fs.readFileSync(path.join(x.path, 'feeds', f), 'utf8')]));
     const wf = Object.fromEntries((await fs.promises.readdir(path.join(x.path, 'workflows')).catch(() => [])).filter(f => f.endsWith('.md')).map(f => [f, fs.readFileSync(path.join(x.path, 'workflows', f), 'utf8')]));
+    const docs = async dir => Object.values(Object.fromEntries((await fs.promises.readdir(path.join(x.path, dir)).catch(() => [])).filter(f => f.endsWith('.md')).map(f => [f, fs.readFileSync(path.join(x.path, dir, f), 'utf8')])));
     const workflows = Object.values(wf).flatMap(t => P.parseWorkflows(t));
-    const feeds = Object.values(files).flatMap(t => P.parseFeeds(t)).map(d => ({ ...d, every: Number(String(d.every || 60).replace(/분$/, '')) || 60, days: d.days || 'daily', start_mode: d.start ? d.start_mode || 'button' : null }));
-    return { ...x, feeds, workflows };
+    const feeds = Object.values(files).flatMap(t => P.parseFeeds(t)).map(d => { const starts = P.startsOf(d.start);
+      return { ...d, every: Number(String(d.every || 60).replace(/분$/, '')) || 60, days: d.days || 'daily', start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null }; });
+    // 검색·편집기는 검사기가 정리한 꼴 그대로 쓴다(설치할 때 이미 검사했다)
+    const v = P.validate([{ path: 'plugin.md', size: 0, text: fs.readFileSync(path.join(x.path, 'plugin.md'), 'utf8') },
+      ...(await docs('searches')).map((t, i) => ({ path: `searches/${i}.md`, size: t.length, text: t })), ...(await docs('editors')).map((t, i) => ({ path: `editors/${i}.md`, size: t.length, text: t })),
+      ...x.manifest.permissions.bundled.map(b => ({ path: b, size: 0, text: '' }))]);
+    return { ...x, feeds, workflows, searches: v.searches || [], editors: v.editors || [] };
   }
   function settingsFor(x, conf){
     const v = conf.settings || {};
@@ -174,11 +180,13 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     writeState(p, x.id, st);
   }
 
-  function newRun(st, x, feed, item, by){
-    const w = x.workflows.find(w => w.name === feed.start);
-    if (!w) throw fail(400, `워크플로우 "${feed.start}"가 없어요`);
+  function newRun(st, x, feed, item, by, wname = feed.start, answer){
+    const w = x.workflows.find(w => w.name === wname);
+    if (!w) throw fail(400, `워크플로우 "${wname}"가 없어요`);
     const run = { id: 'r' + crypto.randomBytes(5).toString('hex'), feed: feed.name, workflow: w.name, by, item: { id: item.id, title: item.title, url: item.url, vars: item.vars || {} },
       status: 'queued', created: now(), updated: now(), steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, mode: s.mode, status: 'pending' })) };
+    // 첫 단계가 ask면 시작할 때 받은 답으로 바로 채운다(시작 버튼을 누를 때 물어본다)
+    if (answer != null && w.steps[0] && w.steps[0].kind === 'ask') run.steps[0].answer = String(answer).slice(0, 2000);
     st.runs.unshift(run);
     st.runs = st.runs.slice(0, KEEP_RUNS);
     return run;
@@ -201,6 +209,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       if (step.status === 'failed'){ run.status = 'stopped'; return; }
       if (step.status === 'pending'){
         if (d.kind === 'manual'){ Object.assign(step, { status: 'input', ask: { type: 'confirm' }, started: now() }); run.status = 'input'; run.updated = now(); return; }
+        if (d.kind === 'ask'){   // 사람에게 글 받기 — 답이 있으면 끝, 없으면 묻고 멈춘다. 다음 단계는 {키.answer}로 쓴다
+          if (step.answer != null && String(step.answer).trim()){ const v = String(step.answer).trim(); Object.assign(step, { status: 'done', output: { answer: v }, text: clip(v, 6000), finished: now(), ask: null }); run.updated = now(); continue; }
+          Object.assign(step, { status: 'input', ask: normAsk({ question: d.name, free: true, placeholder: d.body }), started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
+        }
         try { step.job = await startStep(conn, x, run, step, d, settings); Object.assign(step, { status: 'running', started: now(), error: null }); }
         catch (e) { Object.assign(step, { status: 'failed', error: clip(e.message, 500), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         run.status = 'running'; run.updated = now();
@@ -224,6 +236,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       }
     }
     Object.assign(run, { status: 'done', finished: now(), updated: now() });
+    // 실행·멈추기처럼 항목 상태를 바꾸는 워크플로우 — 끝나면 다음 차례에 목록을 바로 새로 가져온다
+    const fd = x.feeds.find(f => f.name === run.feed), fs_ = st.feeds[run.feed];
+    if (fd && fd.starts.length > 1 && fs_) fs_.at = null;
   }
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true }),
@@ -264,8 +279,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       case 'start': {
         const feed = x.feeds.find(f => f.name === a.feed), it = feed && ((st.feeds[feed.name] || {}).items || []).find(i => i.id === a.item);
         if (!it) throw fail(404, '목록에 없는 항목이에요. 목록을 새로 가져와 주세요');
-        if (st.runs.some(r => r.feed === feed.name && r.item.id === it.id && !['done', 'canceled'].includes(r.status))) throw fail(409, '이미 진행 중이에요');
-        newRun(st, x, feed, it, 'button'); return;
+        const wname = a.workflow || feed.start;
+        if (!feed.starts.includes(wname)) throw fail(400, `이 목록에서 시작할 수 없는 워크플로우예요: ${wname}`);
+        if (st.runs.some(r => r.feed === feed.name && r.item.id === it.id && r.workflow === wname && !['done', 'canceled'].includes(r.status))) throw fail(409, '이미 진행 중이에요');
+        newRun(st, x, feed, it, 'button', wname, a.answer); return;
       }
       case 'answer': case 'confirm': {
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
@@ -347,7 +364,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const out = {};
     for (const x of list){
       const st = readState(p, x.id), pc = plugConf(c, p, x.id), full = await pluginOf(p, x.id);
-      out[x.id] = { state: st, feeds: full.feeds, workflows: full.workflows.map(w => ({ name: w.name, steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind })) })),
+      out[x.id] = { state: st, feeds: full.feeds, searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, workflows: full.workflows.map(w => ({ name: w.name, steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
         local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null } };
     }
     return { here: here(p), plugins: out };
@@ -407,6 +424,30 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     onWrite(p);
     return { applied: false, queued: action.id };
   }
+  /* 검색 — 찾기 화면에서 누를 때. 이 컴퓨터의 pkm-ai-server로 한 번 돌리고 60초까지 기다린다(돌리는 컴퓨터가 아니어도 된다) */
+  async function search(p, id, name, q){
+    const x = await pluginOf(p, id), s = x.searches.find(s => s.name === name);
+    if (!s) throw fail(404, '그런 검색이 없어요');
+    q = String(q || '').trim().slice(0, 300); if (!q) throw fail(400, '찾을 말을 적어 주세요');
+    const conn = readConf().ai, settings = settingsFor(x, plugConf(readConf(), p, id)), missing = [];
+    const args = tokens(s.run).map(a => fill(a, { item: { id: '', title: '', vars: { q } }, steps: [] }, settings, missing));
+    if (missing.length) throw fail(400, `플러그인 설정이 비어 있어요: ${missing.join(' ')}`);
+    let job = await scriptJob(conn, x, args[0], args.slice(1));
+    const until = Date.now() + 60000;
+    while (!['done', 'error', 'canceled'].includes(job.status) && Date.now() < until){
+      await new Promise(r => setTimeout(r, 700));
+      job = (await ai(conn, `/v1/jobs/${job.id}`)).job;
+    }
+    if (job.status !== 'done'){
+      if (!['error', 'canceled'].includes(job.status)) await ai(conn, `/v1/jobs/${job.id}`, { method: 'DELETE' }).catch(() => {});
+      throw fail(502, job.status === 'error' ? jobError(job) : job.status === 'waiting' ? '이 컴퓨터에서 플러그인을 승인해야 찾을 수 있어요' : '60초 안에 끝나지 않았어요');
+    }
+    const out = parseOut(job.result.stdout);
+    if (out && out.error) throw fail(502, clip(out.error, 500));
+    if (!out || !Array.isArray(out.items)) throw fail(502, '검색 결과에 items 목록이 없어요');
+    return { items: out.items.map(normItem).filter(Boolean).slice(0, s.limit), note: out.note ? clip(out.note, 200) : null };
+  }
+
   /* 승인·비밀값 — 이 컴퓨터의 pkm-ai-server로 보낸다 */
   async function approve(p, id){
     const x = await pluginOf(p, id), conn = readConf().ai;
@@ -431,5 +472,5 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     return ai(conn, '/v1/secrets', { method: 'POST', body: JSON.stringify({ name, value }) });
   }
 
-  return { tick, start, status, setRunner, setLocal, act, approve, machine, setSecret, here };
+  return { tick, start, status, setRunner, setLocal, act, approve, machine, setSecret, here, search };
 }

@@ -197,6 +197,27 @@ a.row:hover{background:var(--fill)}
 .row .meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;color:var(--text-2);font-size:.875rem;margin-top:4px}
 .row .chev{color:var(--text-3);align-self:center;font-size:1.25rem;line-height:1}
 @media (max-width:420px){.row{padding:14px 16px}}
+.pl-multi-row{align-items:center;flex-wrap:wrap}
+.psr-bar{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin:0 0 12px}
+.psr-sec{margin-top:8px}
+.psr-local{font-size:1.0625rem;margin:24px 0 8px}
+.psr{padding:8px 0 12px}
+.psr-head h3{margin:0;font-size:1rem}
+.ped-card{display:flex;flex-direction:column;gap:12px;border:0;margin:0}
+.field textarea.ped-f{field-sizing:content;min-height:48px;resize:vertical}
+.ped-sum{margin:8px 0 0;font-weight:600}
+.ped-lab{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}
+.ped-lab label{font-weight:600;font-size:.9375rem;color:var(--text-2)}
+.ped-count{font-weight:400;color:var(--text-2);font-variant-numeric:tabular-nums}
+.ped-count.over{color:var(--danger);font-weight:700}
+.ped-group{font-size:1rem;margin:12px 0 0;color:var(--text-2)}
+.ped-acts{display:flex;justify-content:flex-end;gap:4px}
+.ped-save{position:sticky;bottom:calc(env(safe-area-inset-bottom) + 72px);background:var(--bg);padding:8px 0;justify-content:flex-end;align-items:center}
+.ped-save #ped-dirty{margin-right:auto}
+@media (min-width:900px){.ped-save{bottom:0}}
+.psr-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px}
+.pl-multi-row .body{flex:1 1 220px}
+.pl-btns{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
 /* 모바일: 목록 줄을 왼쪽으로 밀면 오른쪽에서 [삭제]가 나온다 */
 @media (pointer:coarse){.list>li,.board .tcard{touch-action:pan-y pinch-zoom}}
 .sw{position:relative;overflow:hidden}
@@ -2165,19 +2186,198 @@ function searchResults(){
   const q = (S.q || '').trim();
   if (!q) return `<p class="faint">노트·할 일·기록·교과서를 한 번에 찾아요. 띄어 쓴 낱말이 모두 들어간 것만 보여요.<span class="hover-only"> 어디서든 <kbd>/</kbd>를 누르면 이 화면이 열려요.</span></p>`;
   const all = searchRun(q);
-  if (!all.length) return empty(`'${esc(q)}'로 찾은 것이 없어요`, '낱말을 하나 줄이거나 다른 말로 찾아보세요.', '');
+  if (!all.length) return empty(`'${esc(q)}'로 찾은 것이 없어요`, '낱말을 하나 줄이거나 다른 말로 찾아보세요.', '') + plSearchBlock(q);
   const kind = S.qk && all.some(r => r.k === S.qk) ? S.qk : '*', list = kind === '*' ? all : all.filter(r => r.k === kind), shown = list.slice(0, 80);
   const counts = SR_KIND.map(([k, n]) => [k, n, all.filter(r => r.k === k).length]).filter(x => x[2]);
   const r = AIR['search:' + q];
   return `${counts.length > 1 ? chipBar([['*', '전체', all.length], ...counts], kind, 'q-kind', '종류로 거르기') : ''}
     <p class="faint" role="status" style="margin:0 0 8px">${list.length}개 찾았어요${list.length > shown.length ? ` · 앞의 ${shown.length}개만 보여요` : ''}</p>
+    ${plSearchBlock(q)}${plSearches().some(x => PSR[`${x.id}|${x.name}|${q}`]) ? '<h2 class="psr-local">pkm에서 찾은 것</h2>' : ''}
     ${r && r.state === 'ok' ? aiOut('찾은 노트로 AI가 요약한 것', `<div class="md">${md(r.text)}</div>`, `<button class="btn btn-text btn-sm" type="button" data-act="ai-clear" data-key="search:${esc(q)}">닫기</button>`) : aiBtn('search:' + q, `찾은 노트 ${Math.min(8, all.length)}개로 AI 요약 받기`, 'ai-search')}
     <ul class="list" style="margin-top:12px">${shown.map(x => `<li><a class="row" href="${x.href}"><span class="body"><span class="title">${markTerms(x.title, q)}</span><span class="meta"><span class="kind">${SR_NAME[x.k]}</span>${x.sub ? `<span>${esc(x.sub)}</span>` : ''}</span>${srTerms(q).every(w => x.title.toLowerCase().includes(w)) ? '' : `<span class="snip">${snip(x.text, q)}</span>`}</span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`;
 }
+/* ---------------- 플러그인 편집기: 노트를 제목 줄 단위 칸으로 나눠 글자 수를 세며 고친다 ----------------
+   규격: docs/PLUGIN.md › 편집기. 고친 칸만 원래 글에 끼워 넣고 나머지 글은 그대로 둔다 */
+function pedList(){
+  if (!PL.st || PL.p !== S.profile) return [];
+  return Object.entries(PL.st.plugins || {}).flatMap(([id, x]) => (x.editors || []).map(e => {
+    const set = (x.local && x.local.settings) || {};
+    return { id, ...e, noteTitle:e.note.replace(/\{([a-z_][a-z0-9_]*)\}/g, (m, k) => set[k] != null && set[k] !== '' ? String(set[k]) : m) };
+  }));
+}
+const pedNote = title => { const D = db(); return D.ctxs.find(c => c.title === title) || D.perms.find(p => p.title === title) || null; };
+const pedHref = e => `#/plugins/${encodeURIComponent(e.id)}/edit/${encodeURIComponent(e.name)}`;
+const pedLinks = title => { if (plOK()) plLoad(); return pedList().filter(e => e.noteTitle === title).map(e => `<a class="btn btn-tonal btn-sm" href="${pedHref(e)}">${esc(e.name)} 글자 수 맞춰 고치기</a>`).join(''); };
+const hLevel = l => { const m = /^(#{1,6})\s/.exec(l); return m ? m[1].length : 0; };
+function pedParse(body, e){
+  const L = String(body).split('\n'), lv = e.block.length, out = [];
+  let from = 0, to = L.length;
+  if (e.within){
+    const re = new RegExp(e.within), i = L.findIndex(l => re.test(l));
+    if (i < 0) return { lines:L, blocks:[], missing:'within' };
+    from = i + 1; const wl = hLevel(L[i]);
+    if (wl){ const j = L.findIndex((l, k) => k > i && hLevel(l) && hLevel(l) <= wl); if (j > 0) to = j; }
+  }
+  const gl = e.group ? e.group.length : 0; let group = '';
+  for (let i = from; i < to; i++){
+    const h = hLevel(L[i]);
+    if (gl && h === gl){ group = L[i].replace(/^#+\s*/, ''); continue; }
+    if (h !== lv) continue;
+    let end = i + 1; while (end < to && !(hLevel(L[end]) && hLevel(L[end]) <= lv)) end++;
+    let bodyFrom = i + 1;
+    if (e.body_start){ const re = new RegExp(e.body_start), k = L.findIndex((l, n) => n > i && n < end && re.test(l)); if (k < 0) continue; bodyFrom = k + 1; }
+    const fieldRe = /^-\s+([^:：]+?)\s*[:：]\s?(.*)$/, fields = [];
+    if (e.fields.length){
+      const lim = e.body_start ? bodyFrom - 1 : end;
+      for (let n = i + 1; n < lim; n++){ const m = fieldRe.exec(L[n]); if (m && e.fields.includes(m[1].trim())) fields.push({ line:n, name:m[1].trim(), value:m[2] }); else if (!e.body_start && L[n].trim() && !m) break; }
+      if (!e.body_start && fields.length) bodyFrom = fields[fields.length - 1].line + 1;
+    }
+    let bodyTo = end;
+    if (e.body_end){ const re = new RegExp(e.body_end), k = L.findIndex((l, n) => n >= bodyFrom && n < end && re.test(l)); if (k < 0) continue; bodyTo = k; }   // 끝 줄이 없는 칸(참고 같은)은 고칠 칸이 아니다
+    let a = bodyFrom, b = bodyTo; while (a < b && !L[a].trim()) a++; while (b > a && !L[b - 1].trim()) b--;
+    let countLine = null;
+    if (e.count){ const re = new RegExp(e.count), k = L.findIndex((l, n) => n >= bodyTo && n < end && re.test(l)); if (k >= 0) countLine = k; }
+    out.push({ group, head:i, hashes:L[i].match(/^#+/)[0], title:L[i].replace(/^#+\s*/, ''), fields, a, b, body:L.slice(a, b).join('\n'), countLine });
+  }
+  return { lines:L, blocks:out };
+}
+function pedApply(P, e, vals){
+  const L = P.lines.slice(), ops = [];
+  P.blocks.forEach((bk, i) => {
+    const v = vals[i]; if (!v) return;
+    if (v.title !== bk.title) ops.push([bk.head, 1, [`${bk.hashes} ${v.title}`]]);
+    bk.fields.forEach((f, j) => { if (v.fields[j] !== f.value) ops.push([f.line, 1, [`- ${f.name}: ${v.fields[j]}`]]); });
+    if (v.body !== bk.body){
+      ops.push([bk.a, bk.b - bk.a, v.body === '' ? [] : v.body.split('\n')]);
+      if (bk.countLine != null){ const re = new RegExp(e.count); ops.push([bk.countLine, 1, [L[bk.countLine].replace(re, m => m.replace(/\d+/, String(v.body.trim().length)))]]); }
+    }
+  });
+  ops.sort((x, y) => y[0] - x[0]).forEach(([at, n, rep]) => L.splice(at, n, ...rep));
+  return L.join('\n');
+}
+const pedLen = v => String(v).trim().length;
+const pedCountText = (v, max) => { const n = pedLen(v); return max ? `${n} / ${max}자${n > max ? ` · ${n - max}자 넘음` : ''}` : `${n}자`; };
+// 저장 전 고친 칸 — 화면을 다시 그려도(동기화·다른 기기 변경·플러그인 새로 가져오기) 사라지지 않게 메모리에 둔다
+const PED_DRAFT = {};
+const pedKey = (id, name) => `${id}/${name}`;
+const pedDirty = (id, name) => new Set(Object.keys(PED_DRAFT[pedKey(id, name)] || {}).map(k => k.match(/\d+/)[0])).size;   // 칸 단위(제목·본문을 둘 다 고쳐도 한 칸)
+window.addEventListener('beforeunload', e => { if (Object.values(PED_DRAFT).some(d => Object.keys(d).length)){ e.preventDefault(); e.returnValue = ''; } });
+function pedSummary(blocks, e, val){
+  const over = blocks.filter((bk, i) => (e.title && pedLen(val(`t${i}`, bk.title)) > e.title) || (e.body && pedLen(val(`b${i}`, bk.body)) > e.body)).length;
+  return over ? `${blocks.length}칸 중 ${over}칸이 글자 수를 넘었어요` : `${blocks.length}칸 모두 글자 수 안이에요`;
+}
+function vPluginEditor(id, name){
+  if (plOK()) plLoad();
+  const e = pedList().find(x => x.id === id && x.name === name);
+  if (!e) return PL.st ? vNotFound() : `<div class="page"><p class="faint" role="status">불러오는 중…</p></div>`;
+  const n = pedNote(e.noteTitle);
+  const head = `<a class="back" href="#/plugins/${encodeURIComponent(id)}"><span aria-hidden="true">‹</span> ${esc(plName(id))}</a><p class="eyebrow">글자 수 맞춰 고치기</p><h1 tabindex="-1">${esc(e.name)}</h1>`;
+  if (/\{[a-z_]+\}/.test(e.noteTitle)) return `<div class="page">${head}${empty('고칠 노트를 아직 정하지 않았어요', '플러그인 설정에서 노트 제목을 적어 주세요.', `<a class="btn btn-tonal" href="#/plugins/${encodeURIComponent(id)}/setup">설정 열기</a>`)}</div>`;
+  if (!n) return `<div class="page">${head}${empty(`'${esc(e.noteTitle)}' 노트가 없어요`, '플러그인 설정의 노트 제목이 맥락노트·영구노트 제목과 같은지 확인해 주세요.', `<a class="btn btn-tonal" href="#/plugins/${encodeURIComponent(id)}/setup">설정 열기</a>`)}</div>`;
+  const P = pedParse(n.body, e), kind = n.history ? 'ctx' : 'perm', draft = PED_DRAFT[pedKey(id, name)] || {};
+  if (!P.blocks.length) return `<div class="page">${head}${empty('나눌 칸을 찾지 못했어요', `노트에 ${esc(e.block)} 제목 줄이 있는지, 편집기 규칙이 노트 모양과 맞는지 확인해 주세요.`, `<a class="btn btn-tonal" href="#/knowledge/${kind}/${n.id}">노트 보기</a>`)}</div>`;
+  const val = (k, orig) => k in draft ? draft[k] : orig;
+  let lastGroup = null;
+  const card = (bk, i) => {
+    const g = bk.group && bk.group !== lastGroup ? `<h2 class="ped-group">${esc(bk.group)}</h2>` : ''; lastGroup = bk.group;
+    const t = val(`t${i}`, bk.title), b = val(`b${i}`, bk.body);
+    const cnt = (k, v, max) => `<span class="ped-count ${max && pedLen(v) > max ? 'over' : ''}" id="pc-${k}">${pedCountText(v, max)}</span>`;
+    return `${g}<fieldset class="card ped-card" id="ped-${i}"><legend class="sr-only">${esc(bk.title)}</legend>
+      <div class="field"><div class="ped-lab"><label for="pf-t${i}">제목</label>${cnt(`t${i}`, t, e.title)}</div><textarea class="ped-f" id="pf-t${i}" name="t${i}" rows="1" data-max="${e.title || ''}" aria-describedby="pc-t${i}">${esc(t)}</textarea></div>
+      ${bk.fields.map((f, j) => `<label class="field"><span>${esc(f.name)}</span><textarea class="ped-f" name="f${i}_${j}" rows="1">${esc(val(`f${i}_${j}`, f.value))}</textarea></label>`).join('')}
+      <div class="field"><div class="ped-lab"><label for="pf-b${i}">본문</label>${cnt(`b${i}`, b, e.body)}</div><textarea class="ped-f" id="pf-b${i}" name="b${i}" rows="4" data-max="${e.body || ''}" aria-describedby="pc-b${i}">${esc(b)}</textarea></div>
+      <div class="ped-acts"><button class="btn btn-text btn-sm" type="button" data-act="ped-copy" data-what="t" data-i="${i}">제목 복사</button><button class="btn btn-text btn-sm" type="button" data-act="ped-copy" data-what="b" data-i="${i}">본문 복사</button></div></fieldset>`;
+  };
+  const dirty = pedDirty(id, name);
+  setTimeout(() => document.querySelectorAll('.ped-f').forEach(pedFit), 0);
+  return `<div class="page">${head}
+    <p class="faint">${e.description ? `${esc(e.description)} ` : ''}<a href="#/knowledge/${kind}/${n.id}">${esc(n.title)}</a> 노트의 ${P.blocks.length}칸이에요. 글자 수는 공백·줄바꿈을 포함해요. 고친 칸만 노트에 다시 넣어요.</p>
+    <p class="ped-sum" id="ped-sum">${pedSummary(P.blocks, e, val)}</p>
+    <form data-form="pl-editor" data-id="${esc(id)}" data-name="${esc(name)}" novalidate class="stack" style="gap:16px;margin-top:16px">
+      ${P.blocks.map(card).join('')}
+      <div class="dlg-actions ped-save"><span class="faint" id="ped-dirty" aria-live="polite">${dirty ? `저장 안 한 칸 ${dirty}개` : ''}</span><a class="btn btn-text" href="#/knowledge/${kind}/${n.id}">노트 보기</a><button class="btn btn-primary" type="submit">저장하기</button></div>
+    </form><p class="sr-only" role="status" id="ped-live"></p></div>`;
+}
+// 칸 높이를 글에 맞춘다(field-sizing을 못 쓰는 브라우저용)
+const pedFit = t => { if (CSS.supports && CSS.supports('field-sizing', 'content')) return; t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px`; };
+document.addEventListener('input', ev => {
+  const t = ev.target, f = t.closest && t.closest('form[data-form="pl-editor"]'); if (!f || !t.classList.contains('ped-f')) return;
+  const key = pedKey(f.dataset.id, f.dataset.name), e = pedList().find(x => x.id === f.dataset.id && x.name === f.dataset.name), n = e && pedNote(e.noteTitle); if (!n) return;
+  const P = pedParse(n.body, e), d = PED_DRAFT[key] || (PED_DRAFT[key] = {}), m = /^([tbf])(\d+)(?:_(\d+))?$/.exec(t.name), bk = P.blocks[+m[2]];
+  const orig = m[1] === 't' ? bk.title : m[1] === 'b' ? bk.body : bk.fields[+m[3]].value;
+  if (t.value === orig) delete d[t.name]; else d[t.name] = t.value;
+  pedFit(t);
+  const max = +t.dataset.max || 0, c = $(`#pc-${t.name}`);
+  if (c){
+    const wasOver = c.classList.contains('over'), isOver = !!max && pedLen(t.value) > max;
+    c.textContent = pedCountText(t.value, max); c.classList.toggle('over', isOver);
+    if (wasOver !== isOver) $('#ped-live').textContent = isOver ? `${m[1] === 't' ? '제목' : '본문'}이 ${pedLen(t.value) - max}자 넘었어요` : `${m[1] === 't' ? '제목' : '본문'}이 글자 수 안으로 들어왔어요`;
+  }
+  $('#ped-sum').textContent = pedSummary(P.blocks, e, (k, o) => k in d ? d[k] : o);
+  const nd = pedDirty(f.dataset.id, f.dataset.name); $('#ped-dirty').textContent = nd ? `저장 안 한 칸 ${nd}개` : '';
+});
+function pedSave(f){
+  const e = pedList().find(x => x.id === f.dataset.id && x.name === f.dataset.name), n = e && pedNote(e.noteTitle); if (!n) return;
+  const P = pedParse(n.body, e), el = f.elements;
+  const vals = P.blocks.map((bk, i) => ({ title:el['t' + i].value.replace(/\n+/g, ' ').trim(), body:el['b' + i].value.replace(/\s+$/, ''), fields:bk.fields.map((x, j) => el[`f${i}_${j}`].value.replace(/\n+/g, ' ').trim()) }));
+  const next = pedApply(P, e, vals);
+  delete PED_DRAFT[pedKey(f.dataset.id, f.dataset.name)];
+  if (next === n.body){ render(); toast('바뀐 칸이 없어요'); return; }
+  const undo = snapshot(); n.body = next; if (n.history) n.updated = TODAY;
+  render(); toast('노트에 저장했어요', { label:'되돌리기', fn:undo });
+}
+/* 플러그인 검색(사내 위키 같은) — 글자를 칠 때마다가 아니라 누를 때만, 이 컴퓨터의 pkm-ai-server로 */
+const PSR = {};
+function plSearches(){
+  if (!PL.st || PL.p !== S.profile) return [];
+  return Object.entries(PL.st.plugins || {}).flatMap(([id, x]) => (x.searches || []).map(s => ({ id, ...s })));
+}
+function plSearchBlock(q){
+  const list = plSearches(); if (!list.length) return '';
+  const names = list.map(s => s.name).join('·'), started = list.some(s => PSR[`${s.id}|${s.name}|${q}`]);
+  if (!started) return `<div class="psr-bar"><button class="btn btn-tonal btn-sm" type="button" data-act="pl-search-all">${esc(names)}에서도 찾기</button><span class="faint">pkm 밖의 글은 누를 때만 찾아요</span></div>`;
+  const one = s => {
+    const k = `${s.id}|${s.name}|${q}`, r = PSR[k] || { state:'none' }, n = r.state === 'ok' ? r.items.length : 0;
+    const head = `<div class="psr-head"><h3>${esc(s.name)}${r.state === 'ok' ? ` <span class="count">${n}</span>` : ''}</h3>${r.state === 'busy' ? '<span class="faint">찾는 중…</span>' : `<button class="btn btn-text btn-sm" type="button" data-act="pl-search" data-id="${esc(s.id)}" data-name="${esc(s.name)}" aria-label="${esc(s.name)}에서 ${r.state === 'none' ? '' : '다시 '}찾기">${r.state === 'none' ? '찾기' : '다시 찾기'}</button>`}</div>`;
+    const body = r.state === 'err' ? `<p class="err">${esc(r.error)} <a href="#/plugins/${encodeURIComponent(s.id)}/setup">설정 열기</a></p>`
+      : r.state !== 'ok' ? ''
+      : n ? `<ul class="list">${r.items.map(it => `<li>${plUrl(it.url) ? `<a class="row" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">` : '<div class="row">'}<span class="body"><span class="title">${markTerms(it.title, q)}</span><span class="meta">${(it.tags || []).map(t => `<span class="kind">${esc(t)}</span>`).join('')}${(it.meta || []).slice(0, 4).map(m => `<span>${esc(m)}</span>`).join('')}</span></span>${plUrl(it.url) ? '<span class="chev" aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>' : '</div>'}</li>`).join('')}</ul>${r.note ? `<p class="faint">${esc(r.note)}</p>` : ''}`
+      : `<p class="faint">찾은 것이 없어요${r.note ? ` · ${esc(r.note)}` : ''}</p>`;
+    return `<div class="psr">${head}${body}</div>`;
+  };
+  return `<section class="section psr-sec" aria-labelledby="psr-h"><h2 id="psr-h" tabindex="-1">pkm 밖에서 찾은 것</h2>${list.map(one).join('')}</section>`;
+}
+async function plSearchRun(id, name, quiet){
+  const q = (S.q || '').trim(); if (!q) return;
+  const k = `${id}|${name}|${q}`; if (PSR[k] && PSR[k].state === 'busy' && !quiet) return;
+  PSR[k] = { state:'busy' }; if (!quiet) psrPaint();
+  try { const r = await papi(`/plugins/${id}/search`, { name, q }); PSR[k] = { state:'ok', items:r.items || [], note:r.note }; }
+  catch (e) { PSR[k] = { state:'err', error:e.message }; }
+  if (!quiet && (S.q || '').trim() === q){ psrPaint(); psrSay(`${name}에서 ${PSR[k].state === 'ok' ? `${PSR[k].items.length}개 찾았어요` : '찾지 못했어요'}`); }
+}
+async function plSearchAll(){
+  const q = (S.q || '').trim(), list = plSearches(); if (!q || !list.length) return;
+  list.forEach(s => { PSR[`${s.id}|${s.name}|${q}`] = { state:'busy' }; });
+  psrPaint(); focusEl($('#psr-h')); psrSay(`${list.map(s => s.name).join('·')}에서 찾는 중이에요`);
+  await Promise.all(list.map(s => plSearchRun(s.id, s.name, true)));
+  if ((S.q || '').trim() !== q) return;
+  psrPaint();
+  psrSay(list.map(s => { const r = PSR[`${s.id}|${s.name}|${q}`]; return `${s.name} ${r.state === 'ok' ? `${r.items.length}개` : '실패'}`; }).join(', '));
+}
+// 결과만 다시 그리고, 누른 버튼(같은 출처)이나 제목으로 포커스를 돌려놓는다
+function psrPaint(){
+  if (parse()[0] !== 'search' || !$('#q-res')) return;
+  const a = document.activeElement, keep = a && a.dataset && a.dataset.act === 'pl-search' ? `[data-act="pl-search"][data-name="${CSS.escape(a.dataset.name)}"]` : a && a.id === 'psr-h' ? '#psr-h' : '';
+  $('#q-res').innerHTML = searchResults();
+  if (keep){ const el = $(keep) || $('#psr-h'); if (el) el.focus({ preventScroll:true }); }
+}
+const psrSay = t => { const l = $('#psr-live'); if (l){ l.textContent = ''; setTimeout(() => { l.textContent = t; }, 30); } };
+
 function vSearch(){
+  if (plOK()) plLoad();
   return `<div class="page"><header class="page-head"><h1 tabindex="-1">찾기</h1></header>
     <form data-form="search" role="search" class="search-form" novalidate><label class="field" style="flex:1"><span class="sr-only">찾을 말</span><input type="search" id="q" name="q" value="${esc(S.q || '')}" placeholder="예: 습관 신호" autocomplete="off" enterkeyhint="search"></label></form>
-    <div id="q-res">${searchResults()}</div></div>`;
+    <div id="q-res">${searchResults()}</div><p id="psr-live" class="sr-only" role="status" aria-live="polite"></p></div>`;
 }
 
 /* ---------------- 화면: AI 예약 작업 ----------------
@@ -2551,7 +2751,7 @@ function vCtx(id){
     <a class="back" href="#/knowledge/ctx"><span aria-hidden="true">‹</span> 맥락노트</a>
     ${conflictBanner()}
     <p class="eyebrow">맥락노트${c.group ? ` · ${esc(c.group.replace(/\//g, ' › '))}` : ''} · ${staleText(c.updated)}</p><h1 tabindex="-1">${esc(c.title)}</h1>
-    <div class="doc-actions">${editBtn()}${obsBtn()}</div>
+    <div class="doc-actions">${editBtn()}${obsBtn()}${pedLinks(c.title)}</div>
     ${section('한 줄 요약', c.summary ? `<p class="summary">${esc(c.summary)}</p>` : noneText)}
     ${section('내용', c.body ? `<div class="md">${md(c.body)}</div>` : noneText)}
     <section class="section"><h2>바뀐 기록 <span class="count num">${hist.length}개</span></h2>
@@ -2871,10 +3071,6 @@ function lrMarkdown(L){
   else out.push(...recs.slice().reverse().map(x => line(x, x.memo)), '');
   return out.join('\n').trim() + '\n';
 }
-function copyText(txt, ok){
-  const fallback = () => { const t = document.createElement('textarea'); t.value = txt; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); const done = document.execCommand('copy'); t.remove(); toast(done ? ok : '복사하지 못했어요'); };
-  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(() => toast(ok), fallback); else fallback();
-}
 function lrView(L){
   const st = lrState(), r = lrRange(), recs = lrRecords(L), na = noAmt(L.unit);
   const head = `<thead><tr><th scope="col">날짜</th>${na ? '' : '<th scope="col">양</th>'}<th scope="col">메모</th></tr></thead>`;
@@ -3153,6 +3349,7 @@ function plRepaint(){
   buildNav();
   const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#main input, #main textarea, #main select');
   if (!typing && !document.querySelector('dialog[open]') && /^#\/(plugins|now)/.test(location.hash || homeHash())) render();
+  if (/^#\/search/.test(location.hash) && $('#q-res')) $('#q-res').innerHTML = searchResults();   // 플러그인 검색 칸이 늦게 와도 입력 중인 칸은 두고 결과만
 }
 async function plMachine(id, force){
   if (!plOK() || (!force && PL.machine[id] && Date.now() - PL.machine[id].at < 20000) || (PL.machine[id] || {}).loading) return;
@@ -3179,7 +3376,7 @@ function plRunLine(x, r){
 function plRunRow(id, x, r){
   const [w, tone] = PL.sent[r.id] ? ['보냄', 'wait'] : RUN_WORD[r.status] || ['', 'wait'];
   const key = r.item.vars && r.item.vars.key;
-  return `<li><a class="row" href="#/plugins/${id}/run/${r.id}"><span class="body"><span class="title">${key && !r.item.title.includes(key) ? `${esc(key)} ` : ''}${esc(r.item.title)}</span>
+  return `<li><a class="row" href="#/plugins/${id}/run/${r.id}"><span class="body"><span class="title">${key && !r.item.title.includes(key) ? `${esc(key)} ` : ''}${esc(r.item.title)}${(x.feeds.find(f => f.name === r.feed) || {}).starts?.length > 1 ? ` · ${esc(r.workflow)}` : ''}</span>
     <span class="meta">${plBadge(w, tone)}<span>${PL.sent[r.id] ? `${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요` : esc(plRunLine(x, r))}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
 }
 function plItemRow(it){
@@ -3217,18 +3414,24 @@ function vPlugins(id){
   const m = PL.machine[id];
   if (plIsRunner() || !plRunner()) plMachine(id);
   let gate = '';
-  if (!plRunner()) gate = `<div class="ai-state wait"><b>아직 목록을 가져오는 컴퓨터가 없어요</b><span>회사처럼 GitHub·Jira에 닿는 컴퓨터에서 켜 두면, 브라우저를 닫아도 그 컴퓨터가 가져와요.</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">이 컴퓨터에서 돌리기</a></div></div>`;
+  if (!feeds.length) gate = '';
+  else if (!plRunner()) gate = `<div class="ai-state wait"><b>아직 목록을 가져오는 컴퓨터가 없어요</b><span>회사처럼 GitHub·Jira에 닿는 컴퓨터에서 켜 두면, 브라우저를 닫아도 그 컴퓨터가 가져와요.</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">이 컴퓨터에서 돌리기</a></div></div>`;
   else if (plIsRunner() && m && m.at){ const left = plMissing(id); if (left.length) gate = `<div class="ai-state wait"><b>준비가 ${left.length}개 남았어요</b><span>${esc(left.join(' · '))}</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">준비 마치기</a></div></div>`; }
   const tabs = ids.length > 1 ? seg(ids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), id, 'seg-compact', ids.length > 3 ? '플러그인 보기' : '') : '';
   const autoFeed = feeds.find(f => f.start && f.start_mode === 'auto');
   const autoLine = autoFeed ? `<p class="pl-auto">새 티켓 자동 시작 · <b>${plAuto(x) ? '켜짐' : '꺼짐'}</b> ${plIsRunner() ? `<button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${plAuto(x) ? '' : '1'}" aria-label="새 티켓 자동 시작 ${plAuto(x) ? '끄기' : '켜기'}">${plAuto(x) ? '끄기' : '켜기'}</button>` : ''}</p>` : '';
-  const body = feeds.map(f => {
+  const extra = [
+    (x.editors || []).length ? section('편집기', `<ul class="list">${pedList().filter(e => e.id === id).map(e => `<li><a class="row" href="${pedHref(e)}"><span class="body"><span class="title">${esc(e.name)}</span><span class="meta"><span>${/\{[a-z_]+\}/.test(e.noteTitle) ? '노트를 설정에서 정해 주세요' : esc(e.noteTitle)}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : '',
+    (x.searches || []).length ? section('검색', `<p class="faint" style="margin:0">찾기 화면 아래 '다른 곳에서 찾기'에 ${x.searches.map(s => `<b>${esc(s.name)}</b>`).join(', ')}이 생겨요. ${PL.machine[id] && PL.machine[id].approved ? '' : '이 컴퓨터에서 플러그인을 승인하고 비밀값을 넣어야 찾을 수 있어요. '}<a href="#/search">찾기 열기</a></p>`) : ''
+  ].join('');
+  const body = extra + feeds.map(f => {
     const fs_ = x.state.feeds[f.name] || {}, items = fs_.items || [];
     if (!f.start){
       const err = fs_.ok === false ? plFeedError(id, fs_) : '';
       const list = items.length ? plList(items.map(plItemRow)) : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p>` : '';
       return section(`${esc(f.name)}${items.length ? ` <span class="count">${items.length}</span>` : ''}`, `${err}${err && items.length ? `<p class="faint" style="margin:8px 0">${plTime((fs_.items_at || fs_.at))}에 가져온 목록이에요</p>` : ''}${list}`);
     }
+    if ((f.starts || []).length > 1 || f.start_mode !== 'auto') return plMultiFeed(id, x, f);   // 늘 남는 목록(프로젝트·에이전트) — 들어온 티켓을 하나씩 처리하는 자동 시작 목록만 '시작 전' 꼴
     const runs = (x.state.runs || []).filter(r => r.feed === f.name), active = new Set(runs.filter(r => !['done', 'canceled'].includes(r.status)).map(r => r.item.id));
     const mineR = runs.filter(plMine), going = runs.filter(r => ['queued', 'running', 'waiting'].includes(r.status) || (PL.sent[r.id] && ['input', 'stopped'].includes(r.status)));
     const ended = runs.filter(r => ['done', 'canceled'].includes(r.status) && Date.now() - Date.parse(r.updated) < 14 * 86400000);
@@ -3246,18 +3449,22 @@ function vPlugins(id){
   return `<div class="page">
     <header class="page-head"><h1 tabindex="-1">${ids.length > 1 ? '플러그인' : esc(plName(id))}</h1><a class="btn btn-ghost btn-sm" href="#/plugins/_manage">관리</a></header>
     ${tabs}
-    <div class="pl-fresh">${fresh ? `<span class="num">${fresh}</span>` : ''}${plIsRunner() ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="refresh" data-id="${id}" ${busy ? 'aria-disabled="true"' : ''}>${busy ? '가져오는 중' : '지금 가져오기'}</button>` : ''}<a class="btn btn-text btn-sm" href="#/plugins/${id}/setup">설정</a></div>
+    <div class="pl-fresh" ${feeds.length ? '' : 'hidden'}>${fresh ? `<span class="num">${fresh}</span>` : ''}${plIsRunner() ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="refresh" data-id="${id}" ${busy ? 'aria-disabled="true"' : ''}>${busy ? '가져오는 중' : '지금 가져오기'}</button>` : ''}<a class="btn btn-text btn-sm" href="#/plugins/${id}/setup">설정</a></div>
     ${stale ? `<p class="faint">${esc(plRunner())}에서 한동안 소식이 없어요. 컴퓨터가 잠들었거나 pkm 서버가 꺼졌을 수 있어요.</p>` : ''}
     ${gate}${autoLine}${body}
   </div>`;
 }
+/* 검색·편집기만 있는 플러그인 — 돌리는 컴퓨터 없이 지금 이 컴퓨터에서 쓴다 */
+const plLocalOnly = id => { const x = PL.st && PL.st.plugins[id]; return !!x && !x.feeds.length && !(x.workflows || []).length; };
+const plNoScripts = id => { const li = (PL.list || []).find(z => z.id === id); return !!li && !((li.manifest.permissions || {}).bundled || []).length; };
 function plMissing(id){
-  const m = PL.machine[id] || {}, here = plHere(), left = [];
-  if (plRunner() && !plIsRunner()) return [];   // 다른 컴퓨터가 돌리고 있으면 이 기기는 볼 것이 없다
+  const m = PL.machine[id] || {}, here = plHere(), left = [], local = plLocalOnly(id);
+  if (local && plNoScripts(id)) return [];   // 편집기만 — 준비할 것이 없다
+  if (!local && plRunner() && !plIsRunner()) return [];   // 다른 컴퓨터가 돌리고 있으면 이 기기는 볼 것이 없다
   if (!here.ai) left.push('pkm 서버의 AI 연결');
-  if (!plIsRunner()) left.push('돌리는 컴퓨터');
+  if (!local && !plIsRunner()) left.push('돌리는 컴퓨터');
   if (m.connected && !m.approved) left.push('스크립트 승인');
-  for (const s of m.secrets || []) if (!s.set_at) left.push(s.label);
+  if (!local) for (const s of m.secrets || []) if (!s.set_at) left.push(s.label);   // 검색 플러그인의 토큰은 쓰는 곳 것만 넣으면 된다 — 빠진 곳은 찾을 때 알려 준다
   return left;
 }
 
@@ -3361,8 +3568,9 @@ function vPluginSetup(id){
   const mf = li.manifest, m = PL.machine[id] || {}, here = plHere(), conn = window.PKMAI && PKMAI.conn();
   const left = plMissing(id), ready = m.at && !left.length;
   const kv = (label, val, act = '') => `<div class="pl-kv"><dt>${label}</dt><dd><span>${val}</span>${act}</dd></div>`;
-  const aiRow = here.ai ? kv('pkm 서버의 AI 연결', `연결됨 <span class="faint">${esc(here.ai.url)}</span>`, conn && conn.url !== here.ai.url ? `<button class="btn btn-text btn-sm" type="button" data-pl="use-ai">이 브라우저의 연결로 바꾸기</button>` : '')
-    : kv('pkm 서버의 AI 연결', '아직 없어요', conn ? `<button class="btn btn-primary btn-sm" type="button" data-pl="use-ai">이 브라우저의 AI 연결 쓰기</button>` : `<button class="btn btn-primary btn-sm" type="button" data-act="ai" aria-haspopup="dialog">AI 연결하기</button>`);
+  const aiLab = (mf.permissions.ai || []).length ? 'pkm 서버의 AI 연결' : 'pkm 서버 연결';
+  const aiRow = here.ai ? kv(aiLab, `연결됨 <span class="faint">${esc(here.ai.url)}</span>`, conn && conn.url !== here.ai.url ? `<button class="btn btn-text btn-sm" type="button" data-pl="use-ai">이 브라우저의 연결로 바꾸기</button>` : '')
+    : kv(aiLab, '아직 없어요', conn ? `<button class="btn btn-primary btn-sm" type="button" data-pl="use-ai">이 브라우저의 AI 연결 쓰기</button>` : `<button class="btn btn-primary btn-sm" type="button" data-act="ai" aria-haspopup="dialog">AI 연결하기</button>`);
   const runRow = plIsRunner() ? kv('돌리는 컴퓨터', '이 컴퓨터', `<button class="btn btn-text btn-sm" type="button" data-pl="runner-off">멈추기</button>`)
     : plRunner() ? kv('돌리는 컴퓨터', esc(plRunner()), `<button class="btn btn-ghost btn-sm" type="button" data-pl="runner-move" ${here.ai ? '' : 'disabled'}>이 컴퓨터로 옮기기</button>`)
     : kv('돌리는 컴퓨터', '아직 없어요', `<button class="btn ${here.ai ? 'btn-primary' : 'btn-ghost'} btn-sm" type="button" data-pl="runner-on" ${here.ai ? '' : 'disabled aria-describedby="pl-need-ai"'}>이 컴퓨터에서 돌리기</button>${here.ai ? '' : '<small id="pl-need-ai" class="faint">AI 연결이 먼저 필요해요</small>'}`);
@@ -3387,8 +3595,9 @@ function vPluginSetup(id){
   }).join('');
   const autoFeed = x && x.feeds.find(f => f.start && f.start_mode === 'auto');
   const feedsText = x ? x.feeds.map(f => `${f.name} · ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? f.hours.replace('-', '–') + ', ' : ''}${f.every}분마다`) : [];
-  const elsewhere = plRunner() && !plIsRunner();
+  const elsewhere = plRunner() && !plIsRunner() && !plLocalOnly(id);
   const card = elsewhere ? `<div class="ai-state ok"><b>${esc(plRunner())}에서 돌려요</b><span>토큰과 설정은 ${esc(plRunner())}에서 바꿔요. 여기서는 목록을 보고 답할 수 있어요.</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">목록 보기</a></div></div>`
+    : ready && plLocalOnly(id) ? `<div class="ai-state ok"><b>준비됐어요</b><span>이 컴퓨터에서 바로 써요</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">플러그인 보기</a></div></div>`
     : ready ? `<div class="ai-state ok"><b>준비됐어요</b><span>${esc(plWho())}에서 가져와요</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">목록 보기</a></div></div>`
     : m.at || !here.ai ? `<div class="ai-state wait"><b>준비가 ${left.length}개 남았어요</b><span>${esc(left.join(' · '))}</span></div>` : '';
   return `<div class="page">
@@ -3396,7 +3605,7 @@ function vPluginSetup(id){
     <h1 tabindex="-1">${esc(mf.name)} 준비와 설정</h1>
     ${card}
     <section class="section"><h2>이 컴퓨터 · ${esc(here.host || '')}</h2><p class="faint" style="margin:-4px 0 12px">여기 값은 이 컴퓨터에만 있어요. 다른 컴퓨터에서 돌리려면 거기서 다시 넣어요.</p>
-      <dl class="pl-kvs">${elsewhere ? runRow : aiRow + runRow + apRow + secretRows}</dl>${elsewhere ? '' : scriptList + secretForms}</section>
+      <dl class="pl-kvs">${elsewhere ? runRow : plLocalOnly(id) && plNoScripts(id) ? kv('준비', '따로 준비할 것이 없어요') : aiRow + (plLocalOnly(id) ? '' : runRow) + apRow + secretRows}</dl>${elsewhere ? '' : scriptList + secretForms}</section>
     ${settings && !elsewhere ? `<section class="section"><h2>설정 · 이 컴퓨터</h2><form data-pl-form="settings" data-id="${id}" novalidate class="pl-settings">${settings}<div><button class="btn btn-ghost" type="submit">설정 저장하기</button></div></form></section>` : ''}
     ${autoFeed && !elsewhere ? section('자동 시작', `<p class="pl-auto">새 티켓 자동 시작 · <b>${x.local.auto ? '켜짐' : '꺼짐'}</b> <button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${x.local.auto ? '' : '1'}" ${plIsRunner() ? '' : 'disabled'}>${x.local.auto ? '끄기' : '켜기'}</button></p>${plIsRunner() ? '' : '<p class="faint">이 컴퓨터에서 돌리기를 켠 뒤에 켤 수 있어요</p>'}`) : ''}
     ${feedsText.length ? section('가져오는 때', `<ul class="pl-mono">${feedsText.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`) : ''}
@@ -3454,6 +3663,24 @@ function plAsk({ title, body, ok, danger, field }, fn){
   const b = $('#plc-ok'); b.textContent = ok; b.className = `btn ${danger ? 'btn-ghost btn-danger' : 'btn-primary'}`;
   PL.confirm = fn; openDlg('dlg-plc'); (field ? $('#plc-text') : danger ? $('#dlg-plc [data-act="close-dlg"]') : b).focus();   // 위험한 일은 Enter 한 번으로 실행되지 않게
 }
+/* 워크플로우를 여럿 고를 수 있는 목록(프로젝트마다 실행·멈추기·고치기 같은) — 항목은 늘 남고, 버튼이 워크플로우마다 하나씩 */
+function plMultiFeed(id, x, f){
+  const fs_ = x.state.feeds[f.name] || {}, items = fs_.items || [], runs = (x.state.runs || []).filter(r => r.feed === f.name);
+  const err = fs_.ok === false ? plFeedError(id, fs_) : '';
+  const live = (it, w) => runs.some(r => r.item.id === it.id && r.workflow === w && !['done', 'canceled'].includes(r.status));
+  const row = it => {
+    const ttl = plUrl(it.url) ? `<a class="title" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<span class="title">${esc(it.title)}</span>`;
+    const btns = f.starts.map((w, i) => `<button class="btn ${i ? 'btn-text' : 'btn-tonal'} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-wf="${esc(w)}" data-title="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(w)}" ${live(it, w) || PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(w)}${live(it, w) ? ' 중' : ''}</button>`).join('');
+    return `<li><div class="row pl-multi-row"><span class="body">${ttl}${(it.tags || []).map(t => plBadge(t, 'ok')).join('')}<span class="meta">${(it.meta || []).slice(0, 4).map(mm => `<span>${esc(mm)}</span>`).join('')}</span></span><span class="pl-btns">${btns}</span></div></li>`;
+  };
+  const mineR = runs.filter(plMine), going = runs.filter(r => ['queued', 'running', 'waiting'].includes(r.status) || (PL.sent[r.id] && ['input', 'stopped'].includes(r.status)));
+  const ended = runs.filter(r => ['done', 'canceled'].includes(r.status) && Date.now() - Date.parse(r.updated) < 14 * 86400000);
+  return `${err}
+    ${mineR.length ? section(`내 차례 <span class="count">${mineR.length}</span>`, plList(mineR.map(r => plRunRow(id, x, r)))) : ''}
+    ${going.length ? section(`진행 중 <span class="count">${going.length}</span>`, plList(going.map(r => plRunRow(id, x, r)))) : ''}
+    ${section(`${esc(f.name)}${items.length ? ` <span class="count">${items.length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${items.length ? plList(items.map(row)) : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p><a class="btn btn-tonal btn-sm" href="#/plugins/${id}/setup">설정 열기</a>` : ''}`)}
+    ${ended.length ? `<details class="more" data-key="pl-ended-${id}-${esc(f.name)}"><summary>끝난 작업 ${ended.length}</summary>${plList(ended.map(r => plRunRow(id, x, r)))}</details>` : ''}`;
+}
 async function plAct(id, a, okMsg){
   try {
     const r = await papi(`/plugins/${id}/act`, a);
@@ -3490,7 +3717,17 @@ document.addEventListener('click', async e => {
       toast(bad ? '일부 목록을 가져오지 못했어요' : after > before ? `새로 ${after - before}개를 가져왔어요` : '바뀐 게 없어요');
       break;
     }
-    case 'start': plAct(id, { type:'start', feed:b.dataset.feed, item:b.dataset.item }, `${b.dataset.item}을 시작했어요`); break;
+    case 'start': {
+      const a = { type:'start', feed:b.dataset.feed, item:b.dataset.item, ...(b.dataset.wf ? { workflow:b.dataset.wf } : {}) }, ttl = b.dataset.title || b.dataset.item;
+      const wf = b.dataset.wf && (PL.st.plugins[id].workflows || []).find(w => w.name === b.dataset.wf), first = wf && wf.steps[0];
+      if (first && first.kind === 'ask'){   // 첫 단계가 묻는 단계면 누르는 자리에서 바로 묻는다
+        const ai = wf.steps.some(s => ['ai', 'agent'].includes(s.kind));
+        plAsk({ title:`${ttl} — ${first.name}`, body:ai ? '<p class="faint">AI가 고친 뒤 커밋하지 않고 둬요. 바뀐 것은 내가 확인해요.</p>' : '', ok:ai ? 'AI에게 맡기기' : '시작하기', field:{ label:'적을 것', placeholder:first.placeholder || '' } },
+          v => { if (!v.trim()) return false; plAct(id, { ...a, answer:v.trim() }, `${ttl} · ${wf.name} 시작했어요`); });
+        break;
+      }
+      plAct(id, a, b.dataset.wf ? `${ttl} · ${b.dataset.wf} 시작했어요` : `${b.dataset.item}을 시작했어요`); break;
+    }
     case 'confirm': plAct(id, { type:'confirm', run, step }, '끝난 것으로 옮겼어요'); break;
     case 'retry': plAct(id, { type:'retry', run, step }, '이 단계를 다시 해요'); break;
     case 'skip': plAct(id, { type:'skip', run, step }, '건너뛰고 이어서 해요'); break;
@@ -3627,7 +3864,7 @@ function route(p){
       return vAction(b);
     }
     case 'plugins': if (p[1] === '_manage') return vPluginManage(); if (p[1] === '_add') return vPluginAdd();
-      if (p[2] === 'setup') return vPluginSetup(p[1]); if (p[2] === 'run') return vPluginRun(p[1], p[3]); return vPlugins(p[1]);
+      if (p[2] === 'setup') return vPluginSetup(p[1]); if (p[2] === 'run') return vPluginRun(p[1], p[3]); if (p[2] === 'edit') return vPluginEditor(p[1], p[3]); return vPlugins(p[1]);
     default: return vNotFound();
   }
 }
@@ -3690,13 +3927,14 @@ document.addEventListener('touchend', e => {
 const SW_KIND = [[/^#\/knowledge\/ref\/([^/]+)$/, 'refs'], [/^#\/knowledge\/perm\/([^/]+)$/, 'perms'], [/^#\/knowledge\/ctx\/([^/]+)$/, 'ctxs'], [/^#\/time\/daily\/(\d{4}-\d\d-\d\d)$/, 'dailies'],
   [/^#\/action\/short\/([^/]+)$/, 'tasks'], [/^#\/action\/long\/([^/]+)$/, 'longs'], [/^#\/action\/routine\/([^/]+)$/, 'routines'], [/^#\/action\/appt\/([^/]+)$/, 'appts'], [/^#\/time\/[^/]+\/([^/]+)$/, 'meetings']];
 function swTarget(li){
+  if (li.closest('#q-res')) return null;   // 찾기 결과에서는 지우지 않는다
   const a = li.querySelector(':scope > a.row, :scope > .body > a, :scope > .t-head > a'), h = a && a.getAttribute('href') || '';
   for (const [re, kind] of SW_KIND){ const m = h.match(re); if (m && editTarget(kind, m[1])) return { kind, id:m[1], name:a.querySelector('.title')?.textContent || a.textContent }; }
   return null;
 }
-const SW_ROW = '.list > li, .board .tcard';
+const SW_ROW = '#main .list > li, .board .tcard';
 let sw = null, swOpen = null, swAt = 0;
-const swClose = () => { const li = swOpen; swOpen = null; if (!li) return; li.classList.remove('sw-open'); setTimeout(() => { if (!li.classList.contains('sw-open')) li.querySelector('.sw-del')?.remove(); }, 220); };
+const swClose = () => { const li = swOpen; swOpen = null; if (!li) return; li.classList.remove('sw-open'); setTimeout(() => { if (!li.classList.contains('sw-open')){ li.querySelector('.sw-del')?.remove(); li.classList.remove('sw'); } }, 220); };
 document.addEventListener('touchstart', e => {
   sw = null; const li = e.target.closest && e.target.closest(SW_ROW);
   if (swOpen && li !== swOpen) swClose();
@@ -3980,6 +4218,9 @@ document.addEventListener('click', e => {
     }
     case 'delete-item': deleteItem(b.dataset.kind, id); break;
     case 'st-del': { const tid = $('#dlg-status form').dataset.id; $('#dlg-status').close(); deleteItem('tasks', tid, true); break; }
+    case 'pl-search': plSearchRun(id, b.dataset.name); break;
+    case 'pl-search-all': plSearchAll(); break;
+    case 'ped-copy': { const t = $(`#pf-${b.dataset.what}${b.dataset.i}`); copyText(t.value.trim(), b.dataset.what === 't' ? '제목을 복사했어요' : '본문을 복사했어요'); break; }
     case 'swipe-del': swOpen = null; deleteItem(b.dataset.kind, id, true); break;
     case 'inline-edit': S.inline = id; render(); { const t = document.getElementById('ie-' + id); t && t.focus(); } break;
     case 'inline-cancel': S.inline = null; render(); break;
@@ -4141,6 +4382,7 @@ document.addEventListener('submit', e => {
     go('#/jobs'); toast(i >= 0 ? '예약 작업을 고쳤어요' : `${name} — ${cronText(job.cron)} 돌려요`); return;
   }
   if (kind === 'search'){ S.q = f.q.value; $('#q-res').innerHTML = searchResults(); return; }
+  if (kind === 'pl-editor'){ pedSave(f); return; }
   if (kind === 'recall'){
     const p = find('perms', f.dataset.id), v = f.line.value.trim().replace(/\n+/g, ' '); if (!v) return invalid(f.line, `rc-err-${f.dataset.id}`);
     const undo = snapshot(), ln = `- (${TODAY}) ${v}`;

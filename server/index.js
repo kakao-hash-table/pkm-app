@@ -20,6 +20,7 @@
 // GET  /api/profile/:p/plugins/:id/machine 이 컴퓨터의 승인·비밀값 상태     POST …/approve  승인     POST …/secret {name, value|null}
 // POST /api/profile/:p/plugins/:id/local {settings, auto}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
 // GET  /api/profile/:p/plugins/:id/scripts  가져오는 스크립트 내용(승인 전에 보여 준다)
+// POST /api/profile/:p/plugins/:id/search {name, q}   플러그인 검색 한 번(이 컴퓨터의 pkm-ai-server, 60초까지) → { items, note }
 // GET  /api/profile/:p/gcal              구글 캘린더 연결 상태
 // GET  /api/profile/:p/gcal/connect      구글 로그인으로 보낸다(302) — 돌아오는 곳은 /api/gcal/callback
 // POST /api/profile/:p/gcal/sync         지금 맞추기 · POST …/gcal/disconnect 연결 끊기
@@ -283,6 +284,7 @@ async function api(req, res, url){
       if (what === 'secret' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.setSecret(p, id, String(b.name || ''), b.value == null ? null : String(b.value))); }
       if (what === 'local' && req.method === 'POST') return send(res, 200, await runner.setLocal(p, id, await body(req)));
       if (what === 'act' && req.method === 'POST') return send(res, 200, await runner.act(p, id, await body(req)));
+      if (what === 'search' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.search(p, id, b.name, b.q)); }
       if (what === 'scripts' && req.method === 'GET'){
         const x = (await plugins.list(path.join(DATA, p))).find(x => x.id === id);
         if (!x) return send(res, 404, { error:'설치된 플러그인이 아니에요' });
