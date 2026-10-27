@@ -122,6 +122,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
   function parseOut(stdout){
     const t = String(stdout || '').trim();
     try { return JSON.parse(t); } catch {}
+    const fenced = t.match(/```(?:json)?\s*\n([\s\S]*?)\n```\s*$/);   // AI가 코드 블록으로 감싼 JSON
+    if (fenced) try { return JSON.parse(fenced[1]); } catch {}
     const last = t.split('\n').reverse().find(l => /^\s*\{/.test(l));   // 마지막 줄의 JSON
     try { return last ? JSON.parse(last) : null; } catch { return null; }
   }
@@ -177,7 +179,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
   function newRun(st, x, feed, item, by){
     const w = x.workflows.find(w => w.name === feed.start);
     if (!w) throw fail(400, `워크플로우 "${feed.start}"가 없어요`);
-    const run = { id: 'r' + crypto.randomBytes(5).toString('hex'), feed: feed.name, workflow: w.name, by, item: { id: item.id, title: item.title, url: item.url, vars: item.vars || {} },
+    const run = { id: 'r' + crypto.randomBytes(5).toString('hex'), feed: feed.name, workflow: w.name, by, item: { id: item.id, title: item.title, url: item.url, version: item.version ?? null, vars: item.vars || {} },
       status: 'queued', created: now(), updated: now(), steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, mode: s.mode, status: 'pending' })) };
     st.runs.unshift(run);
     st.runs = st.runs.slice(0, KEEP_RUNS);
@@ -224,10 +226,13 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       }
     }
     Object.assign(run, { status: 'done', finished: now(), updated: now() });
+    slim(run);
   }
+  // 끝난 실행은 다음 단계에 넘기려고 받은 큰 값(이름이 _로 시작하는 필드, 예: diff)을 버린다 — 상태 파일은 동기화된다
+  const slim = run => { for (const s of run.steps) if (s.output && typeof s.output === 'object') for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k]; };
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
-    choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true }),
-    free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '' });
+    choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true, confirm: c.confirm ? clip(c.confirm, 200) : '' }),
+    free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true });   // inline: 목록 줄에서 바로 고르는 버튼으로
 
   async function startStep(conn, x, run, step, d, settings){
     const miss = [], cwd = d.cwd ? fill(d.cwd, run, settings, miss) : null;
@@ -238,11 +243,20 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       if (miss.length) throw fail(400, `채우지 못한 값이 있어요: ${miss.join(' ')}`);
       return (await scriptJob(conn, x, args[0], args.slice(1), cwd)).id;
     }
-    let prompt = d.body;
-    if (/^prompts\/[^\s]+\.md$/.test(prompt)) prompt = fs.readFileSync(path.join(x.path, prompt), 'utf8');
+    let prompt = d.body, schema = null;
+    if (/^prompts\/[^\s]+\.md$/.test(prompt)){
+      const sf = path.join(x.path, prompt.replace(/\.md$/, '.schema.json'));   // 옆에 같은 이름의 .schema.json이 있으면 그 모양으로 답하게 한다
+      if (fs.existsSync(sf)) try { schema = JSON.parse(fs.readFileSync(sf, 'utf8')); } catch { throw fail(400, `${path.basename(sf)}이 JSON이 아니에요`); }
+      prompt = fs.readFileSync(path.join(x.path, prompt), 'utf8');
+    }
     prompt = fill(prompt, run, settings);
     if (step.answer != null) prompt += `\n\n사용자 추가 요청: ${step.answer}`;
-    const body = { plugin: { id: x.id, root: x.path }, provider: settings.provider || 'claude', prompt, tag: `plugin:${x.id}` };
+    const provider = settings.provider || 'claude';
+    const body = { plugin: { id: x.id, root: x.path }, provider, prompt, tag: `plugin:${x.id}` };
+    if (schema && d.kind === 'ai'){
+      if (provider === 'claude') body.json_schema = schema;   // 지원하는 AI만. 나머지는 글 끝의 JSON을 읽는다
+      else body.prompt += `\n\n답은 아래 JSON 스키마에 맞는 JSON 하나로만 써 주세요.\n${JSON.stringify(schema)}`;
+    }
     if (d.kind === 'agent') body.agent = { cwd: cwd || x.path, mode: d.mode || 'read', ...(step.session ? { session: step.session } : {}) };
     return (await ai(conn, '/v1/jobs', { method: 'POST', body: JSON.stringify(body) })).job.id;
   }
@@ -264,7 +278,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       case 'start': {
         const feed = x.feeds.find(f => f.name === a.feed), it = feed && ((st.feeds[feed.name] || {}).items || []).find(i => i.id === a.item);
         if (!it) throw fail(404, '목록에 없는 항목이에요. 목록을 새로 가져와 주세요');
-        if (st.runs.some(r => r.feed === feed.name && r.item.id === it.id && !['done', 'canceled'].includes(r.status))) throw fail(409, '이미 진행 중이에요');
+        const prev = st.runs.find(r => r.feed === feed.name && r.item.id === it.id && !['done', 'canceled'].includes(r.status));
+        // 항목이 바뀌었으면(새 커밋 등) 사람을 기다리던 이전 실행은 그만두고 새로 — 하는 중인 것은 끝날 때까지 둔다
+        if (prev && (prev.item.version == null || prev.item.version === it.version || ['running', 'waiting'].includes(prev.status))) throw fail(409, '이미 진행 중이에요');
+        if (prev){ for (const s of prev.steps) await cancelJob(s); Object.assign(prev, { status: 'canceled', note: '항목이 바뀌어서 새로 시작했어요', updated: now() }); slim(prev); }
         newRun(st, x, feed, it, 'button'); return;
       }
       case 'answer': case 'confirm': {
@@ -287,7 +304,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       case 'cancel': {
         if (!run || ['done', 'canceled'].includes(run.status)) throw fail(409, '이미 끝난 실행이에요');
         for (const s of run.steps) await cancelJob(s);
-        Object.assign(run, { status: 'canceled', note: '그만뒀어요', updated: now() }); return;
+        Object.assign(run, { status: 'canceled', note: '그만뒀어요', updated: now() }); slim(run); return;
       }
       case 'dismiss': { if (!run) throw fail(404, '없는 실행이에요'); st.runs = st.runs.filter(r => r !== run); return; }
       default: throw fail(400, '모르는 동작이에요');

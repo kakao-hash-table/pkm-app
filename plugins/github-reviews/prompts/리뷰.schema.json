@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "findings"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["ok", "block"] },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "start_line", "end_line", "category", "title", "scenario", "comment", "confidence"],
+        "properties": {
+          "path": { "type": "string" },
+          "start_line": { "type": "integer" },
+          "end_line": { "type": "integer" },
+          "category": { "type": "string", "enum": ["security", "logic", "react_hooks", "memory_leak", "error_handling", "type_safety", "accessibility", "performance", "accidental_code"] },
+          "title": { "type": "string" },
+          "scenario": { "type": "string" },
+          "comment": { "type": "string" },
+          "confidence": { "type": "number" }
+        }
+      }
+    }
+  }
+}

@@ -82,9 +82,15 @@ settings:
 |---|---|
 | `summary` | 단계 목록에 보일 한 줄 |
 | `error` | 실패 이유(사람에게 보일 말). 종료 코드가 0이 아니어도 이 말을 씁니다 |
-| `ask` | `{ question, hint, choices:[{value, label, hint}] \| [문자열], free, placeholder }` — 사람에게 묻고 멈춥니다. 답하면 같은 단계를 `--answer=<답>`을 붙여 다시 실행합니다 |
+| `ask` | `{ question, hint, choices:[{value, label, hint, recommended, confirm}] \| [문자열], free, placeholder, inline }` — 사람에게 묻고 멈춥니다. 답하면 같은 단계를 `--answer=<답>`을 붙여 다시 실행합니다. `inline: true`면 선택지를 목록 줄과 작업 화면에 버튼으로 바로 보이고, `confirm`이 있는 선택지는 누를 때 그 말로 한 번 더 묻습니다 |
+| `verdict` | `{ tone: ok\|bad, title, text }` — 이 단계의 판정. 화면은 항목 자리와 작업 화면 맨 위에 이 상자를 그립니다. 답을 받아 다시 실행해도 같은 판정을 내면 줄 높이가 바뀌지 않습니다 |
+| `findings` | `[{ where, url, tag, title, text, copy, note }]` — 짚은 곳. `where`는 위치 글자(예: `src/a.tsx:12-18`), `url`은 그 위치로 가는 http(s) 주소, `copy`는 [문구 복사]로 복사할 글. 판정 상자 안에 차례로 그립니다 |
+| `outcome` | `{ title, text }` — 사람이 고른 뒤 한 일(예: 승인함). 끝난 실행은 버튼 자리에 `✓ title · 시각`을 둡니다 |
 | `settings_patch` | `{ 설정키: 새 값 }` — 이 컴퓨터의 플러그인 설정을 바꿉니다(예: 고른 답을 규칙에 기억). 선언한 키만 |
+| `_이름` | 다음 단계에만 넘길 큰 값(예: `_diff`). 실행이 끝나거나 그만두면 상태 파일에서 지웁니다(상태 파일은 동기화됩니다) |
 | 그 밖 | 다음 단계에서 `{단계키.필드}`로 씁니다 |
+
+`ai` 단계의 프롬프트가 `prompts/이름.md`이고 옆에 `prompts/이름.schema.json`(JSON 스키마)이 있으면, 그 모양의 JSON으로 답하게 합니다. 지원하는 AI(claude)는 구조화된 결과로 받고, 나머지는 프롬프트 끝에 스키마를 붙여 글 끝의 JSON을 읽습니다. 결과 필드는 `{판단.verdict}`처럼 다음 단계에서 씁니다.
 
 `manual` 단계는 사람이 [끝난 것으로 옮기기]를 누를 때까지 기다립니다. 에이전트 단계를 다시 시키면 같은 세션을 이어서, 사람이 적은 요청을 덧붙여 돌립니다.
 
@@ -110,10 +116,12 @@ settings:
 | `every` | 몇 분마다(5~1440, 기본 60) |
 | `days`, `hours` | `weekdays`·`daily`, `09:00-18:00`. 이 밖에서는 자동으로 가져오지 않습니다(직접 가져오기는 됩니다) |
 | `start`, `start_mode` | 항목마다 돌릴 워크플로우와 시작 방식. `button`(기본)은 [시작하기]로, `auto`는 사용자가 자동 시작을 켠 뒤에 **새로 들어온** 항목만 저절로 시작합니다. 처음 가져온 목록은 원래 있던 것으로 봅니다 |
+| `view` | `sections`(기본)는 내 차례·진행 중·시작 전 섹션으로 나눠 보입니다. `inline`은 항목을 가져온 순서 그대로 두고 **그 자리에서** 진행 상태·판정·선택지를 보입니다. 목록에서 빠진 항목도 사용자가 그 칸을 떠나기 전까지는 같은 자리에 둡니다(레이아웃이 밀리지 않게). `start`가 있어야 합니다 |
+| `start_label` | 시작 버튼 글자(기본 '시작하기') |
 | `count` | `no`면 '지금'과 탭의 '볼 것' 개수에 세지 않습니다 |
 | `empty` | 비었을 때 보일 말 |
 
-스크립트는 `{ items: [...] , note? }` JSON을 냅니다. 항목은 `{ id, title, url, meta:[짧은 글], tags:[배지 글], at, version, detail:[{ who, at, kind, text, url }], vars:{ 워크플로우에 넘길 값 } }`이고, 화면은 이스케이프한 글자만 그립니다. `url`은 http(s)만 링크가 됩니다.
+스크립트는 `{ items: [...] , note? }` JSON을 냅니다. 항목은 `{ id, title, url, meta:[짧은 글], tags:[배지 글], at, version(바뀌면 다시 시작할 수 있는 값, 예: 커밋), detail:[{ who, at, kind, text, url }], vars:{ 워크플로우에 넘길 값 } }`이고, 화면은 이스케이프한 글자만 그립니다. `url`은 http(s)만 링크가 됩니다.
 
 ## 실행기 — 누가 언제 돌리나
 
@@ -176,5 +184,5 @@ pkm-ai-server:
 
 `test/fixtures/plugin-ok/`가 규격을 모두 지킨 예시입니다. 실제로 쓰는 예시는 `plugins/`에 있습니다.
 
-- `plugins/github-reviews` — 코드 리뷰: 나한테 요청된 리뷰, 나한테 달린 답변, 내가 요청한 리뷰. GitHub·GitHub Enterprise, 읽기만.
+- `plugins/github-reviews` — 코드 리뷰: 나한테 요청된 리뷰, 나한테 달린 답변, 내가 요청한 리뷰. GitHub·GitHub Enterprise. 요청된 리뷰는 AI가 머지하면 안 되는 큰 문제(보안·로직·훅·누수·에러 처리·타입·접근성·성능·실수로 넣은 코드)만 보고, 없으면 [승인하기](검토한 커밋에만, 그 사이 새 커밋이 오면 거절), 있으면 파일:줄과 남길 리뷰 문구를 보입니다. GitHub에 쓰는 것은 사람이 누른 승인 하나입니다.
 - `plugins/jira-autopilot` — 지라 자동 작업: 내게 할당된 티켓 → 저장소 찾기(규칙·브랜치 이력·물어보기) → 설명 확인 → 브랜치 규칙대로 작업 폴더(git worktree) → 지라 진행 중 → AI 구현·커밋 → 점검 → 사람 확인. push·PR은 하지 않습니다.

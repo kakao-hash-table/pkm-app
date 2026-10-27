@@ -597,6 +597,19 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .badge.pl-bad{background:var(--danger-bg);color:var(--danger)}
 .pl-excerpt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--text-2);font-size:.875rem;margin-top:6px;overflow-wrap:anywhere}
 .row .title{overflow-wrap:anywhere}
+.pl-ilist>li{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.pl-ilist>li:last-child{border-bottom:0}
+.pl-ihead{display:flex;flex-direction:column;gap:4px;min-width:0}.pl-ihead .title{color:inherit;text-decoration:none;font-weight:600;overflow-wrap:anywhere}.pl-ihead .title:hover{text-decoration:underline}
+.pl-gone .pl-ihead{opacity:.72}
+.pl-state{padding:10px 14px;border-radius:var(--r-md);background:var(--s-wait-bg)}.pl-state>b{display:block}.pl-state>span{display:block;margin-top:2px;overflow-wrap:anywhere;color:var(--text-2)}
+.pl-state.pl-ok{background:var(--s-done-bg)}.pl-state.pl-ok>b{color:var(--s-done)}.pl-state.pl-bad{background:var(--danger-bg)}.pl-state.pl-bad>b{color:var(--danger)}
+.pl-state.pl-wait{background:var(--s-review-bg)}.pl-state.pl-wait>b{color:var(--s-review)}.pl-state.pl-done{background:none;padding:0}.pl-state.pl-done>b{color:var(--s-done);font-weight:600}
+.pl-iacts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:32px}.pl-outcome{color:var(--s-done);font-weight:700;padding:0 4px}
+.pl-ihead .meta{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--text-2);font-size:.875rem}.pl-acts-note{color:var(--text-2);font-size:.875rem}
+.pl-finds{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;counter-reset:f}
+.pl-finds>li{padding:10px 12px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
+.pl-find-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pl-where{font-weight:700;overflow-wrap:anywhere}.pl-where code{font-size:.8125rem;overflow-wrap:anywhere}
+.pl-find-title{display:block;margin-top:6px}.pl-find-text{margin:4px 0 0;color:var(--text-2);overflow-wrap:anywhere}
+.pl-say{margin-top:8px;padding:8px 10px;border-left:3px solid var(--danger);background:var(--danger-bg);border-radius:0 var(--r-md) var(--r-md) 0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .pl-start-row{align-items:center;flex-wrap:wrap}.pl-start-row .title{color:inherit;text-decoration:none}.pl-start-row .title:hover{text-decoration:underline}
 @media (max-width:599px){.pl-start-row .btn,.pl-card-acts .btn{min-height:44px}}
 .ai-state>span{display:block;margin-top:2px;overflow-wrap:anywhere}.ai-state ul{margin:6px 0 0;padding-left:20px}
@@ -2860,7 +2873,7 @@ function vNotFound(){
 /* ---------------- 플러그인 (SPEC §0-3 · 설계 prototype/plugins-ux.md) ----------------
    설치·승인·비밀값·실행은 로컬 서버(server/runner.js)가 맡는다. 화면은 상태를 읽고, 누른 것을 보낸다.
    돌리는 컴퓨터가 아닌 기기에서 누른 것은 서버가 받은편지함 파일로 남겨 동기화로 보낸다. */
-const PL = { p:null, st:null, list:null, machine:{}, scripts:{}, bundled:null, at:0, loading:false, error:null, inspect:null, inspecting:false, busy:'', sent:{}, confirm:null, live:'' };
+const PL = { p:null, st:null, list:null, machine:{}, scripts:{}, bundled:null, at:0, loading:false, error:null, inspect:null, inspecting:false, busy:'', sent:{}, confirm:null, live:'', keep:{}, keepTab:null, picked:{} };
 const plOK = () => !!STORE && STORE.kind === 'server';
 const papi = (sub, body, method) => STORE.json(`/api/profile/${encodeURIComponent(S.profile)}${sub}`,
   body !== undefined || method ? { method:method || 'POST', headers:{ 'content-type':'application/json' }, body:body !== undefined ? JSON.stringify(body) : undefined } : undefined);
@@ -2888,7 +2901,7 @@ function plCount(id){
 }
 async function plLoad(force){
   if (!plOK() || PL.loading) return;
-  if (PL.p !== S.profile) Object.assign(PL, { p:S.profile, st:null, list:null, machine:{}, scripts:{}, at:0, inspect:null, sent:{} });
+  if (PL.p !== S.profile) Object.assign(PL, { p:S.profile, st:null, list:null, machine:{}, scripts:{}, at:0, inspect:null, sent:{}, keep:{}, picked:{} });
   if (!force && PL.at && Date.now() - PL.at < 10000) return;
   PL.loading = true;
   try {
@@ -2952,6 +2965,72 @@ function plFeedError(id, f){
   return `<div class="ai-state ${tone}" role="status"><b>${title}</b><span>${esc(e)}${net ? ' 다음 가져오기 때 다시 해요.' : ''}</span>${act ? `<div>${act}</div>` : ''}</div>`;
 }
 
+/* 항목 자리에서 진행을 보이는 피드(view: inline) — 상태가 바뀌어도 줄이 섹션 사이를 옮겨 다니지 않는다.
+   목록에서 빠진 항목(승인해서 요청이 풀린 PR 같은)도 이 칸을 떠나기 전까지는 그 자리에 둔다. 새 항목은 맨 아래에 붙인다 */
+function plKept(id, f, items){
+  const k = PL.keep[`${id}|${f.name}`] ||= { order:[], items:{} };
+  for (const it of items){ k.items[it.id] = it; if (!k.order.includes(it.id)) k.order.push(it.id); }
+  const live = new Set(items.map(it => it.id));
+  return k.order.map(i => ({ it:k.items[i], gone:!live.has(i) }));
+}
+// 단계 결과의 판정(verdict: {tone, title, text})과 짚은 곳(findings: [{where, url, tag, title, text, copy, note}]) — 플러그인이 정한 말을 그대로 그린다
+const plVerdictOf = r => { for (let i = r.steps.length - 1; i >= 0; i--){ const o = r.steps[i].output; if (o && o.verdict && typeof o.verdict === 'object') return { v:o.verdict, findings:Array.isArray(o.findings) ? o.findings : [], step:r.steps[i] }; } return null; };
+function plFinds(list){
+  if (!list.length) return '';
+  return `<ol class="pl-finds">${list.map((f, k) => `<li>
+    <div class="pl-find-head">${plUrl(f.url) ? `<a class="pl-where" href="${esc(plUrl(f.url))}" target="_blank" rel="noopener"><code>${esc(f.where || '')}</code> <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<code class="pl-where">${esc(f.where || '')}</code>`}${f.tag ? plBadge(f.tag, 'bad') : ''}${f.note ? plBadge(f.note, 'wait') : ''}</div>
+    ${f.title ? `<b class="pl-find-title">${esc(f.title)}</b>` : ''}
+    ${f.text ? `<p class="pl-find-text">${esc(f.text)}</p>` : ''}
+    ${f.copy ? `<div class="pl-say"><p class="pl-text">${esc(f.copy)}</p><button class="btn btn-text btn-sm" type="button" data-pl="copy" data-text="${esc(f.copy)}" data-msg="${k + 1}번째 리뷰 문구를 복사했어요" aria-label="${k + 1}번째 리뷰 문구 복사">문구 복사</button></div>` : ''}
+  </li>`).join('')}</ol>`;
+}
+// 묻는 단계의 선택지를 버튼으로(ask.inline). 누른 뒤에는 같은 자리에 '하는 중'을 둔다
+function plChoices(id, r, s){
+  const a = s.ask || {}, picked = PL.picked[r.id];
+  if (picked && s.status !== 'input') delete PL.picked[r.id];
+  if (picked || PL.sent[r.id]) return `<span class="pl-acts-note" role="status">${esc(picked ? `${picked} 하는 중…` : '보냈어요')}</span>`;
+  return (a.choices || []).map(c => `<button class="btn ${c.recommended ? 'btn-primary' : 'btn-ghost'} btn-sm" type="button" data-pl="choose" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" data-value="${esc(c.value)}" data-label="${esc(c.label)}"${c.confirm ? ` data-confirm="${esc(c.confirm)}"` : ''}>${esc(c.label)}</button>`).join('');
+}
+function plInlineFeed(id, x, f){
+  const fs_ = x.state.feeds[f.name] || {}, runs = (x.state.runs || []).filter(r => r.feed === f.name);
+  const rows = plKept(id, f, fs_.items || []), err = fs_.ok === false ? plFeedError(id, fs_) : '';
+  const label = f.start_label || '시작하기';
+  const row = ({ it, gone }) => {
+    const r = runs.find(z => z.item.id === it.id && z.status !== 'canceled');   // 최근 것(runs는 새것이 앞)
+    const stale = r && it.version != null && r.item.version != null && r.item.version !== it.version && !['queued', 'running', 'waiting'].includes(r.status);
+    const startBtn = (text, cls = 'btn-tonal') => plIsRunner() || plRunner() ? `<button class="btn ${cls} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-label="${esc(it.title)}" ${PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(text)}</button>` : '';
+    let tone = '', head = '', body = '', acts = '';
+    const s = r && plStepNow(r), vd = r && plVerdictOf(r);
+    if (r && ['done', 'stopped', 'canceled'].includes(r.status)) delete PL.picked[r.id];
+    if (!r || stale){
+      if (stale){ tone = 'wait'; head = '검토한 뒤 새 커밋이 올라왔어요'; }
+      acts = gone ? '' : startBtn(stale ? `다시 ${label}` : label);
+    } else if (PL.sent[r.id]) { tone = 'wait'; head = '보냈어요'; body = `<span>${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요</span>`; }
+    else if (['queued', 'running', 'waiting'].includes(r.status)){ tone = 'wait'; head = esc(PL.picked[r.id] ? `${PL.picked[r.id]} 하는 중…` : r.status === 'queued' ? '차례를 기다려요' : r.status === 'waiting' ? plRunLine(x, r) : `${s.name} 하는 중`);
+      body = PL.picked[r.id] || r.status === 'waiting' ? '' : `<span>${r.status === 'queued' ? esc(plRunLine(x, r)) : `${r.steps.indexOf(s) + 1}/${r.steps.length} · ${plMin(s.started || r.updated)}분째`}</span>`; }
+    else if (['input', 'done'].includes(r.status) && vd){
+      tone = vd.v.tone === 'bad' ? 'bad' : 'ok'; head = esc(vd.v.title || ''); body = `${vd.v.text ? `<span>${esc(vd.v.text)}</span>` : ''}${plFinds(vd.findings)}`;
+      const oc = vd.step.output.outcome;
+      acts = r.status === 'done' ? `<span class="pl-outcome">✓ ${esc((oc && oc.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>`
+        : s.ask && s.ask.inline ? plChoices(id, r, s) : `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`;
+    }
+    else if (r.status === 'input'){ tone = 'wait'; head = esc((s.ask && s.ask.question) || '답이 필요해요'); acts = `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`; }
+    else if (r.status === 'stopped'){ tone = 'bad'; head = `${esc(s.name)}에서 멈췄어요`; body = `<span>${esc(String(s.error || '').split('\n')[0])}</span>`;
+      acts = plIsRunner() || plRunner() ? `<button class="btn btn-primary btn-sm" type="button" data-pl="retry" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>` : ''; }
+    else if (r.status === 'done'){ tone = 'done'; head = `끝 · ${plTime(r.finished || r.updated)}`; }
+    const more = r && !stale ? `<a class="btn btn-text btn-sm" href="#/plugins/${id}/run/${r.id}">자세히</a>` : '';
+    const state = head || body ? `<div class="pl-state ${tone ? `pl-${tone}` : ''}" ${tone === 'wait' ? 'role="status"' : ''}>${head ? `<b>${head}</b>` : ''}${body}</div>` : '';
+    return `<li class="pl-irow${gone ? ' pl-gone' : ''}">
+      <div class="pl-ihead"><a class="title" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>
+        <span class="meta">${(it.tags || []).map(t => plBadge(t, /변경|멈|오류/.test(t) ? 'bad' : 'wait')).join('')}${(it.meta || []).slice(0, 4).map(m => `<span>${esc(m)}</span>`).join('')}${gone ? '<span>목록에서 빠짐</span>' : ''}</span></div>
+      ${state}
+      ${acts || more ? `<div class="pl-iacts">${acts}${more}</div>` : ''}
+    </li>`;
+  };
+  const list = rows.length ? `<ul class="list pl-ilist">${rows.map(row).join('')}</ul>` : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p>` : '';
+  return section(`${esc(f.name)}${rows.length ? ` <span class="count">${rows.filter(z => !z.gone).length}</span>` : ''}`, `${err}${list}`);
+}
+
 /* 플러그인 화면 — 피드 섹션, 작업을 돌리는 플러그인은 내 차례·진행 중·시작 전·끝난 작업 */
 function vPlugins(id){
   if (!plOK()) return `<div class="page"><h1 tabindex="-1">플러그인</h1><p class="muted" style="margin-top:8px">플러그인 목록은 컴퓨터에서 pkm 서버로 열었을 때 볼 수 있어요.</p></div>`;
@@ -2961,6 +3040,7 @@ function vPlugins(id){
   if (!ids.length) return vPluginManage();
   if (!ids.includes(id)){ const last = LS.get(`pkm:v1:pl-tab:${S.profile}`, ''); id = ids.includes(last) ? last : ids[0]; }
   LS.set(`pkm:v1:pl-tab:${S.profile}`, id);
+  if (PL.keepTab !== id){ PL.keep = {}; PL.keepTab = id; }
   const x = PL.st.plugins[id], here = plHere(), feeds = x.feeds;
   const ats = feeds.map(f => (x.state.feeds[f.name] || {}).at).filter(Boolean).sort(), last = ats[ats.length - 1];
   const busy = feeds.some(f => (x.state.feeds[f.name] || {}).running) || PL.busy === `refresh:${id}`;
@@ -2973,9 +3053,10 @@ function vPlugins(id){
   else if (plIsRunner() && m && m.at){ const left = plMissing(id); if (left.length) gate = `<div class="ai-state wait"><b>준비가 ${left.length}개 남았어요</b><span>${esc(left.join(' · '))}</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">준비 마치기</a></div></div>`; }
   const tabs = ids.length > 1 ? seg(ids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), id, 'seg-compact', ids.length > 3 ? '플러그인 보기' : '') : '';
   const autoFeed = feeds.find(f => f.start && f.start_mode === 'auto');
-  const autoLine = autoFeed ? `<p class="pl-auto">새 티켓 자동 시작 · <b>${plAuto(x) ? '켜짐' : '꺼짐'}</b> ${plIsRunner() ? `<button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${plAuto(x) ? '' : '1'}" aria-label="새 티켓 자동 시작 ${plAuto(x) ? '끄기' : '켜기'}">${plAuto(x) ? '끄기' : '켜기'}</button>` : ''}</p>` : '';
+  const autoLine = autoFeed ? `<p class="pl-auto">새로 들어오면 자동 시작 · <b>${plAuto(x) ? '켜짐' : '꺼짐'}</b> ${plIsRunner() ? `<button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${plAuto(x) ? '' : '1'}" aria-label="새로 들어오면 자동 시작 ${plAuto(x) ? '끄기' : '켜기'}">${plAuto(x) ? '끄기' : '켜기'}</button>` : ''}</p>` : '';
   const body = feeds.map(f => {
     const fs_ = x.state.feeds[f.name] || {}, items = fs_.items || [];
+    if (f.view === 'inline') return plInlineFeed(id, x, f);
     if (!f.start){
       const err = fs_.ok === false ? plFeedError(id, fs_) : '';
       const list = items.length ? plList(items.map(plItemRow)) : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p>` : '';
@@ -3038,7 +3119,7 @@ function vPluginRun(id, rid){
   const agent = r.steps.find(z => z.kind === 'agent'), rep = agent && agent.status === 'done' ? plReport(agent.text) : null;
   const chk = r.steps.find(z => z.output && Array.isArray(z.output.commits)), co = chk ? chk.output : null;
   const wt = r.steps.map(z => z.output || {}).find(o => o.path && o.branch) || {};
-  const here = plIsRunner(), sent = PL.sent[r.id], key = (r.item.vars && r.item.vars.key) || '';
+  const here = plIsRunner(), sent = PL.sent[r.id], key = (r.item.vars && r.item.vars.key) || '', vd = plVerdictOf(r);
   const btn = (act, label, cls = 'btn-ghost', extra = '') => `<button class="btn ${cls} btn-sm" type="button" data-pl="${act}" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" ${extra}>${label}</button>`;
   const cancel = ['done', 'canceled'].includes(r.status) ? '' : btn('cancel', '그만두기', 'btn-text');
   let card;
@@ -3053,6 +3134,7 @@ function vPluginRun(id, rid){
      ${rep && rep.pr ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="copy" data-text="${esc(rep.pr)}" data-msg="PR 설명을 복사했어요">PR 설명 복사</button>` : ''}
      ${agent ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="redo" data-id="${id}" data-run="${r.id}" data-step="${esc(agent.key)}">AI에게 다시 시키기</button>` : ''}
      <span class="pl-quiet">${btn('confirm', '끝난 것으로 옮기기', 'btn-text')}${cancel}</span>`];
+  else if (r.status === 'input' && vd && s.ask && s.ask.inline) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), `${plChoices(id, r, s)}${cancel}`];
   else if (r.status === 'input') card = ['wait', esc(s.ask.question || '답이 필요해요'), esc(s.ask.hint || ''), ''];
   else if (r.status === 'stopped' && /할당이 풀렸어요|이미 끝났어요/.test(s.error || '')){   // 동료 눈에 보이는 변경은 막았다 — 그만두는 게 기본
     card = ['bad', /할당이 풀렸어요/.test(s.error) ? `${esc(key || '이 티켓')} 할당이 풀렸어요` : `${esc(key || '이 티켓')}이 지라에서 끝났어요`, esc(String(s.error || '').split('\n')[0].replace(/^.*?(할당이 풀렸어요|이미 끝났어요)\s*/, '').replace(/^\((.*)\)\.\s*/, '$1 · ')),
@@ -3064,11 +3146,12 @@ function vPluginRun(id, rid){
       `${token ? (here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">토큰 넣기</a>` : `<span class="faint">${esc(plRunner() || '돌리는 컴퓨터')}에서 넣어 주세요</span>`) : btn('retry', '이 단계 다시 하기', 'btn-primary')}
        ${btn('skip', '건너뛰고 이어 하기')}${cancel}`];
   }
+  else if (r.status === 'done' && vd) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || '끝났어요'), esc(vd.v.text || ''), `<span class="pl-outcome">✓ ${esc((vd.step.output.outcome && vd.step.output.outcome.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>`];
   else if (r.status === 'done') card = ['ok', '끝난 것으로 옮겼어요', wt.path ? `작업 폴더는 남아 있어요 · <code>${esc(wt.path)}</code>` : '', ''];
   else card = ['wait', '그만둔 작업이에요', wt.branch ? `브랜치 <code>${esc(wt.branch)}</code>와 작업 폴더는 남아 있어요` : '', ''];
   // 답하는 폼(고르기·적기)
   let form = '';
-  if (!sent && r.status === 'input' && s.ask && s.ask.type !== 'confirm'){
+  if (!sent && r.status === 'input' && s.ask && s.ask.type !== 'confirm' && !s.ask.inline){
     const a = s.ask, choices = a.choices || [];
     form = `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
       ${choices.length ? `<fieldset class="choice"><legend class="sr-only">${esc(a.question)}</legend>${choices.map(c => `<label><input type="radio" name="v" value="${esc(c.value)}" ${c.recommended ? 'checked' : ''}><span><b>${esc(c.label)}${c.recommended ? ' (추천)' : ''}</b>${c.hint ? `<small>${esc(c.hint)}</small>` : ''}</span></label>`).join('')}</fieldset>` : ''}
@@ -3088,6 +3171,7 @@ function vPluginRun(id, rid){
     <h1 tabindex="-1">${esc(r.item.title)}</h1>
     <div class="ai-state ${card[0]} pl-card" role="status"><b id="pl-card-h" tabindex="-1">${card[1]}</b>${card[2] ? `<span>${card[2]}</span>` : ''}${card[3] && card[3].trim() ? `<div class="pl-card-acts">${card[3]}</div>` : ''}</div>
     ${form}
+    ${vd && vd.findings.length ? section(`짚은 곳 <span class="count">${vd.findings.length}</span>`, plFinds(vd.findings)) : ''}
     ${co && co.warnings && co.warnings.length ? `<ul class="pl-warn">${co.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
     ${rep && rep.summary ? section('AI 요약', plMd(rep.summary)) : ''}
     ${rep && rep.risks && !/^없음\.?$/.test(rep.risks) ? section('AI가 남긴 확인할 것', plMd(rep.risks, 800)) : ''}
@@ -3242,7 +3326,12 @@ document.addEventListener('click', async e => {
       toast(bad ? '일부 목록을 가져오지 못했어요' : after > before ? `새로 ${after - before}개를 가져왔어요` : '바뀐 게 없어요');
       break;
     }
-    case 'start': plAct(id, { type:'start', feed:b.dataset.feed, item:b.dataset.item }, `${b.dataset.item}을 시작했어요`); break;
+    case 'start': plAct(id, { type:'start', feed:b.dataset.feed, item:b.dataset.item }, `${b.dataset.label || b.dataset.item}을 시작했어요`); break;
+    case 'choose': {   // 목록 줄의 선택지 버튼 — 고른 자리에 '하는 중'을 두고 보낸다. 선택지에 confirm 말이 있으면 한 번 더 묻는다
+      const send = () => { PL.picked[run] = b.dataset.label; render(); plAct(id, { type:'answer', run, step, value:b.dataset.value }); };
+      if (b.dataset.confirm) plAsk({ title:`${b.dataset.label}할까요?`, body:`<p>${esc(b.dataset.confirm)}</p>`, ok:b.dataset.label, danger:true }, send); else send();
+      break;
+    }
     case 'confirm': plAct(id, { type:'confirm', run, step }, '끝난 것으로 옮겼어요'); break;
     case 'retry': plAct(id, { type:'retry', run, step }, '이 단계를 다시 해요'); break;
     case 'skip': plAct(id, { type:'skip', run, step }, '건너뛰고 이어서 해요'); break;
@@ -3255,9 +3344,10 @@ document.addEventListener('click', async e => {
       const set = v => papi(`/plugins/${id}/local`, { auto:v }).then(() => plLoad(true)).then(render).catch(er => toast(er.message));
       if (!on){ await set(false); const going = (x.state.runs || []).some(r => ['running', 'waiting'].includes(r.status)); toast(`자동 시작을 껐어요${going ? '. 하던 작업은 마저 해요' : ''}`, { label:'되돌리기', fn:() => set(true) }); break; }
       const wf = x.workflows.find(w => w.name === feed.start);
-      plAsk({ title:'새로 할당된 티켓을 자동으로 시작할까요?', ok:'자동 시작 켜기',
-        body:`<p>켜면 ${esc(plWho())}가 이렇게 해요.</p><ol class="pl-ol"><li>${feed.days === 'weekdays' ? '평일 ' : ''}${feed.hours ? esc(feed.hours.replace('-', '–')) + '에 ' : ''}${feed.every}분마다 새 티켓을 확인해요</li><li>새 티켓을 하나씩 차례로 작업해요</li>${wf ? wf.steps.map(s => `<li>${esc(s.name)}</li>`).join('') : ''}</ol>
-          <p>물어볼 게 있으면 지라를 바꾸기 전에 내 차례로 올려요. 작업은 티켓마다 따로 만든 작업 폴더에서 해서, 지금 쓰는 저장소 폴더는 건드리지 않아요. <b>push와 PR은 하지 않아요.</b></p>
+      const agentWf = wf && wf.steps.some(s => s.kind === 'agent');
+      plAsk({ title:`${esc(feed.name)}에 새로 들어온 것을 자동으로 시작할까요?`, ok:'자동 시작 켜기',
+        body:`<p>켜면 ${esc(plWho())}가 이렇게 해요.</p><ol class="pl-ol"><li>${feed.days === 'weekdays' ? '평일 ' : ''}${feed.hours ? esc(feed.hours.replace('-', '–')) + '에 ' : ''}${feed.every}분마다 새로 들어온 것을 확인해요</li><li>하나씩 차례로 해요</li>${wf ? wf.steps.map(s => `<li>${esc(s.name)}</li>`).join('') : ''}</ol>
+          ${agentWf ? `<p>물어볼 게 있으면 지라를 바꾸기 전에 내 차례로 올려요. 작업은 티켓마다 따로 만든 작업 폴더에서 해서, 지금 쓰는 저장소 폴더는 건드리지 않아요. <b>push와 PR은 하지 않아요.</b></p>` : '<p>고를 것이 있으면 내 차례로 올리고, 내가 누르기 전에는 그 다음을 하지 않아요.</p>'}
           <p class="faint">지금 목록에 있는 ${n}개는 자동으로 시작하지 않아요. AI는 'AI 연결'에서 정한 한도 안에서만 써요.</p>` }, () => set(true).then(() => toast('자동 시작을 켰어요')));
       break;
     }
