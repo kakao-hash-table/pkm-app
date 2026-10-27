@@ -149,3 +149,16 @@ test('검토한 뒤 새 커밋이 오면 승인하지 않고, 새 버전으로 �
   assert.equal(runs[0].item.version, 'c'.repeat(40)); assert.equal(runs[1].status, 'canceled');
   await assert.rejects(runner.act(P, ID, { type: 'start', feed: FEED, item: it.id }), /이미 진행 중/);
 });
+
+test('나한테 달린 답변은 확인하고 닫을 수 있고(버전째), 목록에서 빠지면 닫은 기록도 지운다', async () => {
+  const R = '나한테 달린 답변', it = 'http://gh/o/web/pull/7';
+  await runner.act(P, ID, { type: 'hide', feed: R, item: it, version: '2026-10-27T00:00:00Z' });
+  assert.deepEqual((await state()).hidden[R], { [it]: '2026-10-27T00:00:00Z' });
+  await assert.rejects(runner.act(P, ID, { type: 'hide', feed: FEED, item: it }), /닫을 수 없는 목록/);
+  await runner.act(P, ID, { type: 'unhide', feed: R, item: it });
+  assert.deepEqual((await state()).hidden[R], {});
+  await runner.act(P, ID, { type: 'hide', feed: R, item: 'http://gh/o/web/pull/99', version: '1' });
+  await runner.act(P, ID, { type: 'refresh', feed: R });
+  assert.equal((await state()).feeds[R].ok, true);
+  assert.deepEqual((await state()).hidden[R], {});
+});

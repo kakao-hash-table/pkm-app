@@ -5,6 +5,7 @@
 // 프로필 데이터(동기화됨):  <프로필>/_플러그인/.state/<id>.json        — 피드 목록과 실행 기록. 켠 컴퓨터만 쓴다
 //                           <프로필>/_플러그인/.state/<id>.inbox.<컴퓨터>.json — 다른 기기에서 누른 것(답하기·다시 하기…). 켠 컴퓨터가 읽어서 처리한다
 // 비밀값(토큰)은 어느 쪽에도 두지 않는다 — pkm-ai-server에만 있고, 승인한 플러그인 스크립트의 환경 변수로만 간다.
+// 이 컴퓨터의 플러그인 설정(runner.json)에는 설정값 말고도 every(목록마다 가져오는 주기, 분)와 gates(자동 시작한 작업에서 내 확인을 받을 단계)가 있다.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,6 +34,9 @@ function writeConf(c){
 }
 const profConf = (c, p) => (c.profiles[p] ||= { on: false, plugins: {} });
 const plugConf = (c, p, id) => (profConf(c, p).plugins[id] ||= { settings: {}, auto: false, auto_since: null });
+const everyOf = (pc, feed) => (pc.every && pc.every[feed.name]) || feed.every;   // 이 컴퓨터에서 바꾼 주기가 먼저
+const gateKey = (workflow, step) => `${workflow}|${step}`;
+export const EVERY_MIN = 5, EVERY_MAX = 1440;
 
 /* ---------- pkm-ai-server 호출 ---------- */
 async function ai(conn, pathname, opt = {}){
@@ -154,6 +158,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       f.seeded = true;
       for (const k of Object.keys(f.first)) if (!items.some(it => it.id === k) && Date.now() - Date.parse(f.first[k]) > 30 * 86400000) delete f.first[k];
       const t = now(); Object.assign(f, { items, at: t, items_at: t, ok: true, error: null, note: out.note ? clip(out.note, 200) : null });   // items_at: 오류 뒤에도 남는 목록이 언제 것인지
+      const hid = st.hidden && st.hidden[feed.name];   // 닫은 항목 — 목록에서 빠진 것은 기록도 지운다
+      if (hid) for (const k of Object.keys(hid)) if (!items.some(it => it.id === k)) delete hid[k];
     } catch (e) {
       Object.assign(f, { at: now(), ok: false, error: clip(e.message, 500) });
     } finally { f.running = false; }
@@ -203,6 +209,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       if (step.status === 'failed'){ run.status = 'stopped'; return; }
       if (step.status === 'pending'){
         if (d.kind === 'manual'){ Object.assign(step, { status: 'input', ask: { type: 'confirm' }, started: now() }); run.status = 'input'; run.updated = now(); return; }
+        if (run.by === 'auto' && !step.gate_ok && conf.gates && conf.gates[gateKey(run.workflow, step.key)]){
+          Object.assign(step, { status: 'input', ask: { type: 'gate', question: `${step.name}을 할까요?` }, started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
+        }
         try { step.job = await startStep(conn, x, run, step, d, settings); Object.assign(step, { status: 'running', started: now(), error: null }); }
         catch (e) { Object.assign(step, { status: 'failed', error: clip(e.message, 500), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         run.status = 'running'; run.updated = now();
@@ -286,7 +295,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       }
       case 'answer': case 'confirm': {
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
-        if (a.type === 'confirm') Object.assign(step, { status: 'done', finished: now(), ask: null });
+        if (a.type === 'confirm' && step.ask && step.ask.type === 'gate') Object.assign(step, { status: 'pending', gate_ok: true, ask: null });   // 관문: 확인하면 그 단계를 한다
+        else if (a.type === 'confirm') Object.assign(step, { status: 'done', finished: now(), ask: null });
         else Object.assign(step, { status: 'pending', answer: String(a.value ?? '').slice(0, 2000), ask: null });
         Object.assign(run, { status: 'running', updated: now() }); return;
       }
@@ -307,6 +317,14 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         Object.assign(run, { status: 'canceled', note: '그만뒀어요', updated: now() }); slim(run); return;
       }
       case 'dismiss': { if (!run) throw fail(404, '없는 실행이에요'); st.runs = st.runs.filter(r => r !== run); return; }
+      // 확인하고 닫기(피드 dismiss: yes) — 항목 버전째 기억해서, 버전이 바뀌면(새 답변 등) 다시 보인다
+      case 'hide': case 'unhide': {
+        const feed = x.feeds.find(f => f.name === a.feed);
+        if (!feed || feed.dismiss !== 'yes') throw fail(400, '닫을 수 없는 목록이에요');
+        const h = ((st.hidden ||= {})[feed.name] ||= {}), key = clip(a.item, 200);
+        if (a.type === 'hide') h[key] = a.version == null ? '*' : clip(a.version, 100); else delete h[key];
+        return;
+      }
       default: throw fail(400, '모르는 동작이에요');
     }
   }
@@ -339,7 +357,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
           }
           for (const feed of x.feeds){
             const f = st.feeds[feed.name];
-            if (!inWindow(feed) || (f && f.at && Date.now() - Date.parse(f.at) < feed.every * 60000)) continue;
+            if (!inWindow(feed) || (f && f.at && Date.now() - Date.parse(f.at) < everyOf(pc, feed) * 60000)) continue;
             await refreshFeed(p, x, pc, feed, st, conf.ai);
           }
           await advance(p, x, pc, st, conf.ai);
@@ -364,8 +382,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const out = {};
     for (const x of list){
       const st = readState(p, x.id), pc = plugConf(c, p, x.id), full = await pluginOf(p, x.id);
-      out[x.id] = { state: st, feeds: full.feeds, workflows: full.workflows.map(w => ({ name: w.name, steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind })) })),
-        local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null } };
+      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, every: everyOf(pc, f), every_default: f.every })), workflows: full.workflows.map(w => ({ name: w.name, steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind })) })),
+        local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null, every: pc.every || {}, gates: pc.gates || {} } };
     }
     return { here: here(p), plugins: out };
   }
@@ -388,8 +406,25 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     if (on) setTimeout(() => tick(p).catch(() => {}), 50);
     return here(p);
   }
-  async function setLocal(p, id, { settings, auto }){
+  async function setLocal(p, id, { settings, auto, every, gates }){
     const x = await pluginOf(p, id), c = readConf(), pc = plugConf(c, p, id);
+    if (every && typeof every === 'object'){   // { 목록 이름: 분 | null(기본으로) }
+      for (const [name, v] of Object.entries(every)){
+        if (!x.feeds.some(f => f.name === name)) throw fail(400, `없는 목록이에요: ${name}`);
+        if (v == null){ if (pc.every) delete pc.every[name]; continue; }
+        const n = Number(v);
+        if (!Number.isInteger(n) || n < EVERY_MIN || n > EVERY_MAX) throw fail(400, `가져오는 주기는 ${EVERY_MIN}~${EVERY_MAX}분이에요`);
+        (pc.every ||= {})[name] = n;
+      }
+    }
+    if (gates && typeof gates === 'object'){   // { "워크플로우|단계키": true | false }
+      for (const [k, v] of Object.entries(gates)){
+        const [w, s] = k.split('|'), wf = x.workflows.find(z => z.name === w), st = wf && wf.steps.find(z => z.key === s);
+        if (!st) throw fail(400, `없는 단계예요: ${k}`);
+        if (st.kind === 'manual') continue;   // 사람이 하는 단계는 원래 내 차례
+        if (v) (pc.gates ||= {})[k] = true; else if (pc.gates) delete pc.gates[k];
+      }
+    }
     if (settings && typeof settings === 'object'){
       for (const s of x.manifest.settings) if (s.key in settings){
         const v = settings[s.key];
@@ -399,7 +434,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     if (auto != null){ pc.auto = !!auto; pc.auto_since = auto ? (pc.auto_since && pc.auto ? pc.auto_since : now()) : null; }
     writeConf(c);
     if (auto != null && mine(p)){ const st = readState(p, id); st.auto = !!auto; writeState(p, id, st); }
-    return { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since };
+    return { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since, every: pc.every || {}, gates: pc.gates || {} };
   }
   // 누른 것 — 켠 컴퓨터면 바로, 아니면 이 컴퓨터 이름의 받은편지함에 남겨 동기화로 보낸다
   async function act(p, id, a){
