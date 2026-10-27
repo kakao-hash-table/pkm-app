@@ -610,6 +610,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .pl-find-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pl-where{font-weight:700;overflow-wrap:anywhere}.pl-where code{font-size:.8125rem;overflow-wrap:anywhere}
 .pl-find-title{display:block;margin-top:6px}.pl-find-text{margin:4px 0 0;color:var(--text-2);overflow-wrap:anywhere}
 .pl-say{margin-top:8px;padding:8px 10px;border-left:3px solid var(--danger);background:var(--danger-bg);border-radius:0 var(--r-md) var(--r-md) 0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.pl-upd{margin:0 0 12px}.pl-changes{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.pl-changes li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pl-changes code{overflow-wrap:anywhere;font-size:.8125rem}
 .pl-start-row{align-items:center;flex-wrap:wrap}.pl-start-row .title{color:inherit;text-decoration:none}.pl-start-row .title:hover{text-decoration:underline}
 @media (max-width:599px){.pl-start-row .btn,.pl-card-acts .btn{min-height:44px}}
 .ai-state>span{display:block;margin-top:2px;overflow-wrap:anywhere}.ai-state ul{margin:6px 0 0;padding-left:20px}
@@ -2906,10 +2907,10 @@ async function plLoad(force){
   PL.loading = true;
   try {
     const [st, list] = await Promise.all([papi('/plugins/state'), papi('/plugins')]);
-    const before = PL.st ? JSON.stringify(PL.st) : '';
-    Object.assign(PL, { st, list:list.plugins, at:Date.now(), error:null });
+    const before = PL.st ? JSON.stringify([PL.st, PL.updates]) : '';
+    Object.assign(PL, { st, list:list.plugins, updates:list.updates || {}, at:Date.now(), error:null });
     for (const [rid, a] of Object.entries(PL.sent)) if (Date.now() - a > 15 * 60000) delete PL.sent[rid];
-    if (before !== JSON.stringify(st)) plRepaint();
+    if (before !== JSON.stringify([st, PL.updates])) plRepaint();
   } catch (e) { PL.error = e.message; PL.at = Date.now(); plRepaint(); }
   finally { PL.loading = false; }
 }
@@ -2927,6 +2928,12 @@ async function plMachine(id, force){
   plRepaint();
 }
 const plUrl = u => /^https?:\/\//.test(String(u || '')) ? String(u) : '';   // 밖에서 온 주소는 http(s)만 링크로
+const plUpd = id => { const u = PL.updates && PL.updates[id]; return u && !u.check && u.files && u.files.length ? u : null; };
+const plUpdBtn = (id, label, cls = 'btn-primary') => `<button class="btn ${cls} btn-sm" type="button" data-pl="update" data-id="${id}" ${PL.busy === `update:${id}` ? 'aria-disabled="true"' : ''}>${PL.busy === `update:${id}` ? '가져오는 중…' : label}</button>`;
+function plUpdBanner(id){
+  const u = plUpd(id); if (!u) return '';
+  return `<div class="ai-state wait pl-upd"><b>새 버전${u.to ? ` ${esc(u.to)}` : ''}이 있어요</b><span>${u.from ? `지금 ${esc(u.from)} · ` : ''}바뀐 파일 ${u.files.length}개 · 설정과 토큰은 그대로예요</span><div>${plUpdBtn(id, '살펴보고 업데이트')}</div></div>`;
+}
 const plBadge = (text, tone) => `<span class="badge pl-${tone}">${esc(text)}</span>`;
 const RUN_WORD = { queued:['차례 기다림', 'wait'], running:['하는 중', 'wait'], waiting:['기다림', 'wait'], input:['내 차례', 'review'], stopped:['멈춤', 'bad'], done:['끝', 'done'], canceled:['그만둠', 'wait'] };
 const plStepNow = r => r.steps.find(s => !['done', 'skipped'].includes(s.status)) || r.steps[r.steps.length - 1];
@@ -3081,7 +3088,7 @@ function vPlugins(id){
     ${tabs}
     <div class="pl-fresh">${fresh ? `<span class="num">${fresh}</span>` : ''}${plIsRunner() ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="refresh" data-id="${id}" ${busy ? 'aria-disabled="true"' : ''}>${busy ? '가져오는 중' : '지금 가져오기'}</button>` : ''}<a class="btn btn-text btn-sm" href="#/plugins/${id}/setup">설정</a></div>
     ${stale ? `<p class="faint">${esc(plRunner())}에서 한동안 소식이 없어요. 컴퓨터가 잠들었거나 pkm 서버가 꺼졌을 수 있어요.</p>` : ''}
-    ${gate}${autoLine}${body}
+    ${plUpdBanner(id)}${gate}${autoLine}${body}
   </div>`;
 }
 function plMissing(id){
@@ -3236,7 +3243,8 @@ function vPluginSetup(id){
     ${settings && !elsewhere ? `<section class="section"><h2>설정 · 이 컴퓨터</h2><form data-pl-form="settings" data-id="${id}" novalidate class="pl-settings">${settings}<div><button class="btn btn-ghost" type="submit">설정 저장하기</button></div></form></section>` : ''}
     ${autoFeed && !elsewhere ? section('자동 시작', `<p class="pl-auto">새 티켓 자동 시작 · <b>${x.local.auto ? '켜짐' : '꺼짐'}</b> <button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${x.local.auto ? '' : '1'}" ${plIsRunner() ? '' : 'disabled'}>${x.local.auto ? '끄기' : '켜기'}</button></p>${plIsRunner() ? '' : '<p class="faint">이 컴퓨터에서 돌리기를 켠 뒤에 켤 수 있어요</p>'}`) : ''}
     ${feedsText.length ? section('가져오는 때', `<ul class="pl-mono">${feedsText.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`) : ''}
-    ${section('정보', `<p class="faint">${esc(mf.version)}${li.installed_at ? ` · ${plTime(li.installed_at)} 설치` : ''}${li.source ? ` · ${esc(li.source.url || li.source.path || '')}` : ''}</p>${li.changed && li.changed.length ? `<p class="faint">설치 뒤 바뀐 파일: ${esc(li.changed.join(', '))}</p>` : ''}<button class="btn btn-text btn-sm pl-danger" type="button" data-pl="remove" data-id="${id}">이 플러그인 지우기</button>`)}
+    ${section('정보', `<p class="faint">${esc(mf.version)}${li.installed_at ? ` · ${plTime(li.installed_at)} 설치` : ''}${li.source ? ` · ${li.source.type === 'bundled' ? 'pkm에 들어 있는 플러그인' : esc(li.source.url || li.source.path || '')}` : ''}</p>
+      ${plUpd(id) ? `<p>새 버전 ${esc(plUpd(id).to || '')}이 있어요 · 바뀐 파일 ${plUpd(id).files.length}개 ${plUpdBtn(id, '살펴보고 업데이트')}</p>` : PL.updates && PL.updates[id] && PL.updates[id].check ? `<p>${plUpdBtn(id, 'git에서 새 버전 확인', 'btn-ghost')}</p>` : ''}${li.changed && li.changed.length ? `<p class="faint">설치 뒤 바뀐 파일: ${esc(li.changed.join(', '))}</p>` : ''}<button class="btn btn-text btn-sm pl-danger" type="button" data-pl="remove" data-id="${id}">이 플러그인 지우기</button>`)}
   </div>`;
 }
 
@@ -3246,7 +3254,7 @@ function vPluginManage(){
   plLoad();
   const list = PL.list || [];
   const rows = list.map(z => { const n = z.manifest ? z.manifest.name : z.id, st = !z.ok ? '규격에 맞지 않아 멈춤' : z.changed && z.changed.length ? '바뀐 파일이 있어 멈춤' : '';
-    return `<li><a class="row" href="#/plugins/${z.id}/setup"><span class="body"><span class="title">${esc(n)}</span><span class="meta"><span>${esc(z.manifest ? z.manifest.version : '')}</span>${st ? plBadge(st, 'bad') : ''}${plRunner() ? `<span>${esc(plWho())}에서 돌림</span>` : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`; });
+    return `<li><a class="row" href="#/plugins/${z.id}/setup"><span class="body"><span class="title">${esc(n)}</span><span class="meta"><span>${esc(z.manifest ? z.manifest.version : '')}</span>${plUpd(z.id) ? plBadge(`새 버전 ${plUpd(z.id).to || ''}`.trim(), 'review') : ''}${st ? plBadge(st, 'bad') : ''}${plRunner() ? `<span>${esc(plWho())}에서 돌림</span>` : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`; });
   return `<div class="page">
     ${plIds().length ? `<a class="back" href="#/plugins"><span aria-hidden="true">‹</span> 플러그인</a>` : ''}
     <header class="page-head"><div><h1 tabindex="-1">플러그인 관리</h1><p class="sub">${esc(S.profile)} 프로필에 설치한 플러그인이에요</p></div>${rows.length ? '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>' : ''}</header>
@@ -3256,9 +3264,12 @@ function vPluginManage(){
 function vPluginAdd(){
   if (!plOK()) return vPluginManage();
   if (!PL.bundled){ PL.bundled = []; STORE.json('/api/plugins/bundled').then(r => { PL.bundled = r.plugins; plRepaint(); }).catch(() => {}); }
-  const ins = PL.inspect, mf = ins && ins.manifest, have = mf && (PL.list || []).find(z => z.id === mf.id);
+  const ins = PL.inspect, mf = ins && ins.manifest, have = mf && (PL.list || []).find(z => z.id === mf.id), up = ins && ins.update, same = up && !up.changes.length;
+  const kinds = { '바뀜':'review', '새 파일':'done', '지움':'bad' };
+  const changes = up ? `<h3>바뀌는 것</h3>${same ? '<p class="faint">설치한 것과 같아요. 이미 최신이에요.</p>' : `<p class="faint">${esc(up.from || '?')} → ${esc(up.to || '?')} · 파일 ${up.changes.length}개${up.changes.some(c => /^scripts\//.test(c.path)) ? ' · 스크립트가 바뀌어서 업데이트하면 이 컴퓨터에서 다시 승인해요' : ''}</p><ul class="pl-changes">${up.changes.map(c => `<li>${plBadge(c.kind, kinds[c.kind] || 'wait')}<code>${esc(c.path)}</code></li>`).join('')}</ul>`}` : '';
   const review = !ins ? '' : !ins.ok ? `<div class="ai-state bad" role="alert"><b>설치할 수 없어요 — 규격에 맞지 않는 곳이 ${ins.errors.length}개 있어요</b><ul>${ins.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul><div><button class="btn btn-ghost btn-sm" type="button" data-pl="inspect-reset">다른 주소로 다시 하기</button></div></div>` : `
     <section class="section pl-review" aria-labelledby="pl-rv-h"><h2 id="pl-rv-h" tabindex="-1">${esc(mf.name)} <span class="faint num">${esc(mf.version)}</span></h2>${mf.description ? `<p class="pl-text">${esc(mf.description)}</p>` : ''}
+      ${changes}
       <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}</ul>
       <h3>쓰는 권한</h3><ul>
         ${mf.permissions.ai.includes('agent') ? `<li class="pl-danger"><b>AI가 파일을 고치고 명령을 실행해요</b> (에이전트 · 상한 ${esc(mf.permissions.agent_mode)})</li>` : mf.permissions.ai.includes('chat') ? '<li>AI와 대화만 해요</li>' : ''}
@@ -3269,11 +3280,11 @@ function vPluginAdd(){
       ${ins.warnings.length ? `<ul class="pl-warn">${ins.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
       <h3>알아 둘 것</h3><p class="faint">가져온 목록과 작업 기록은 ${esc(S.profile)} 프로필과 함께 동기화돼요. 비밀값과 설정은 이 컴퓨터에만 둬요.${!plHere().ai && window.PKMAI && PKMAI.conn() ? ' 브라우저를 닫아도 돌 수 있게, 이 브라우저의 AI 연결을 이 컴퓨터의 pkm 서버에도 넣어요.' : ''}</p>
       <div class="dlg-actions" style="justify-content:flex-start;margin-top:16px"><button class="btn btn-text" type="button" data-pl="inspect-reset">닫기</button>
-        <button class="btn btn-primary" type="button" data-pl="install" ${PL.busy === 'install' ? 'aria-disabled="true"' : ''}>${PL.busy === 'install' ? '설치하는 중…' : have ? `${esc(mf.version)}으로 바꾸기` : `${esc(S.profile)} 프로필에 설치하기`}</button></div>
-      <p class="faint">${have ? `설치한 ${esc(have.manifest ? have.manifest.version : '')}은 휴지통으로 옮겨요. ` : ''}설치하면 위 스크립트를 이 컴퓨터에서 실행하는 것도 승인해요.</p></section>`;
+        ${same ? '' : `<button class="btn btn-primary" type="button" data-pl="install" ${PL.busy === 'install' ? 'aria-disabled="true"' : ''}>${PL.busy === 'install' ? (have ? '업데이트하는 중…' : '설치하는 중…') : have ? `${esc(mf.version)}으로 ${up ? '업데이트' : '바꾸기'}` : `${esc(S.profile)} 프로필에 설치하기`}</button>`}</div>
+      ${same ? '' : `<p class="faint">${have ? `설치한 ${esc(have.manifest ? have.manifest.version : '')}은 휴지통으로 옮기고, 설정값·토큰·가져온 목록은 그대로 둬요. ` : ''}${have ? '업데이트' : '설치'}하면 위 스크립트를 이 컴퓨터에서 실행하는 것도 승인해요.</p>`}</section>`;
   return `<div class="page">
     <a class="back" href="#/plugins/_manage"><span aria-hidden="true">‹</span> 플러그인 관리</a>
-    <h1 tabindex="-1">플러그인 더하기</h1>
+    <h1 tabindex="-1">${up ? '플러그인 업데이트' : '플러그인 더하기'}</h1>
     ${!ins && PL.bundled && PL.bundled.length ? section('pkm에 들어 있는 플러그인', `<ul class="list">${PL.bundled.map(b => `<li><button class="row pl-pick" type="button" data-pl="inspect-path" data-path="${esc(b.path)}"><span class="body"><span class="title">${esc(b.name)}</span><span class="meta"><span>${esc(b.description || '')}</span></span></span><span class="chev" aria-hidden="true">›</span></button></li>`).join('')}</ul>`) : ''}
     ${!ins ? `<form data-pl-form="inspect" novalidate class="section">
       <label class="field"><span>어디서 가져올까요 <span class="hint">git 주소(https://…)나 이 컴퓨터의 폴더 경로</span></span><input name="src" id="pl-src" inputmode="url" autocapitalize="off" spellcheck="false" autocomplete="off" aria-describedby="pl-src-err"></label>
@@ -3364,6 +3375,12 @@ document.addEventListener('click', async e => {
     case 'remove': plAsk({ title:`${plName(id)} 플러그인을 지울까요?`, body:'<p>플러그인 파일을 휴지통으로 옮겨요. 가져오기와 자동 시작이 멈춰요. 만든 작업 폴더와 브랜치, 이 컴퓨터에 넣어 둔 토큰은 그대로 남아요.</p>', ok:'플러그인 지우기', danger:true },
       async () => { try { await STORE.json(`/api/profile/${encodeURIComponent(S.profile)}/plugins/${id}`, { method:'DELETE' }); await plLoad(true); go('#/plugins/_manage'); toast('플러그인을 지웠어요'); } catch (er) { toast(er.message); } }); break;
     case 'inspect-path': plInspect({ local:b.dataset.path }); break;
+    case 'update': {   // 출처에서 다시 가져와 검토 화면으로 — 설치(바꾸기)와 승인은 거기서 [업데이트]를 눌러야
+      PL.busy = `update:${id}`; render();
+      try { PL.inspect = await papi(`/plugins/${id}/update`, {}); PL.busy = ''; go('#/plugins/_add'); focusEl($('#pl-rv-h')); }
+      catch (er) { PL.busy = ''; render(); toast(`새 버전을 가져오지 못했어요 — ${er.message}`); }
+      break;
+    }
     case 'inspect-reset': PL.inspect = null; render(); focusEl($('#pl-src')); break;
     case 'install': {
       PL.busy = 'install'; render();
@@ -3376,7 +3393,7 @@ document.addEventListener('click', async e => {
         if (!plRunner() && plHere().ai) await plRunnerSet(true);
         PL.inspect = null; PL.busy = ''; await plLoad(true); plMachine(id2, true);
         go(`#/plugins/${id2}/setup`);
-        toast(`${r.manifest.name} 플러그인을 설치했어요${first ? ". 하단 메뉴에 '플러그인'이 생겼어요" : ''}`);
+        toast(r.previous ? `${r.manifest.name}을 ${r.previous} → ${r.version}으로 업데이트했어요` : `${r.manifest.name} 플러그인을 설치했어요${first ? ". 하단 메뉴에 '플러그인'이 생겼어요" : ''}`);
       } catch (er) { PL.busy = ''; render(); toast(`설치하지 못했어요 — ${er.message}`); }
       break;
     }

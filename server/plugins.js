@@ -1,6 +1,8 @@
 // 플러그인 가져오기·설치 — 규격은 docs/PLUGIN.md, 검사는 web/js/pkm-plugin.js(화면과 같은 코드).
 // 가져오기(inspect): git(https)은 얕게 받고, 로컬 폴더는 복사해 임시 폴더에서 검사한다. 아무것도 설치하지 않는다.
 // 설치(install): 검사를 통과한 파일만 <프로필>/_플러그인/<id>/ 로. 같은 id가 있으면 이전 것은 .trash/로.
+// 업데이트(updates·inspectUpdate): 설치 기록의 출처(앱에 들어 있는 플러그인·로컬 폴더·git)를 다시 읽어 설치한 파일 해시와 견준다.
+//   앱 내장과 로컬 폴더는 목록을 볼 때마다 견주고, git은 네트워크가 필요해서 사람이 누를 때만 받아 본다. 설치는 install()을 그대로 쓴다.
 // 스크립트 실행 승인은 여기서 하지 않는다 — 실행하는 컴퓨터의 pkm-ai-server가 파일 해시로 승인한다.
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
@@ -16,6 +18,7 @@ const P = createRequire(import.meta.url)('../web/js/pkm-plugin.js');
 const STAGES = new Map();   // 가져온 것 → 30분 안에 설치하지 않으면 지운다
 const TTL = 30 * 60000;
 const INSTALL = '.pkm-install.json';
+const APP_PLUGINS = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'plugins');   // 앱에 들어 있는 플러그인
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const sha256 = buf => crypto.createHash('sha256').update(buf).digest('hex');
 const textual = p => P.DOC_EXT.test(p) || P.SCRIPT_EXT.test(p);
@@ -59,7 +62,7 @@ export async function bundled(dir){
   return out;
 }
 
-export async function inspect({ git, ref, local }){
+export async function inspect({ git, ref, local }, appDir = APP_PLUGINS){
   sweep();
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'pkm-plugin-'));
   try {
@@ -80,6 +83,8 @@ export async function inspect({ git, ref, local }){
     } else throw fail(400, 'git 주소나 폴더 경로를 알려 주세요');
 
     const files = await readAll(dir), result = P.validate(files);
+    // 앱에 들어 있는 플러그인이면 이 컴퓨터의 경로가 아니라 '앱 내장 + id'로 기록한다 — 다른 컴퓨터·앱 위치에서도 업데이트를 찾게
+    if (source.type === 'local' && result.manifest && path.dirname(source.path) === path.resolve(appDir)) source = { type: 'bundled', id: result.manifest.id, path: source.path };
     const stage = crypto.randomBytes(8).toString('hex');
     STAGES.set(stage, { dir, at: Date.now(), result, source, commit, files });
     const hashOf = p => (files.find(f => f.path === p) || {}).sha256 || null;
@@ -137,6 +142,56 @@ export async function list(profileDir){
       installed_at: rec.installed_at || null, changed, scripts: r.scripts.map(p => ({ path: p, sha256: (files.find(f => f.path === p) || {}).sha256 || null })) });
   }
   return out;
+}
+
+/* ---------- 업데이트 ---------- */
+// 설치 기록의 출처를 지금 읽을 수 있는 곳으로: 앱 내장(같은 id) → 로컬 폴더 → git
+async function sourceOf(rec, id, appDir){
+  const s = rec.source || {};
+  const inApp = (await bundled(appDir)).find(b => b.id === id);
+  if (inApp && (s.type === 'bundled' || (s.type === 'local' && path.dirname(path.resolve(s.path || '')) === path.resolve(appDir)))) return { local: inApp.path, kind: 'bundled' };
+  if (s.type === 'local' && s.path && fss.existsSync(s.path)) return { local: s.path, kind: 'local' };
+  if (s.type === 'git' && s.url) return { git: s.url, ref: s.ref || null, kind: 'git' };
+  return null;
+}
+function diffFiles(installed, files){
+  const now = Object.fromEntries(files.map(f => [f.path, f.sha256]));
+  const out = [];
+  for (const [p, h] of Object.entries(now)) if (!(p in installed)) out.push({ path: p, kind: '새 파일' }); else if (installed[p] !== h) out.push({ path: p, kind: '바뀜' });
+  for (const p of Object.keys(installed)) if (!(p in now)) out.push({ path: p, kind: '지움' });
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+const recOf = async dir => { try { return JSON.parse(await fs.readFile(path.join(dir, INSTALL), 'utf8')); } catch { return {}; } };
+
+// 설치한 플러그인마다 새 버전이 있는지 — { id: { kind, from, to, files:[…] } | { kind:'git', check:true } }. 같으면 넣지 않는다
+export async function updates(profileDir, appDir = APP_PLUGINS){
+  const base = path.join(profileDir, P.DIR), out = {};
+  if (!fss.existsSync(base)) return out;
+  for (const e of await fs.readdir(base, { withFileTypes: true })){
+    if (!e.isDirectory() || e.name.startsWith('.')) continue;
+    const rec = await recOf(path.join(base, e.name)), src = await sourceOf(rec, e.name, appDir).catch(() => null);
+    if (!src) continue;
+    if (src.kind === 'git'){ out[e.name] = { kind: 'git', check: true, url: src.git }; continue; }
+    try {
+      const files = await readAll(src.local), files_ = diffFiles(rec.files || {}, files);
+      if (!files_.length) continue;
+      const mf = P.validate(files).manifest;
+      out[e.name] = { kind: src.kind, from: rec.version || null, to: mf ? mf.version : null, files: files_ };
+    } catch {}
+  }
+  return out;
+}
+// 업데이트할 것을 출처에서 다시 가져와 검사한다(설치는 하지 않음) — 화면은 이 결과로 검토 화면을 띄우고 install(stage)
+export async function inspectUpdate(profileDir, id, appDir = APP_PLUGINS){
+  if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(id)) throw fail(400, 'id 형식이 맞지 않아요');
+  const dir = path.join(profileDir, P.DIR, id);
+  if (!fss.existsSync(dir)) throw fail(404, '설치된 플러그인이 아니에요');
+  const rec = await recOf(dir), src = await sourceOf(rec, id, appDir);
+  if (!src) throw fail(409, '어디서 설치했는지 기록이 없거나 그 폴더가 사라졌어요. 플러그인 더하기에서 다시 가져와 주세요');
+  const r = await inspect(src.kind === 'git' ? { git: src.git, ref: src.ref } : { local: src.local }, appDir);
+  if (r.manifest && r.manifest.id !== id){ STAGES.delete(r.stage); throw fail(409, `출처의 플러그인 id가 달라요(${r.manifest.id})`); }
+  const st = STAGES.get(r.stage), changes = diffFiles(rec.files || {}, st ? st.files : []);
+  return { ...r, update: { from: rec.version || null, to: r.manifest ? r.manifest.version : null, commit_from: rec.commit || null, changes } };
 }
 
 export async function remove(profileDir, id){
