@@ -236,9 +236,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       }
     }
     Object.assign(run, { status: 'done', finished: now(), updated: now() });
-    // 실행·멈추기처럼 항목 상태를 바꾸는 워크플로우 — 끝나면 다음 차례에 목록을 바로 새로 가져온다
+    // 담기·실행·멈추기처럼 항목 상태를 바꾸는 워크플로우 — 끝나면 다음 차례에 목록을 바로 새로 가져온다
     const fd = x.feeds.find(f => f.name === run.feed), fs_ = st.feeds[run.feed];
-    if (fd && fd.starts.length > 1 && fs_) fs_.at = null;
+    if (fd && (fd.starts.length > 1 || fd.start_mode !== 'auto') && fs_) fs_.at = null;   // 늘 남는 목록(자동 시작이 아닌 것)
   }
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true }),
@@ -287,7 +287,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       case 'answer': case 'confirm': {
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
         if (a.type === 'confirm') Object.assign(step, { status: 'done', finished: now(), ask: null });
-        else Object.assign(step, { status: 'pending', answer: String(a.value ?? '').slice(0, 2000), ask: null });
+        else { const v = String(a.value ?? '').slice(0, 2000), ch = ((step.ask && step.ask.choices) || []).find(c => c.value === v);   // 고른 것이면 사람이 본 이름도 남긴다
+          Object.assign(step, { status: 'pending', answer: v, answer_label: ch ? ch.label : null, ask: null }); }
         Object.assign(run, { status: 'running', updated: now() }); return;
       }
       case 'retry': {
@@ -412,7 +413,15 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       try {
         const st = readState(p, id);
         await apply(p, x, st, action, c.ai);
-        if (a.type !== 'refresh') await advance(p, x, plugConf(c, p, id), st, c.ai).catch(() => {});
+        if (a.type !== 'refresh'){
+          // 스크립트 단계는 금방 끝난다 — 다음 차례(10초)를 기다리지 않고 잠깐씩 이어서 본다(사람이 누른 직후 바로 다음 물음·결과가 보이게)
+          for (let i = 0; i < 6; i++){
+            await advance(p, x, plugConf(c, p, id), st, c.ai).catch(() => {});
+            const r = st.runs.find(r => ['running', 'queued'].includes(r.status)), s = r && r.steps.find(s => s.status === 'running');
+            if (!r || (s && s.kind !== 'script')) break;
+            await new Promise(res => setTimeout(res, 500));
+          }
+        }
         writeState(p, id, st);
         return { applied: true, state: st };
       } finally { busy.delete(key); }

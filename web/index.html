@@ -198,6 +198,8 @@ a.row:hover{background:var(--fill)}
 .row .chev{color:var(--text-3);align-self:center;font-size:1.25rem;line-height:1}
 @media (max-width:420px){.row{padding:14px 16px}}
 .pl-multi-row{align-items:center;flex-wrap:wrap}
+.pl-quick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.pl-quick .btn{flex:1 1 140px}
 .psr-bar{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin:0 0 12px}
 .psr-sec{margin-top:8px}
 .psr-local{font-size:1.0625rem;margin:24px 0 8px}
@@ -3524,8 +3526,11 @@ function vPluginRun(id, rid){
   // 답하는 폼(고르기·적기)
   let form = '';
   if (!sent && r.status === 'input' && s.ask && s.ask.type !== 'confirm'){
-    const a = s.ask, choices = a.choices || [];
-    form = `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
+    const a = s.ask, choices = a.choices || [], quick = !a.free && choices.length && choices.length <= 3;   // 고를 것이 셋 이하면 버튼 하나로 바로
+    form = quick ? `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
+      <div class="pl-quick" role="group" aria-label="${esc(a.question)}">${choices.map((c, k) => `<button class="btn ${c.recommended || (!choices.some(x => x.recommended) && !k) ? 'btn-primary' : 'btn-ghost'}" type="submit" name="v" value="${esc(c.value)}">${esc(c.label)}</button>`).join('')}</div>
+      <div class="dlg-actions" style="justify-content:flex-start">${cancel}</div></form>`
+    : `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
       ${choices.length ? `<fieldset class="choice"><legend class="sr-only">${esc(a.question)}</legend>${choices.map(c => `<label><input type="radio" name="v" value="${esc(c.value)}" ${c.recommended ? 'checked' : ''}><span><b>${esc(c.label)}${c.recommended ? ' (추천)' : ''}</b>${c.hint ? `<small>${esc(c.hint)}</small>` : ''}</span></label>`).join('')}</fieldset>` : ''}
       ${a.free || !choices.length ? `<label class="field"><span>${choices.length ? '목록에 없으면 적어 주세요' : esc(a.question)}</span><textarea name="t" rows="3" placeholder="${esc(a.placeholder || '')}" aria-describedby="pl-ans-err"></textarea></label>` : ''}
       <p class="err" id="pl-ans-err" hidden>${choices.length ? '하나를 골라 주세요' : '내용을 적어 주세요'}</p>
@@ -3534,7 +3539,7 @@ function vPluginRun(id, rid){
   const steps = `<ol class="run-steps" aria-label="단계, ${n}개 중 ${i}번째 ${RUN_WORD[r.status] ? RUN_WORD[r.status][0] : ''}">${r.steps.map((z, k) => {
     const [sym, word] = { pending:['○', '대기'], running:['●', '하는 중'], waiting:['‖', '기다림'], input:['!', '내 차례'], failed:['!', '멈춤'], done:['✓', '완료'], skipped:['–', '건너뜀'] }[z.status] || ['○', '대기'];
     const note = z.status === 'failed' ? String(z.error || '').split('\n')[0] : z.status === 'done' ? (z.output && (z.output.summary || z.output.how) ? z.output.summary || z.output.how : '') : z.status === 'running' ? `${plMin(z.started || r.updated)}분째` : z.status === 'input' ? (sent ? '답을 보냄' : z.ask && z.ask.type === 'confirm' ? '확인할 차례' : '답이 필요해요') : '';
-    return `<li class="rs-${z.status}" ${z === s && !['done', 'canceled'].includes(r.status) ? 'aria-current="step"' : ''}><span class="rs-sym" aria-hidden="true">${sym}</span><span><b>${k + 1} ${esc(z.name)}</b> <span class="sr-only">${word}</span>${note ? `<small>${esc(note)}</small>` : ''}${z.answer ? `<small>내 답: ${esc(z.answer)}</small>` : ''}</span></li>`;
+    return `<li class="rs-${z.status}" ${z === s && !['done', 'canceled'].includes(r.status) ? 'aria-current="step"' : ''}><span class="rs-sym" aria-hidden="true">${sym}</span><span><b>${k + 1} ${esc(z.name)}</b> <span class="sr-only">${word}</span>${note ? `<small>${esc(note)}</small>` : ''}${z.answer ? `<small>내 답: ${esc(z.answer_label || z.answer)}</small>` : ''}</span></li>`;
   }).join('')}</ol>`;
   const files = co && co.files && co.files.length ? section(`바뀐 파일 <span class="count">${co.files.length + (co.more_files || 0)}</span>`, plList(co.files.map(f => `<li><div class="row pl-file"><code>${esc(f.file)}</code><span class="num">+${f.add} −${f.del}</span></div></li>`), 15)) : '';
   return `<div class="page">
@@ -3782,7 +3787,7 @@ document.addEventListener('submit', async e => {
   e.preventDefault();
   const id = f.dataset.id;
   if (kind === 'answer'){
-    const v = (f.t && f.t.value.trim()) || (f.v ? (f.querySelector('input[name="v"]:checked') || {}).value : '');
+    const v = (e.submitter && e.submitter.name === 'v' && e.submitter.value) || (f.t && f.t.value.trim()) || (f.querySelector('input[name="v"]:checked') || {}).value || '';
     if (!v){ $('#pl-ans-err').hidden = false; focusEl(f.t || f.querySelector('input')); return; }
     plAct(id, { type:'answer', run:f.dataset.run, step:f.dataset.step, value:v });
   } else if (kind === 'secret'){
