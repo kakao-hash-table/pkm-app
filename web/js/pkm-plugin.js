@@ -26,7 +26,8 @@
     return out;
   }
 
-  /* 피드 문서: "## 이름" 아래 "- 키: 값" 줄. 키 = run(필수) · every(분) · days(weekdays|daily) · hours(09:00-18:00) · start(워크플로우) · start_mode(auto|button) · empty. 다른 줄은 설명 */
+  /* 피드 문서: "## 이름" 아래 "- 키: 값" 줄. 키 = run(필수) · every(분) · days(weekdays|daily) · hours(09:00-18:00) · start(워크플로우) · start_mode(auto|button)
+     · view(sections|inline — inline이면 항목 자리에서 진행 상태를 보인다) · start_label(시작 버튼 글자) · dismiss(yes — 확인하고 닫기) · count · empty. 다른 줄은 설명 */
   function parseFeeds(text){
     const out = []; let cur = null;
     for (const line of String(text || '').split('\n')){
@@ -123,6 +124,10 @@
         if (d.start_mode && !['auto', 'button'].includes(d.start_mode)) err(`${where}: start_mode는 auto 또는 button`);
         const starts = startsOf(d.start);   // "실행, 멈추기" — 항목마다 버튼 하나씩, 첫 번째가 주 버튼
         for (const w of starts) if (!workflows.some(x => x.name === w)) err(`${where}: 워크플로우 "${w}"가 없어요`);
+        if (d.view && !['inline', 'sections'].includes(d.view)) err(`${where}: view는 inline 또는 sections`);
+        if (d.view === 'inline' && !d.start) err(`${where}: view: inline은 start와 함께 써요`);
+        if (d.dismiss && d.dismiss !== 'yes') err(`${where}: dismiss는 yes만 써요`);
+        if (d.dismiss && d.start) err(`${where}: dismiss는 start가 없는 목록에만 써요`);
         if (feeds.some(x => x.name === d.name)) err(`${where}: 피드 이름이 겹쳐요`);
         feeds.push({ name: d.name, file: f.path, description: d.description, run: String(d.run || ''), every: every || 60, days: d.days || 'daily', hours: d.hours || null,
           start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null });

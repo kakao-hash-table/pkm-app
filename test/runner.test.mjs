@@ -98,6 +98,31 @@ test('버튼으로 시작한 것도 같은 흐름이고, 이미 진행 중이면
   assert.equal((await state()).runs.find(x => x.id === r.id).status, 'canceled');
 });
 
+test('주기는 이 컴퓨터에서 바꾸고, 자동 시작한 작업은 내 확인을 받게 한 단계 앞에서 멈췄다가 확인하면 그 단계를 한다', async () => {
+  await assert.rejects(runner.setLocal(P, ID, { every: { '할 일': 2 } }), /5~1440/);
+  await assert.rejects(runner.setLocal(P, ID, { every: { '없는 목록': 30 } }), /없는 목록/);
+  await runner.setLocal(P, ID, { every: { '할 일': 30 }, gates: { '처리|고르기': true, '처리|확인': true } });
+  const s = (await runner.status(P)).plugins[ID];
+  assert.equal(s.feeds[0].every, 30); assert.equal(s.feeds[0].every_default, 5);
+  assert.deepEqual(s.local.gates, { '처리|고르기': true });   // 사람이 하는 단계(manual)는 원래 내 차례
+  await runner.setLocal(P, ID, { settings: { items: 'A-1,A-2,A-3' } });
+  await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
+  await runner.tick();
+  let r = (await state()).runs.find(x => x.item.id === 'A-3');
+  assert.equal(r.by, 'auto'); assert.equal(r.status, 'input'); assert.equal(r.steps[0].ask.type, 'gate');
+  assert.equal(r.steps[0].job, undefined);   // 아직 아무것도 실행하지 않았다
+  await runner.act(P, ID, { type: 'confirm', run: r.id, step: '고르기' });
+  await runner.tick();
+  r = (await state()).runs.find(x => x.item.id === 'A-3');
+  assert.equal(r.steps[0].ask.question, '어느 쪽?');   // 관문을 지나 그 단계(묻는 스크립트)를 했다
+  await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1' }).catch(() => {});
+  const b = (await state()).runs.find(x => x.item.id === 'A-1' && x.by === 'button' && x.status !== 'canceled');
+  if (b){ await runner.tick(); assert.notEqual((await state()).runs.find(x => x.id === b.id).steps[0].ask?.type, 'gate'); }   // 버튼으로 시작한 것은 멈추지 않는다
+  for (const z of (await state()).runs.filter(x => !['done', 'canceled'].includes(x.status))) await runner.act(P, ID, { type: 'cancel', run: z.id });
+  await runner.setLocal(P, ID, { every: { '할 일': null } });
+  assert.equal((await runner.status(P)).plugins[ID].feeds[0].every, 5);
+});
+
 test('돌리는 컴퓨터가 다른 컴퓨터로 옮겨지면 이 컴퓨터는 멈추고, 누른 것은 받은편지함으로 보낸다', async () => {
   fs.writeFileSync(path.join(DATA, P, '_플러그인/.state/runner.json'), JSON.stringify({ host: '집맥' }));
   const h = (await runner.status(P)).here;

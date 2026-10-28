@@ -13,7 +13,8 @@
 // POST /api/plugins/inspect {git, ref} | {local}   플러그인 가져와서 검사만(설치 안 함) → { stage, ok, errors, manifest, scripts… }
 // GET  /api/plugins/bundled              앱에 들어 있는 플러그인(plugins/*)
 // GET  /api/profile/:p/plugins            설치된 플러그인
-// POST /api/profile/:p/plugins {stage}    검사한 플러그인을 이 프로필에 설치
+// POST /api/profile/:p/plugins {stage}    검사한 플러그인을 이 프로필에 설치(같은 id면 바꾸기) — GET 목록에는 updates(출처에 새 버전이 있는 것)도
+// POST /api/profile/:p/plugins/:id/update  설치 기록의 출처에서 다시 가져와 검사만 → { stage, …, update:{from, to, changes} }
 // DELETE /api/profile/:p/plugins/:id      휴지통으로
 // GET  /api/profile/:p/plugins/state      피드·실행 기록과 이 컴퓨터의 실행기 상태(server/runner.js)
 // POST /api/profile/:p/runner {on, ai}     이 컴퓨터에서 돌리기 켜기·끄기, AI 연결 넣기
@@ -285,6 +286,7 @@ async function api(req, res, url){
       if (what === 'local' && req.method === 'POST') return send(res, 200, await runner.setLocal(p, id, await body(req)));
       if (what === 'act' && req.method === 'POST') return send(res, 200, await runner.act(p, id, await body(req)));
       if (what === 'search' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.search(p, id, b.name, b.q)); }
+      if (what === 'update' && req.method === 'POST') return send(res, 200, await plugins.inspectUpdate(path.join(DATA, p), id));   // 출처에서 다시 가져와 검사만 — 설치는 POST …/plugins {stage}
       if (what === 'scripts' && req.method === 'GET'){
         const x = (await plugins.list(path.join(DATA, p))).find(x => x.id === id);
         if (!x) return send(res, 404, { error:'설치된 플러그인이 아니에요' });
@@ -293,7 +295,7 @@ async function api(req, res, url){
     }
     if (sub === 'plugins'){
       const dir = path.join(DATA, p);
-      if (req.method === 'GET' && !parts[3]) return send(res, 200, { plugins:await plugins.list(dir) });
+      if (req.method === 'GET' && !parts[3]) return send(res, 200, { plugins:await plugins.list(dir), updates:await plugins.updates(dir) });
       if (req.method === 'POST' && !parts[3]){ const r = await plugins.install(dir, String((await body(req)).stage || '')); if ((await settingsOf(p)).storage === 'github') scheduleSync(p); return send(res, 201, r); }
       if (req.method === 'DELETE' && parts[3]){ const r = await plugins.remove(dir, parts[3]); if ((await settingsOf(p)).storage === 'github') scheduleSync(p); return send(res, 200, r); }
     }
