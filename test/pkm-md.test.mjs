@@ -152,3 +152,19 @@ test('묶음(group)은 하위 폴더가 되고, 쉬는 날·AI 예약 작업은 
   assert.deepEqual(back.settings.ai_jobs, set.ai_jobs);
   assert.deepEqual(MD.serialize(back), files);
 });
+
+test('문제은행 노트를 문제로 읽고, 교과서 기록(읽은 노트·푼 문제)은 책마다 파일로 왕복한다', () => {
+  const body = '## 01 장\n\n### Q1-1. 질문 하나?\n① 가\n② 나\n③ 다\n\n> [!success]- 정답과 해설\n> **③** — 다가 맞다. [[근거]]\n\n**Q2.** 두 번째?\n- ① 하나\n- ② 둘\n> [!check]- 정답\n> ② — 둘이다\n\n### 3.\n세 번째 질문\n1) 일\n2) 이\n> [!success]- 정답\n> 2번. 이다\n';
+  const qs = MD.parseQuiz(body);
+  assert.deepEqual(qs.map(q => [q.key, q.chapter, q.answer, q.options.length]), [['Q1-1', '01 장', '3', 3], ['Q2', '01 장', '2', 2], ['3', '01 장', '2', 2]]);
+  assert.equal(qs[2].q, '세 번째 질문');
+  assert.match(qs[0].explain, /다가 맞다/);
+  const db = Object.assign(MD.emptyDb(), { tbLogs:[{ book:'책 A', last:'B1', card:'B1/2', read:{ B1:'2026-10-29' }, quiz:{ 'B2|Q1-1':{ ok:false, pick:'1', at:'2026-10-29', tries:1, wrong:1 }, 'B2|Q2':{ ok:true, pick:'2', at:'2026-10-29', tries:2, wrong:1 } } }] });
+  const files = MD.serialize({ db, settings });
+  const f = files['01_지식/교과서 기록/책 A.md'];
+  assert.ok(f, '책마다 기록 파일');
+  assert.match(f, /# 오답 노트\n- B2 Q1-1 · 고른 답 1/);
+  const back = MD.parse(files).db.tbLogs[0];
+  assert.deepEqual(back, db.tbLogs[0]);
+  assert.equal(MD.serialize(MD.parse(files))['01_지식/교과서 기록/책 A.md'], f);
+});

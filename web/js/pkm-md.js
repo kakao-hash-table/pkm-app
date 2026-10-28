@@ -14,7 +14,7 @@
   const toVal = (p, k) => (k == null || k === '' ? k : p.k2v[k] || k);
 
   const DEFAULT_FOLDERS = {
-    inbox:'00_인박스', reference:'01_지식/참조노트', fleeting:'01_지식/임시노트', permanent:'01_지식/영구노트', context:'01_지식/맥락노트', textbook:'01_지식/교과서', cards:'01_지식/교과서 카드',
+    inbox:'00_인박스', reference:'01_지식/참조노트', fleeting:'01_지식/임시노트', permanent:'01_지식/영구노트', context:'01_지식/맥락노트', textbook:'01_지식/교과서', cards:'01_지식/교과서 카드', tblog:'01_지식/교과서 기록',
     daily:'02_시간/데일리', project:'03_행동/단기보드', area:'03_행동/장기보드', routine:'03_행동/루틴보드', appointment:'03_행동/약속보드',
     templates:'_템플릿'
   };
@@ -176,6 +176,17 @@
       files[place(inGroup(F.context, c.group), c.title, c.id)] = writeDoc({ type:'context', id:c.id, topic:c.title, group:cleanGroup(c.group) || undefined, created:c.created, updated:c.updated, sources:c.sources || [] }, [['한 줄 요약', c.summary], ['내용', c.body], ['바뀐 기록', hist]]);
     });
     // 교과서(D.textbooks)는 읽기전용이라 쓰지 않는다 — 파일 지도에 없으니 저장이 고치지도 지우지도 않는다
+    // 교과서 기록(읽은 노트·푼 문제) — 책마다 파일 하나. 기기마다가 아니라 프로필과 함께 동기화된다
+    (D.tbLogs || []).slice().sort((a, b) => a.book.localeCompare(b.book)).forEach(L => {
+      const read = Object.entries(L.read || {}).sort((a, b) => a[0].localeCompare(b[0])).map(([id, at]) => ({ id, at }));
+      const quiz = Object.entries(L.quiz || {}).sort((a, b) => a[0].localeCompare(b[0])).map(([k, z]) => { const [note, q] = k.split('|'); return { note, q, ok:!!z.ok, pick:z.pick == null ? '' : String(z.pick), at:z.at || '', tries:z.tries || 1, wrong:z.wrong || 0 }; });
+      if (!read.length && !quiz.length && !L.last && !L.card) return;
+      const wrongs = quiz.filter(z => !z.ok).map(z => {
+        const n = (D.textbooks || []).find(x => x.id === z.note), qq = n && parseQuiz(n.body).find(x => x.key === z.q);
+        return `- ${n ? link(n.title) : z.note} ${z.q}${qq ? ` — ${firstLine(qq.q).slice(0, 80)}` : ''} · 고른 답 ${z.pick || '-'}${qq && qq.answer ? ` · 정답 ${qq.answer}` : ''} (${z.at})`;
+      }).join('\n');
+      files[place(F.tblog, L.book)] = writeDoc({ type:'tb_log', book:L.book, last:L.last || undefined, card:L.card || undefined, read, quiz }, [['오답 노트', wrongs]]);   // last·card = 이어 읽을 노트·카드(기기마다가 아니라 함께)
+    });
     // 데일리 — 계획·메모·회고·체크한 루틴이 있을 때만 파일을 만든다
     const days = new Set([...Object.keys(D.dailies || {}), ...Object.keys(D.routineDone || {})]);
     [...days].sort().forEach(d => {
@@ -243,7 +254,7 @@
   }
 
   /* ---------- 읽기: 파일 지도 → 프로필 하나 ---------- */
-  function emptyDb(){ return { inbox:[], refs:[], fleeting:[], perms:[], ctxs:[], textbooks:[], tbCards:[], dailies:{}, kinds:[], meetings:[], tasks:[], longs:[], routines:[], appts:[], routineDone:{}, formats:['책', '아티클', '영상'] }; }
+  function emptyDb(){ return { inbox:[], refs:[], fleeting:[], perms:[], ctxs:[], textbooks:[], tbCards:[], tbLogs:[], dailies:{}, kinds:[], meetings:[], tasks:[], longs:[], routines:[], appts:[], routineDone:{}, formats:['책', '아티클', '영상'] }; }
   let seq = 0;
   const newId = p => p + Date.now().toString(36).slice(-4) + (seq++).toString(36);
 
@@ -358,6 +369,12 @@
         D.textbooks.push({ id:id || 'B' + pathId(rel), title:String(f.title || base(d.path)), book:String(f.book || rel.split('/')[0]), kind:String(f.kind || 'note'), chapter:f.chapter == null ? '' : String(f.chapter),
           order:f.order == null ? 9999 : Number(f.order), path:d.path, source:f.source ? String(f.source) : '', updated:f.updated ? String(f.updated).slice(0, 10) : '', body:d.body });
       }
+      else if (type === 'tb_log'){
+        const book = String(f.book || base(d.path)), L = D.tbLogs.find(x => x.book === book) || (D.tbLogs.push({ book, read:{}, quiz:{} }), D.tbLogs[D.tbLogs.length - 1]);
+        if (f.last) L.last = String(f.last); if (f.card) L.card = String(f.card);
+        for (const x of f.read || []) if (x && x.id != null) L.read[String(x.id)] = String(x.at || '');
+        for (const z of f.quiz || []) if (z && z.note != null && z.q != null) L.quiz[`${z.note}|${z.q}`] = { ok:z.ok === true, pick:z.pick == null ? '' : String(z.pick), at:String(z.at || ''), tries:Number(z.tries) || 1, wrong:Number(z.wrong) || 0 };
+      }
       else if (type === 'cards'){
         // 교과서 노트 하나를 짧은 카드 여러 장으로 다시 쓴 것(SPEC §0-2) — 읽기전용, `## 카드 제목` 하나가 카드 한 장
         const cards = [...('\n' + d.body).matchAll(/\n## +(.+)\n([\s\S]*?)(?=\n## |$)/g)].map(m => { const q = m[2].match(/^\s*> \[!question\] *(.+)\n?/); return { title:m[1].trim(), q:q ? q[1].trim() : '', body:(q ? m[2].slice(q[0].length) : m[2]).trim() }; });   // 카드 바로 아래 > [!question] 줄 = 복습 질문
@@ -400,8 +417,43 @@
     return { writes, deletes, empty:!Object.keys(writes).length && !deletes.length };
   }
 
+  /* ---------- 문제은행 노트 → 객관식 문제들 ----------
+     "### Q1-2. 질문"(또는 "### 3." 다음 줄에 질문) 아래 ①~⑤ / 1. / 1) 보기, 그 아래 "> [!success]- 정답" 접힌 칸에 정답 번호와 해설 */
+  const CIRCLED = '①②③④⑤⑥⑦⑧⑨';
+  const optKey = t => { const i = CIRCLED.indexOf(t); return i >= 0 ? String(i + 1) : String(Number(t)); };
+  function parseQuiz(body){
+    const out = [], lines = String(body || '').split('\n');
+    let chapter = '', cur = null, fence = false;
+    const flush = () => {
+      if (!cur) return;
+      const ans = cur.callout.join('\n'), m = ans.match(new RegExp(`\\*\\*\\s*(?:정답\\s*[:：]?\\s*)?([${CIRCLED}]|\\d+)(?:번)?\\s*\\*\\*`)) || ans.match(new RegExp(`정답\\s*[:：]?\\s*([${CIRCLED}]|\\d+)`)) || ans.match(new RegExp(`^\\s*([${CIRCLED}]|\\d+)\\s*번`, 'm')) || ans.match(new RegExp(`^\\s*([${CIRCLED}])`));
+      if (cur.options.length >= 2) out.push({ key:cur.key, chapter:cur.chapter, q:[cur.head, ...cur.text].filter(Boolean).join('\n').trim(), options:cur.options, answer:m ? optKey(m[1]) : '', explain:ans.trim() });
+      cur = null;
+    };
+    for (const line of lines){
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      const bold = !fence && line.match(/^\*\*(Q?\d+(?:-\d+)?[.)]?)\*\*\s*(.*)$/i);   // "**Q1.** 질문" 줄도 문제 시작
+      const h2 = !fence && line.match(/^##\s+(.+)$/), h3 = !fence && (line.match(/^###\s+(.+)$/) || (bold && [line, `${bold[1]} ${bold[2]}`]));
+      if (h2){ flush(); chapter = h2[1].trim(); continue; }
+      if (h3){
+        flush();
+        const t = h3[1].trim(), m = t.match(/^(Q?\d+(?:-\d+)?)[.)]?\s*(.*)$/i);
+        cur = { key:m ? m[1].toUpperCase() : t.slice(0, 20), head:m ? m[2] : t, chapter, text:[], options:[], callout:[] };
+        continue;
+      }
+      if (!cur) continue;
+      if (/^\s*>/.test(line)){ const c = line.replace(/^\s*>\s?/, ''); if (!/^\[![\w-]+\][-+]?/.test(c)) cur.callout.push(c); else cur.callout.push(c.replace(/^\[![\w-]+\][-+]?\s*(정답(과 해설)?|해설)?\s*/, '')); continue; }
+      const o = line.match(new RegExp(`^\\s*(?:[-*]\\s+)?(?:([${CIRCLED}])\\s*|(\\d+)[.)]\\s+)(.+)$`));
+      if (o && !cur.callout.length){ cur.options.push({ k:o[1] ? optKey(o[1]) : String(Number(o[2])), text:o[3].trim() }); continue; }
+      if (/^\s*-{3,}\s*$/.test(line)) continue;
+      if (line.trim() && !cur.options.length && !cur.callout.length) cur.text.push(line.trim());
+    }
+    flush();
+    return out;
+  }
+
   const textHash = pathId;   // 카드가 만들어진 뒤 원본 노트가 바뀌었는지 — 같은 함수를 브라우저와 Node가 함께 쓴다
-  const api = { cleanGroup, FORMAT_VERSION, textHash, serialize, parse, diff, parseDoc, writeDoc, parseYaml, emptyDb, DEFAULT_FOLDERS, SETTINGS, STATUS, RSTATUS, FORMAT, UNIT };
+  const api = { parseQuiz, cleanGroup, FORMAT_VERSION, textHash, serialize, parse, diff, parseDoc, writeDoc, parseYaml, emptyDb, DEFAULT_FOLDERS, SETTINGS, STATUS, RSTATUS, FORMAT, UNIT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMMD = api;
 })(typeof self !== 'undefined' ? self : this);
