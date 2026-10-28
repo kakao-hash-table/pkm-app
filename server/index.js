@@ -155,18 +155,51 @@ function scheduleSync(p, ms = 8000){
   clearTimeout(s.timer); s.state = 'pending';
   s.timer = setTimeout(() => syncNow(p).catch(() => {}), ms);
 }
+// 프로필들이 한 저장소를 같이 쓴다 — 한 프로필이 rebase하는 사이에 다른 프로필이 커밋하면 브랜치 밖에 쌓이므로 git 작업은 한 번에 하나씩
+let gitQueue = Promise.resolve();
+const inRepo = fn => { const r = gitQueue.then(fn, fn); gitQueue = r.catch(() => {}); return r; };
+async function recoverRepo(){   // 앞서 멈춘 rebase·merge가 남아 있으면 되돌린다 — 그대로 두면 이후 커밋이 브랜치 밖(detached HEAD)에 쌓인다
+  const has = async n => fss.existsSync(path.resolve(DATA, (await git('rev-parse', '--git-path', n)).stdout.trim()));
+  if (await has('rebase-merge') || await has('rebase-apply')) await git('rebase', '--abort').catch(() => {});
+  if (await has('MERGE_HEAD')) await git('merge', '--abort').catch(() => {});
+}
+// 다른 기기 변경 받기: rebase가 충돌로 멈추면 되돌리고 merge로 합친다. 같은 파일을 양쪽에서 고쳤으면 이 기기 것을 두고
+// 다른 기기 것은 옆에 '(다른 기기 충돌 사본)'으로 남긴다. 플러그인 실행 상태(.state/)는 기기마다 다시 쓰므로 사본 없이 이 기기 것.
+async function pullMerge(branch){
+  try { await git('pull', '--rebase', '--autostash', 'origin', branch); return; }
+  catch { await git('rebase', '--abort').catch(() => {}); }
+  try { await git('merge', '--no-edit', `origin/${branch}`); return; } catch {}
+  const top = (await git('rev-parse', '--show-toplevel')).stdout.trim();
+  const files = (await git('diff', '--name-only', '--diff-filter=U', '-z')).stdout.split('\0').filter(Boolean);
+  if (!files.length){ await git('merge', '--abort').catch(() => {}); throw new Error('다른 기기 변경을 합치지 못했어요'); }
+  const stage = (n, f) => run('git', ['-C', DATA, 'show', `:${n}:${f}`], { encoding:'buffer', maxBuffer:64 << 20 }).then(r => r.stdout, () => null);
+  for (const f of files){
+    const abs = path.join(top, f), theirs = await stage(3, f), ours = await stage(2, f);
+    if (theirs && !f.includes('/.state/')){
+      const ext = path.extname(f), copy = `${abs.slice(0, abs.length - ext.length)} (다른 기기 충돌 사본)${ext}`;
+      await fs.writeFile(copy, theirs); await git('add', '--', copy);
+    }
+    if (ours) { await git('checkout', '--ours', '--', abs); await git('add', '--', abs); }
+    else await git('rm', '-q', '--', abs);
+  }
+  await git('commit', '--no-edit');
+}
 async function syncNow(p){
   const s = SYNC[p] || (SYNC[p] = { state:'idle' });
   if (s.running) return s;
   s.running = true; s.state = 'syncing';
   const rel = p;   // DATA 기준 경로
   try {
-    await git('add', '-A', '--', rel, `:(exclude)${rel}/.trash`);
-    const staged = await git('diff', '--cached', '--name-only', '--', rel);
-    if (staged.stdout.trim()) await git('commit', '-m', `pkm(${p}): 자동 저장 ${new Date().toLocaleString('ko-KR', { hour12:false })}`, '--', rel);
-    const branch = (await git('rev-parse', '--abbrev-ref', 'HEAD')).stdout.trim();
-    await git('pull', '--rebase', '--autostash', 'origin', branch);
-    await git('push', 'origin', `HEAD:${branch}`);
+    await inRepo(async () => {
+      await recoverRepo();
+      const branch = (await git('rev-parse', '--abbrev-ref', 'HEAD')).stdout.trim();
+      if (branch === 'HEAD') throw new Error('저장소가 브랜치 밖(detached HEAD)에 있어서 동기화를 멈췄어요');
+      await git('add', '-A', '--', rel, `:(exclude)${rel}/.trash`);
+      const staged = await git('diff', '--cached', '--name-only', '--', rel);
+      if (staged.stdout.trim()) await git('commit', '-m', `pkm(${p}): 자동 저장 ${new Date().toLocaleString('ko-KR', { hour12:false })}`, '--', rel);
+      await pullMerge(branch);
+      await git('push', 'origin', `HEAD:${branch}`);
+    });
     Object.assign(s, { state:'ok', at:new Date().toISOString(), error:null });
   } catch (e) {
     Object.assign(s, { state:'error', at:new Date().toISOString(), error:String(e.stderr || e.message).trim().split('\n').slice(-2).join(' ') });
