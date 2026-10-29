@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: jira-autopilot
 name: 지라 자동 작업
-version: 0.1.0
+version: 0.2.0
 author: pkm
 permissions:
   ai: [agent]
@@ -16,7 +16,7 @@ settings:
   - { key: jql, label: 가져올 티켓(JQL), default: "assignee = currentUser() AND statusCategory != Done AND created >= -14d ORDER BY created DESC" }
   - { key: start_status, label: 시작할 때 바꿀 지라 상태, default: "In Progress" }
   - { key: repos, label: 저장소가 모여 있는 폴더, type: path, placeholder: "~/code", hint: "이 폴더 바로 아래의 git 저장소 중에서 고르게 해요" }
-  - { key: projects, label: 저장소 규칙, type: lines, placeholder: "ABC → web-app (기준 develop)", hint: "한 줄에 하나. 지라 프로젝트 키나 제목의 [태그] → 저장소 폴더 이름. 괄호에 기준 브랜치를 적을 수 있어요. 고르게 했던 답도 여기에 더해져요" }
+  - { key: projects, label: 저장소 규칙, type: lines, placeholder: "ABC → web-app, api (기준 develop)", hint: "한 줄에 하나. 지라 프로젝트 키나 제목의 [태그] → 저장소 폴더 이름(여럿이면 쉼표로, 그럼 시작할 때 물어요). 괄호에 기준 브랜치를 적을 수 있어요. 고른 저장소도 여기에 더해져요" }
   - { key: branch, label: 브랜치 이름, default: "feature/{key}", hint: "{key}는 티켓 키로 바뀌어요. 예: feature/{key}, bugfix/{key}" }
   - { key: base, label: 기준 브랜치, default: "main, master, develop", hint: "원격에 있는 것 중 앞에서부터 처음 찾은 것. 저장소 규칙의 (기준 …)이 먼저예요" }
   - { key: worktrees, label: 작업 폴더를 만들 곳, type: path, default: "~/.pkm-worktrees", hint: "티켓마다 여기에 작업 폴더(git worktree)를 따로 만들어서, 내가 쓰는 저장소 폴더는 건드리지 않아요" }
