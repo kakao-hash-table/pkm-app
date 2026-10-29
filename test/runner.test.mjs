@@ -98,6 +98,39 @@ test('버튼으로 시작한 것도 같은 흐름이고, 이미 진행 중이면
   assert.equal((await state()).runs.find(x => x.id === r.id).status, 'canceled');
 });
 
+test('그만둔 작업은 처음부터 다시 하고, 같은 항목을 다른 갈래로 하나 더 돌린다 — 같은 갈래는 하나만, 갈래는 다시 고를 수 있다', async () => {
+  const ticks = async (k = 4) => { for (let i = 0; i < k; i++) await runner.tick(); };
+  const get = async id => (await state()).runs.find(x => x.id === id);
+  const r = (await state()).runs.find(x => x.item.id === 'A-1' && x.status === 'canceled');
+  await runner.act(P, ID, { type: 'retry', run: r.id, step: '고르기' });   // 처음부터 다시
+  assert.notEqual((await get(r.id)).status, 'canceled'); assert.equal((await get(r.id)).note, null);
+  await ticks();
+  assert.equal((await get(r.id)).steps[0].ask.question, '어느 쪽?');
+  await runner.act(P, ID, { type: 'answer', run: r.id, step: '고르기', value: '왼쪽' });
+  await ticks();
+  assert.equal((await get(r.id)).lane, '왼쪽');
+
+  await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', fork: { step: '고르기', value: '왼쪽' } });   // 같은 갈래로 하나 더 — 막힌다
+  const dup = (await state()).runs[0];
+  await ticks();
+  assert.equal((await get(dup.id)).status, 'stopped');
+  assert.match((await get(dup.id)).steps[0].error, /왼쪽에서 이미/);
+
+  await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', fork: { step: '고르기', value: '*' } });   // 다른 갈래 — 새로 고른다
+  const f = (await state()).runs[0];
+  await ticks();
+  await runner.act(P, ID, { type: 'answer', run: f.id, step: '고르기', value: '오른쪽' });
+  await ticks();
+  assert.equal((await get(f.id)).lane, '오른쪽');
+  assert.equal((await get(r.id)).lane, '왼쪽');   // 앞 작업은 그대로
+
+  await runner.act(P, ID, { type: 'retry', run: r.id, step: '고르기', value: '*' });   // 갈래 다시 고르기(저장소 바꾸기)
+  await ticks();
+  assert.equal((await get(r.id)).steps[0].status, 'input');
+  assert.equal((await get(r.id)).steps[1].status, 'pending');   // 뒤 단계도 새로
+  for (const z of (await state()).runs.filter(x => !['done', 'canceled'].includes(x.status))) await runner.act(P, ID, { type: 'cancel', run: z.id });
+});
+
 test('주기는 이 컴퓨터에서 바꾸고, 자동 시작한 작업은 내 확인을 받게 한 단계 앞에서 멈췄다가 확인하면 그 단계를 한다', async () => {
   await assert.rejects(runner.setLocal(P, ID, { every: { '할 일': 2 } }), /5~1440/);
   await assert.rejects(runner.setLocal(P, ID, { every: { '없는 목록': 30 } }), /없는 목록/);

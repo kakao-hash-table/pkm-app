@@ -3409,7 +3409,7 @@ function plRunLine(x, r){
 function plRunRow(id, x, r){
   const [w, tone] = PL.sent[r.id] ? ['보냄', 'wait'] : RUN_WORD[r.status] || ['', 'wait'];
   const key = r.item.vars && r.item.vars.key;
-  return `<li><a class="row" href="#/plugins/${id}/run/${r.id}"><span class="body"><span class="title">${key && !r.item.title.includes(key) ? `${esc(key)} ` : ''}${esc(r.item.title)}${(x.feeds.find(f => f.name === r.feed) || {}).starts?.length > 1 ? ` · ${esc(r.workflow)}` : ''}</span>
+  return `<li><a class="row" href="#/plugins/${id}/run/${r.id}"><span class="body"><span class="title">${key && !r.item.title.includes(key) ? `${esc(key)} ` : ''}${esc(r.item.title)}${(x.feeds.find(f => f.name === r.feed) || {}).starts?.length > 1 ? ` · ${esc(r.workflow)}` : ''}${r.lane ? ` · ${esc(r.lane)}` : ''}</span>
     <span class="meta">${plBadge(w, tone)}<span>${PL.sent[r.id] ? `${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요` : esc(plRunLine(x, r))}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
 }
 function plItemRow(it, hide){
@@ -3629,7 +3629,16 @@ function vPluginRun(id, rid){
   }
   else if (r.status === 'done' && vd) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || '끝났어요'), esc(vd.v.text || ''), `<span class="pl-outcome">✓ ${esc((vd.step.output.outcome && vd.step.output.outcome.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>`];
   else if (r.status === 'done') card = ['ok', '끝난 것으로 옮겼어요', wt.path ? `작업 폴더는 남아 있어요 · <code>${esc(wt.path)}</code>` : '', ''];
-  else card = ['wait', '그만둔 작업이에요', wt.branch ? `브랜치 <code>${esc(wt.branch)}</code>와 작업 폴더는 남아 있어요` : '', ''];
+  else card = ['wait', '그만둔 작업이에요', `${wt.branch ? `브랜치 <code>${esc(wt.branch)}</code>와 작업 폴더는 남아 있어요. ` : ''}처음부터 다시 하거나, 시작 전 목록으로 되돌릴 수 있어요.`,
+    plIsRunner() || plRunner() ? `<button class="btn btn-primary btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-pl="unstart" data-id="${id}" data-run="${r.id}">시작 전으로 되돌리기</button>` : ''];
+  // 단계 결과의 change(이 단계를 다른 답으로 다시)·fork(같은 항목을 다른 갈래로 하나 더) — 예: 저장소 바꾸기·다른 저장소에서도 작업
+  const chg = r.steps.find(z => z.status === 'done' && z.output && z.output.change && z.output.change.label), frk = r.steps.find(z => z.output && z.output.fork && z.output.fork.label);
+  const busy = ['queued', 'running', 'waiting'].includes(r.status);
+  const tools = sent || !(plIsRunner() || plRunner()) ? '' : [
+    chg && !busy ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="change" data-id="${id}" data-run="${r.id}" data-step="${esc(chg.key)}" data-value="${esc(chg.output.change.value ?? '')}" data-label="${esc(chg.output.change.label)}">${esc(chg.output.change.label)}</button>` : '',
+    frk ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="fork" data-id="${id}" data-feed="${esc(r.feed)}" data-item="${esc(r.item.id)}" data-wf="${esc(r.workflow)}" data-step="${esc(frk.key)}" data-value="${esc(frk.output.fork.value ?? '')}" data-label="${esc(frk.output.fork.label)}">${esc(frk.output.fork.label)}</button>` : ''
+  ].join('');
   // 답하는 폼(고르기·적기)
   let form = '';
   if (!sent && r.status === 'input' && s.ask && !['confirm', 'gate'].includes(s.ask.type) && !s.ask.inline){
@@ -3651,9 +3660,10 @@ function vPluginRun(id, rid){
   const files = co && co.files && co.files.length ? section(`바뀐 파일 <span class="count">${co.files.length + (co.more_files || 0)}</span>`, plList(co.files.map(f => `<li><div class="row pl-file"><code>${esc(f.file)}</code><span class="num">+${f.add} −${f.del}</span></div></li>`), 15)) : '';
   return `<div class="page">
     <a class="back" href="#/plugins/${id}"><span aria-hidden="true">‹</span> ${esc(plName(id))}</a>
-    <p class="eyebrow">${esc(plName(id))}${key ? ` · ${plUrl(r.item.url) ? `<a href="${esc(plUrl(r.item.url))}" target="_blank" rel="noopener">${esc(key)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : esc(key)}` : ''}</p>
+    <p class="eyebrow">${esc(plName(id))}${key ? ` · ${plUrl(r.item.url) ? `<a href="${esc(plUrl(r.item.url))}" target="_blank" rel="noopener">${esc(key)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : esc(key)}` : ''}${r.lane ? ` · ${esc(r.lane)}` : ''}</p>
     <h1 tabindex="-1">${esc(r.item.title)}</h1>
     <div class="ai-state ${card[0]} pl-card" role="status"><b id="pl-card-h" tabindex="-1">${card[1]}</b>${card[2] ? `<span>${card[2]}</span>` : ''}${card[3] && card[3].trim() ? `<div class="pl-card-acts">${card[3]}</div>` : ''}</div>
+    ${tools.trim() ? `<div class="pl-card-acts" style="margin:12px 0 0">${tools}</div>` : ''}
     ${form}
     ${vd && vd.findings.length ? section(`짚은 곳 <span class="count">${vd.findings.length}</span>`, plFinds(vd.findings)) : ''}
     ${co && co.warnings && co.warnings.length ? `<ul class="pl-warn">${co.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
@@ -3868,6 +3878,13 @@ document.addEventListener('click', async e => {
     case 'retry': plAct(id, { type:'retry', run, step }, '이 단계를 다시 해요'); break;
     case 'skip': plAct(id, { type:'skip', run, step }, '건너뛰고 이어서 해요'); break;
     case 'dismiss': await plAct(id, { type:'dismiss', run }); go(`#/plugins/${id}`); break;
+    case 'restart': plAct(id, { type:'retry', run, step }, '처음부터 다시 해요'); break;
+    case 'unstart': plAsk({ title:'시작 전으로 되돌릴까요?', body:'<p>이 실행 기록을 지우고 목록의 \'시작 전\'으로 돌려요. 만든 브랜치·작업 폴더·커밋은 그대로 남아요.</p>', ok:'되돌리기' },
+      async () => { await plAct(id, { type:'dismiss', run }, '시작 전으로 되돌렸어요'); go(`#/plugins/${id}`); }); break;
+    case 'change': plAsk({ title:`${b.dataset.label}`, body:'<p>이 단계부터 다시 해요. 뒤 단계도 새로 하고, 이미 만든 브랜치·작업 폴더·커밋은 그대로 남아요.</p>', ok:b.dataset.label },
+      () => plAct(id, { type:'retry', run, step, value:b.dataset.value }, `${b.dataset.label} — 다시 골라 주세요`)); break;
+    case 'fork': plAsk({ title:`${b.dataset.label}`, body:'<p>같은 항목으로 작업을 하나 더 만들어요. 지금 작업은 그대로 두고, 새 작업은 따로 진행해요.</p>', ok:b.dataset.label },
+      () => plAct(id, { type:'start', feed:b.dataset.feed, item:b.dataset.item, workflow:b.dataset.wf, fork:{ step, value:b.dataset.value } }, `${b.dataset.label}을 시작했어요`)); break;
     case 'cancel': plAsk({ title:'이 작업을 그만둘까요?', body:'<p>하던 단계를 멈춰요. 만든 브랜치·작업 폴더·커밋은 그대로 남고, 지라 상태는 바꾸지 않아요.</p>', ok:'그만두기', danger:true }, () => plAct(id, { type:'cancel', run }, '그만뒀어요')); break;
     case 'redo': plAsk({ title:'AI에게 다시 시키기', body:'<p class="faint">같은 작업 폴더·브랜치에서 이어서 해요. 지금까지의 커밋은 그대로 남아요.</p>', ok:'다시 시키기', field:{ label:'무엇을 다르게 할까요', placeholder:'예: 버튼 문구는 그대로 두고 API 호출만 바꿔 줘' } },
       v => { if (!v.trim()) return false; plAct(id, { type:'retry', run, step, value:v.trim() }, 'AI에게 다시 시켰어요'); }); break;

@@ -188,13 +188,15 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     writeState(p, x.id, st);
   }
 
-  function newRun(st, x, feed, item, by, wname = feed.start, answer){
+  function newRun(st, x, feed, item, by, wname = feed.start, answer, preset){
     const w = x.workflows.find(w => w.name === wname);
     if (!w) throw fail(400, `워크플로우 "${wname}"가 없어요`);
     const run = { id: 'r' + crypto.randomBytes(5).toString('hex'), feed: feed.name, workflow: w.name, by, item: { id: item.id, title: item.title, url: item.url, version: item.version ?? null, vars: item.vars || {} },
       status: 'queued', created: now(), updated: now(), steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, mode: s.mode, status: 'pending' })) };
     // 첫 단계가 ask면 시작할 때 받은 답으로 바로 채운다(시작 버튼을 누를 때 물어본다)
     if (answer != null && w.steps[0] && w.steps[0].kind === 'ask') run.steps[0].answer = String(answer).slice(0, 2000);
+    // 같은 항목을 한 갈래 더(fork) — 그 단계에 미리 답을 넣어 둔다(예: 저장소를 새로 고르게)
+    const ps = preset && run.steps.find(s => s.key === preset.step); if (ps) ps.answer = String(preset.value ?? '').slice(0, 2000);
     st.runs.unshift(run);
     st.runs = st.runs.slice(0, KEEP_RUNS);
     return run;
@@ -241,6 +243,13 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         if (out && out.error){ Object.assign(step, { status: 'failed', error: clip(out.error, 500), output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (out && out.ask){ Object.assign(step, { status: 'input', ask: normAsk(out.ask), output: out, text, job: null }); Object.assign(run, { status: 'input', updated: now() }); return; }
         if (out && out.settings_patch) patchSettings(p, x, out.settings_patch);
+        if (out && out.lane){   // 갈래 이름(예: 저장소) — 같은 항목·워크플로우에서 같은 갈래는 하나만 돈다
+          const lane = clip(out.lane, 60);
+          if (st.runs.some(r => r !== run && r.feed === run.feed && r.item.id === run.item.id && r.workflow === run.workflow && r.lane === lane && !['done', 'canceled'].includes(r.status))){
+            Object.assign(step, { status: 'failed', error: `${lane}에서 이미 이 항목을 작업하고 있어요`, output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return;
+          }
+          run.lane = lane;
+        }
         Object.assign(step, { status: 'done', output: out, text, finished: now(), session: j.result.session || undefined, until: null, reason: null });
         run.updated = now();
         continue;
@@ -304,6 +313,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         if (!it) throw fail(404, '목록에 없는 항목이에요. 목록을 새로 가져와 주세요');
         const wname = a.workflow || feed.start;
         if (!feed.starts.includes(wname)) throw fail(400, `이 목록에서 시작할 수 없는 워크플로우예요: ${wname}`);
+        if (a.fork){   // 같은 항목을 다른 갈래로 하나 더 — 갈래가 겹치는지는 그 단계가 끝날 때 본다
+          if (!x.workflows.find(w => w.name === wname)?.steps.some(s => s.key === a.fork.step)) throw fail(400, '없는 단계예요');
+          newRun(st, x, feed, it, 'button', wname, null, { step: a.fork.step, value: a.fork.value }); return;
+        }
         const prev = st.runs.find(r => r.feed === feed.name && r.item.id === it.id && r.workflow === wname && !['done', 'canceled'].includes(r.status));
         // 항목이 바뀌었으면(새 커밋 등) 사람을 기다리던 이전 실행은 그만두고 새로 — 하는 중인 것은 끝날 때까지 둔다
         if (prev && (prev.item.version == null || prev.item.version === it.version || ['running', 'waiting'].includes(prev.status))) throw fail(409, '이미 진행 중이에요');
@@ -319,10 +332,13 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         Object.assign(run, { status: 'running', updated: now() }); return;
       }
       case 'retry': {
-        if (!step || !['failed', 'input', 'done'].includes(step.status)) throw fail(409, '다시 할 수 있는 단계가 아니에요');
+        if (!step) throw fail(409, '다시 할 수 있는 단계가 아니에요');
+        if (['queued', 'running', 'waiting'].includes(run.status)) throw fail(409, '하는 중에는 다시 할 수 없어요. 그만두거나 끝난 뒤에 해 주세요');
+        // 그만뒀거나 멈춘 실행은 어느 단계에서든 다시(처음부터 다시 등)
+        if (!['failed', 'input', 'done'].includes(step.status) && !['canceled', 'stopped'].includes(run.status)) throw fail(409, '다시 할 수 있는 단계가 아니에요');
         const i = run.steps.indexOf(step);
         for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, output: s === step ? s.output : null, finished: null, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
-        Object.assign(run, { status: 'queued', updated: now() }); return;
+        Object.assign(run, { status: 'queued', note: null, finished: null, updated: now() }); return;
       }
       case 'skip': {
         if (!step || !['failed', 'input'].includes(step.status)) throw fail(409, '건너뛸 수 있는 단계가 아니에요');

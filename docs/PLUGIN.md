@@ -88,6 +88,9 @@ settings:
 | `verdict` | `{ tone: ok\|bad, title, text }` — 이 단계의 판정. 화면은 항목 자리와 작업 화면 맨 위에 이 상자를 그립니다. 답을 받아 다시 실행해도 같은 판정을 내면 줄 높이가 바뀌지 않습니다 |
 | `findings` | `[{ where, url, tag, title, text, copy, note }]` — 짚은 곳. `where`는 위치 글자(예: `src/a.tsx:12-18`), `url`은 그 위치로 가는 http(s) 주소, `copy`는 [문구 복사]로 복사할 글. 판정 상자 안에 차례로 그립니다 |
 | `outcome` | `{ title, text }` — 사람이 고른 뒤 한 일(예: 승인함). 끝난 실행은 버튼 자리에 `✓ title · 시각`을 둡니다 |
+| `lane` | 같은 항목 안에서 이 실행을 가르는 이름(예: 저장소). 목록과 작업 화면에 붙고, 같은 항목·워크플로우에서 같은 `lane`으로 하나가 이미 진행 중이면 이 단계에서 멈춥니다 |
+| `change` | `{ label, value }` — 작업 화면에 `label` 버튼을 둡니다. 누르면 이 단계를 `--answer=<value>`로 다시 하고 뒤 단계도 새로 합니다(예: 저장소 바꾸기) |
+| `fork` | `{ label, value }` — 작업 화면에 `label` 버튼을 둡니다. 누르면 같은 항목으로 실행을 하나 더 만들고, 새 실행의 이 단계에 `value`를 답으로 넣습니다(예: 다른 저장소에서도 작업) |
 | `settings_patch` | `{ 설정키: 새 값 }` — 이 컴퓨터의 플러그인 설정을 바꿉니다(예: 고른 답을 규칙에 기억). 선언한 키만 |
 | `_이름` | 다음 단계에만 넘길 큰 값(예: `_diff`). 실행이 끝나거나 그만두면 상태 파일에서 지웁니다(상태 파일은 동기화됩니다) |
 | 그 밖 | 다음 단계에서 `{단계키.필드}`로 씁니다 |
@@ -221,7 +224,7 @@ pkm 로컬 서버:
 | `POST /api/profile/:p/plugins/:id/approve` | 이 컴퓨터의 pkm-ai-server에 승인 |
 | `POST /api/profile/:p/plugins/:id/secret {name, value\|null}` | 비밀값 넣기·지우기 |
 | `POST /api/profile/:p/plugins/:id/local {settings, auto}` | 이 컴퓨터의 설정값, 자동 시작 |
-| `POST /api/profile/:p/plugins/:id/act {type, …}` | `refresh`·`start`·`answer`·`confirm`·`retry`·`skip`·`cancel`·`dismiss`. 돌리는 컴퓨터가 아니면 받은편지함으로 보냅니다 |
+| `POST /api/profile/:p/plugins/:id/act {type, …}` | `start`에 `fork:{step, value}`를 주면 같은 항목으로 실행을 하나 더 만듭니다. `retry`는 그만뒀거나 멈춘 실행이면 어느 단계에서든 됩니다(처음부터 다시). `refresh`·`start`·`answer`·`confirm`·`retry`·`skip`·`cancel`·`dismiss`. 돌리는 컴퓨터가 아니면 받은편지함으로 보냅니다 |
 | `GET /api/profile/:p/plugins/:id/scripts` | 가져오는 스크립트 내용(승인 전에 보여 줌) |
 
 pkm-ai-server:
@@ -240,7 +243,7 @@ pkm-ai-server:
 `test/fixtures/plugin-ok/`가 규격을 모두 지킨 예시입니다. 실제로 쓰는 예시는 `plugins/`에 있습니다.
 
 - `plugins/github-reviews` — 코드 리뷰: 나한테 요청된 리뷰, 나한테 달린 답변, 내가 요청한 리뷰. GitHub·GitHub Enterprise. 요청된 리뷰는 AI가 머지하면 안 되는 큰 문제(보안·로직·훅·누수·에러 처리·타입·접근성·성능·실수로 넣은 코드)만 보고, 없으면 [승인하기](검토한 커밋에만, 그 사이 새 커밋이 오면 거절), 있으면 파일:줄과 남길 리뷰 문구를 보입니다. GitHub에 쓰는 것은 사람이 누른 승인 하나입니다.
-- `plugins/jira-autopilot` — 지라 자동 작업: 내게 할당된 티켓 → 저장소 찾기(규칙·브랜치 이력·물어보기) → 설명 확인 → 브랜치 규칙대로 작업 폴더(git worktree) → 지라 진행 중 → AI 구현·커밋 → 점검 → 사람 확인. push·PR은 하지 않습니다.
+- `plugins/jira-autopilot` — 지라 자동 작업: 내게 할당된 티켓 → 저장소 찾기(규칙에 여럿이면 물어보기·브랜치 이력·물어보기, 작업 중 저장소 바꾸기·다른 저장소에서도 작업) → 설명 확인 → 브랜치 규칙대로 작업 폴더(git worktree) → 지라 진행 중 → AI 구현·커밋 → 점검 → 사람 확인. push·PR은 하지 않습니다.
 - `plugins/company-search` — 사내 검색: 찾기 화면에 위키(Confluence)·지라·아지트 검색을 더한다. 읽기만. `searches/` 예시.
 - `plugins/perf-review` — 성과 평가 글: 글자 수 제한이 있는 노트를 칸마다 세며 고친다. 스크립트 없음. `editors/` 예시.
 - `plugins/agit-daily` — 아지트 데일리: 직전 근무일 약속·계획(한 일), 오늘 약속·계획(할 일), 요일·다가오는 쉬는 날(이슈), 월·주차 태그로 아지트에 붙여 넣을 글을 만든다. 진행 중 카드는 목록 줄의 버튼으로 더한다. AI·비밀값 없이 프로필 노트만 읽는다.
