@@ -92,7 +92,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
 
   /* ---------- 자리 채우기: {title} {키.필드} {설정키} ---------- */
   // 채우지 못한 자리는 misses에 모은다(설정값 안의 {key}처럼 채운 값 속 중괄호는 스크립트 몫이라 다시 보지 않는다)
-  function fill(text, run, settings, misses = []){
+  // blank면 못 채운 자리를 빈 값으로 넘긴다 — 사람이 "빈 값은 두고 이 단계 하기"를 골랐을 때
+  function fill(text, run, settings, misses = [], blank = false){
     const vars = { id: run.item.id, title: run.item.title, url: run.item.url || '', ...run.item.vars, ...settings };
     return String(text).replace(/\{([^{}\s]+)\}/g, (m, k) => {
       let v;
@@ -100,7 +101,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         const [step, ...rest] = k.split('.'), s = run.steps.find(x => x.key === step);
         v = s && s.output; for (const r of rest) v = v == null ? undefined : v[r];
       } else v = vars[k];
-      if (v == null){ misses.push(m); return m; }
+      if (v == null){ misses.push(m); return blank ? '' : m; }
       return typeof v === 'object' ? JSON.stringify(v) : String(v);
     });
   }
@@ -240,6 +241,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : jobError(j), text: clip(j.result && (j.result.stdout || j.result.text), 4000), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         const out = d.kind === 'script' ? parseOut(j.result.stdout) : (j.result.structured || parseOut(j.result.text));
         const text = clip(d.kind === 'script' ? (out ? out.summary || '' : j.result.stdout) : j.result.text, 6000);
+        // JSON을 내려다 중간에 잘린 출력 — 결과 없이 넘기면 다음 단계가 "채우지 못한 값"으로 멈춘다. 여기서 멈춰 다시 하게 한다
+        if (d.kind === 'script' && !out && /^\s*\{/.test(j.result.stdout || '')){ Object.assign(step, { status: 'failed', error: '스크립트 결과를 읽지 못했어요. 출력이 중간에 잘렸을 수 있어요', text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (out && out.error){ Object.assign(step, { status: 'failed', error: clip(out.error, 500), output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (out && out.ask){ Object.assign(step, { status: 'input', ask: normAsk(out.ask), output: out, text, job: null }); Object.assign(run, { status: 'input', updated: now() }); return; }
         if (out && out.settings_patch) patchSettings(p, x, out.settings_patch);
@@ -271,9 +274,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const miss = [], cwd = d.cwd ? fill(d.cwd, run, settings, miss) : null;
     if (cwd && (miss.length || !path.isAbsolute(cwd) || !fs.existsSync(cwd))) throw fail(400, `작업 폴더를 찾지 못했어요: ${cwd}`);
     if (d.kind === 'script'){
-      const args = tokens(d.body).map(a => fill(a, run, settings, miss));
+      const args = tokens(d.body).map(a => fill(a, run, settings, miss, !!step.lenient));
       if (step.answer != null) args.push(`--answer=${step.answer}`);
-      if (miss.length) throw fail(400, `채우지 못한 값이 있어요: ${miss.join(' ')}`);
+      if (miss.length && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${miss.join(' ')}`);
       return (await scriptJob(conn, x, args[0], args.slice(1), cwd)).id;
     }
     let prompt = d.body, schema = null;
@@ -337,7 +340,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         // 그만뒀거나 멈춘 실행은 어느 단계에서든 다시(처음부터 다시 등)
         if (!['failed', 'input', 'done'].includes(step.status) && !['canceled', 'stopped'].includes(run.status)) throw fail(409, '다시 할 수 있는 단계가 아니에요');
         const i = run.steps.indexOf(step);
-        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, output: s === step ? s.output : null, finished: null, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
+        // lenient: 못 채운 값은 빈 값으로 두고 이 단계를 한다(앞 단계 결과가 비었을 때 처음부터 다시 말고 이어 가는 길)
+        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, output: s === step ? s.output : null, finished: null, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
         Object.assign(run, { status: 'queued', note: null, finished: null, updated: now() }); return;
       }
       case 'skip': {

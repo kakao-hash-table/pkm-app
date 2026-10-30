@@ -3597,6 +3597,8 @@ function plFinds(list){
   </li>`).join('')}</ol>`;
 }
 // 묻는 단계의 선택지를 버튼으로(ask.inline). 누른 뒤에는 같은 자리에 '하는 중'을 둔다
+// 앞 단계 결과가 비어 이 단계의 값을 못 채워 멈춘 것
+const plUnfilled = s => /^채우지 못한 값이 있어요/.test((s && s.error) || '');
 function plChoices(id, r, s){
   const a = s.ask || {}, picked = PL.picked[r.id];
   if (picked && s.status !== 'input') delete PL.picked[r.id];
@@ -3630,7 +3632,7 @@ function plInlineFeed(id, x, f){
       acts = `<button class="btn btn-primary btn-sm" type="button" data-pl="confirm" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" data-msg="이어서 해요">이 단계 하기</button>`; }
     else if (r.status === 'input'){ tone = 'wait'; head = esc((s.ask && s.ask.question) || '답이 필요해요'); acts = `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`; }
     else if (r.status === 'stopped'){ tone = 'bad'; head = `${esc(s.name)}에서 멈췄어요`; body = `<span>${esc(String(s.error || '').split('\n')[0])}</span>`;
-      acts = plIsRunner() || plRunner() ? `<button class="btn btn-primary btn-sm" type="button" data-pl="retry" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>` : ''; }
+      acts = plIsRunner() || plRunner() ? `<button class="btn btn-primary btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>${plUnfilled(s) ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="lenient" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}">빈 값은 두고 이어 하기</button>` : ''}` : ''; }
     else if (r.status === 'done'){ tone = 'done'; head = `끝 · ${plTime(r.finished || r.updated)}`; }
     const more = r && !stale ? `<a class="btn btn-text btn-sm" href="#/plugins/${id}/run/${r.id}">자세히</a>` : '';
     const state = head || body ? `<div class="pl-state ${tone ? `pl-${tone}` : ''}" ${tone === 'wait' ? 'role="status"' : ''}>${head ? `<b>${head}</b>` : ''}${body}</div>` : '';
@@ -3747,6 +3749,7 @@ function vPluginRun(id, rid){
   const here = plIsRunner(), sent = PL.sent[r.id], key = (r.item.vars && r.item.vars.key) || '', vd = plVerdictOf(r);
   const btn = (act, label, cls = 'btn-ghost', extra = '') => `<button class="btn ${cls} btn-sm" type="button" data-pl="${act}" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" ${extra}>${label}</button>`;
   const cancel = ['done', 'canceled'].includes(r.status) ? '' : btn('cancel', '그만두기', 'btn-text');
+  const restart = (cls = 'btn-ghost') => `<button class="btn ${cls} btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>`;
   let card;
   if (!sent && r.gone && plMine(r)) card = ['bad', `${esc(key || r.item.title)}이 내 목록에서 빠졌어요`, '할당이 풀렸거나 지라에서 끝났을 수 있어요. 이어 해도 지라 상태를 바꾸기 전에 담당자와 상태를 다시 확인하고, 다르면 바꾸지 않아요.', `${btn('cancel', '그만두기', 'btn-primary')}`];
   else if (sent) card = ['wait', '답을 보냈어요', `${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요. 동기화에 몇 분 걸릴 수 있어요.`, ''];
@@ -3770,8 +3773,10 @@ function vPluginRun(id, rid){
   else if (r.status === 'stopped'){
     const token = /토큰/.test(s.error || '');
     card = ['bad', token ? '토큰을 다시 넣어 주세요' : `${i}단계 ${esc(s.name)}에서 멈췄어요`, esc(String(s.error || '').split('\n')[0]),
-      `${token ? (here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">토큰 넣기</a>` : `<span class="faint">${esc(plRunner() || '돌리는 컴퓨터')}에서 넣어 주세요</span>`) : btn('retry', '이 단계 다시 하기', 'btn-primary')}
-       ${btn('skip', '건너뛰고 이어 하기')}${cancel}`];
+      // 앞 단계 결과가 빈 것(채우지 못한 값) — 이 단계만 다시 하면 또 멈춘다. 처음부터 다시가 먼저, 빈 값은 두고 이어 가는 길도 준다
+      plUnfilled(s) ? `${restart('btn-primary')}${btn('lenient', '빈 값은 두고 이어 하기')}${btn('skip', '건너뛰기')}${cancel}`
+      : `${token ? (here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">토큰 넣기</a>` : `<span class="faint">${esc(plRunner() || '돌리는 컴퓨터')}에서 넣어 주세요</span>`) : btn('retry', '이 단계 다시 하기', 'btn-primary')}
+       ${i > 1 ? restart() : ''}${btn('skip', '건너뛰고 이어 하기')}${cancel}`];
   }
   else if (r.status === 'done' && vd) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || '끝났어요'), esc(vd.v.text || ''), `<span class="pl-outcome">✓ ${esc((vd.step.output.outcome && vd.step.output.outcome.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>`];
   else if (r.status === 'done') card = ['ok', '끝난 것으로 옮겼어요', wt.path ? `작업 폴더는 남아 있어요 · <code>${esc(wt.path)}</code>` : '', ''];
@@ -4025,6 +4030,7 @@ document.addEventListener('click', async e => {
     case 'skip': plAct(id, { type:'skip', run, step }, '건너뛰고 이어서 해요'); break;
     case 'dismiss': await plAct(id, { type:'dismiss', run }); go(`#/plugins/${id}`); break;
     case 'restart': plAct(id, { type:'retry', run, step }, '처음부터 다시 해요'); break;
+    case 'lenient': plAct(id, { type:'retry', run, step, lenient:true }, '빈 값은 두고 이 단계를 다시 해요'); break;
     case 'unstart': plAsk({ title:'시작 전으로 되돌릴까요?', body:'<p>이 실행 기록을 지우고 목록의 \'시작 전\'으로 돌려요. 만든 브랜치·작업 폴더·커밋은 그대로 남아요.</p>', ok:'되돌리기' },
       async () => { await plAct(id, { type:'dismiss', run }, '시작 전으로 되돌렸어요'); go(`#/plugins/${id}`); }); break;
     case 'change': plAsk({ title:`${b.dataset.label}`, body:'<p>이 단계부터 다시 해요. 뒤 단계도 새로 하고, 이미 만든 브랜치·작업 폴더·커밋은 그대로 남아요.</p>', ok:b.dataset.label },

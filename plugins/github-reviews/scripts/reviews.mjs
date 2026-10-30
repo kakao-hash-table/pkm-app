@@ -4,13 +4,17 @@
 //   node reviews.mjs diff --api=… --repo=owner/name --number=12                                         AI에게 넘길 diff(새 파일 줄 번호를 붙여서)
 //   node reviews.mjs decide --api=… --repo=… --number=… --head=<검토한 커밋> --verdict=ok|block --findings=<JSON> --lines=<JSON> [--answer=approve|done]
 //     답 없이 부르면 판정과 문제 위치를 정리해 묻고, --answer=approve면 검토한 커밋에 승인을 남긴다(GitHub에 쓰는 것은 이것 하나)
+//     --head·--lines가 비어 오면(앞 단계 결과를 잃음) PR에서 다시 읽는다. head가 없으면 AI가 코드를 못 본 것이라 승인을 권하지 않는다
 // 토큰은 환경 변수 GITHUB_TOKEN(pkm-ai-server가 승인한 플러그인에만 넣어 준다).
+import fs from 'node:fs';
 const [cmd, ...rest] = process.argv.slice(2);
 const opt = Object.fromEntries(rest.filter(a => a.startsWith('--')).map(a => { const i = a.indexOf('='); return i < 0 ? [a.slice(2), true] : [a.slice(2, i), a.slice(i + 1)]; }));
 const API = String(opt.api || 'https://api.github.com').replace(/\/+$/, '');
 const REPOS = String(opt.repos || '').split(/[\n,]+/).map(s => s.trim()).filter(s => /^[\w.-]+\/[\w.-]+$/.test(s));
 const TOKEN = process.env.GITHUB_TOKEN;
-const done = (obj, code = 0) => { process.stdout.write(JSON.stringify(obj) + '\n'); process.exit(code); };
+// 파이프로 쓰는 stdout은 macOS에서 비동기라 바로 exit하면 64KB 넘는 출력(diff)이 잘린다 — 끝까지 동기로 쓴다
+const writeAll = s => { const b = Buffer.from(s); for (let o = 0; o < b.length;){ try { o += fs.writeSync(1, b, o); } catch (e) { if (e.code !== 'EAGAIN') throw e; } } };
+const done = (obj, code = 0) => { writeAll(JSON.stringify(obj) + '\n'); process.exit(code); };
 const failWith = msg => done({ error: msg }, 1);
 
 if (!['requested', 'mine', 'replies', 'diff', 'decide'].includes(cmd)) failWith('명령은 requested, mine, replies, diff, decide 중 하나예요');
@@ -173,8 +177,8 @@ function annotate(patch){
 }
 const webBase = () => /^api\.github\.com$/i.test(host) ? 'https://github.com' : API.replace(/\/api\/v3$/, '');
 
-if (cmd === 'diff'){
-  const pr = await gh(`/repos/${REPO}/pulls/${NUM}`);
+// PR의 바뀐 파일을 AI에게 넘길 꼴로 — diff 단계와, 그 결과를 잃은 decide가 같이 쓴다
+async function readDiff(){
   const files = [];
   for (let page = 1; page <= 10; page++){ const d = await gh(`/repos/${REPO}/pulls/${NUM}/files`, { per_page: 100, page }); files.push(...d); if (d.length < 100) break; }
   const skipped = [], lines = {}, parts = [];
@@ -187,6 +191,12 @@ if (cmd === 'diff'){
     if (size + block.length > MAX_DIFF){ truncated = true; skipped.push(f.filename); continue; }
     size += block.length; parts.push(block); lines[f.filename] = a.added;
   }
+  return { skipped, lines, parts, truncated };
+}
+
+if (cmd === 'diff'){
+  const pr = await gh(`/repos/${REPO}/pulls/${NUM}`);
+  const { skipped, lines, parts, truncated } = await readDiff();
   const seen = Object.keys(lines).length;
   done({
     summary: `파일 ${seen}개를 봐요 · +${pr.additions} −${pr.deletions}${skipped.length ? ` · ${skipped.length}개 뺌` : ''}${truncated ? ' · 커서 앞부분만' : ''}`,
@@ -199,10 +209,14 @@ const CATS = { security: '보안', logic: '로직 오류', react_hooks: '훅 규
 const parseJSON = (s, d) => { try { return JSON.parse(String(s)); } catch { return d; } };
 
 if (cmd === 'decide'){
-  const head = String(opt.head || ''), verdict = String(opt.verdict || ''), answer = opt.answer == null ? null : String(opt.answer);
-  if (!/^[0-9a-f]{7,40}$/.test(head)) failWith('검토한 커밋(--head)이 없어요');
+  const verdict = String(opt.verdict || ''), answer = opt.answer == null ? null : String(opt.answer);
   if (answer != null && !['approve', 'done'].includes(answer)) failWith(`모르는 답이에요: ${answer}`);
-  const lines = parseJSON(opt.lines, {}), raw = parseJSON(opt.findings, []);
+  // 검토한 커밋이 비어 왔으면 diff 결과를 잃은 것 — AI도 코드를 못 봤다. 지금 PR 커밋으로 이어 가되 승인은 권하지 않는다
+  const blind = !opt.head || opt.head === true;
+  const head = blind ? (await gh(`/repos/${REPO}/pulls/${NUM}`)).head.sha : String(opt.head);
+  if (!/^[0-9a-f]{7,40}$/.test(head)) failWith('검토한 커밋(--head)이 없어요');
+  const raw = parseJSON(opt.findings, []), given = parseJSON(opt.lines, null);
+  const lines = given && typeof given === 'object' && Object.keys(given).length ? given : (await readDiff()).lines;
   const inDiff = (p, a, b) => (lines[p] || []).some(([s, e]) => a <= e && b >= s);
   // 범주 밖·확신이 낮은 것·diff에 없는 파일은 버린다(오탐을 줄인다). 많아도 5개까지
   const findings = (Array.isArray(raw) ? raw : []).filter(f => f && CATS[f.category] && Number(f.confidence) >= 0.8 && lines[f.path]).slice(0, 5).map(f => {
@@ -214,8 +228,10 @@ if (cmd === 'decide'){
     };
   });
   const truncated = String(opt.truncated) === 'true', summary = short(opt.summary, 300);
-  const clean = verdict !== 'block' || !findings.length;
-  const judged = clean
+  const clean = !blind && (verdict !== 'block' || !findings.length);
+  const judged = blind
+    ? { summary: 'AI가 코드를 못 봤어요', verdict: { tone: 'bad', title: 'AI가 코드를 못 봤어요', text: '바뀐 코드를 가져온 결과가 비어서 AI 판정을 믿을 수 없어요. 직접 리뷰하고 남겨 주세요.' }, ...(findings.length ? { findings } : {}) }
+    : clean
     ? { summary: truncated ? '본 부분에는 큰 문제가 없어요' : '큰 문제가 없어요',
         verdict: { tone: 'ok', title: truncated ? '본 부분에는 큰 문제 없음' : '큰 문제 없음', text: `${summary}${truncated ? ' PR이 커서 앞부분만 봤어요.' : ''}` } }
     : { summary: `문제 ${findings.length}개`, verdict: { tone: 'bad', title: `큰 문제 ${findings.length}개`, text: summary }, findings };
@@ -229,5 +245,5 @@ if (cmd === 'decide'){
   }
   done({ ...judged, ask: clean
     ? { question: '승인할까요?', inline: true, choices: [{ value: 'approve', label: truncated ? '본 부분만 보고 승인' : '승인하기', recommended: !truncated }] }
-    : { question: '리뷰를 남겨 주세요', inline: true, choices: [{ value: 'done', label: '리뷰 남겼어요' }, { value: 'approve', label: '그래도 승인', confirm: 'AI가 큰 문제로 짚은 곳이 있어요. 직접 확인했으면 승인해요.' }] } });
+    : { question: '리뷰를 남겨 주세요', inline: true, choices: [{ value: 'done', label: '리뷰 남겼어요' }, { value: 'approve', label: '그래도 승인', confirm: blind ? 'AI가 코드를 보지 못했어요. 직접 확인했으면 승인해요.' : 'AI가 큰 문제로 짚은 곳이 있어요. 직접 확인했으면 승인해요.' }] } });
 }

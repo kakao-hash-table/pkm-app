@@ -14,7 +14,8 @@ const DATA = path.join(T, 'data'), P = '회사', ID = 'github-reviews', FEED = '
 fs.mkdirSync(path.join(DATA, P), { recursive: true });
 
 // 가짜 GitHub — PR 하나(o/web#7). 승인하면 리뷰 요청에서 빠진다
-const GH = { head: 'a'.repeat(40), requested: true, posted: [] };
+const GH = { head: 'a'.repeat(40), requested: true, posted: [], big: false };
+const BIG = '@@ -0,0 +1,2000 @@\n' + Array.from({ length: 2000 }, (_, i) => `+export const value${i} = '${'x'.repeat(24)}';`).join('\n');   // 64KB가 넘는 diff
 const PATCH = '@@ -10,3 +10,4 @@ function A(){\n   const a = 1;\n-  old();\n+  el.innerHTML = props.html;\n+  track(a);\n   return a;';
 const gh = http.createServer(async (req, res) => {
   const send = (s, b) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); };
@@ -32,7 +33,7 @@ const gh = http.createServer(async (req, res) => {
   if (p === '/repos/o/web/pulls/7/files') return send(200, u.searchParams.get('page') === '1' ? [
     { filename: 'src/A.tsx', status: 'modified', patch: PATCH },
     { filename: 'package-lock.json', status: 'modified', patch: '@@ -1 +1 @@\n-a\n+b' },
-    { filename: 'src/icon.svg', status: 'added', patch: '@@ -0,0 +1 @@\n+<svg/>' }] : []);
+    { filename: 'src/icon.svg', status: 'added', patch: '@@ -0,0 +1 @@\n+<svg/>' }, ...(GH.big ? [{ filename: 'src/Big.ts', status: 'added', patch: BIG }] : [])] : []);
   if (p === '/repos/o/web/pulls/7/reviews' && req.method === 'POST'){ GH.posted.push(JSON.parse(body)); GH.requested = false; return send(200, { id: 1 }); }
   if (p === '/repos/o/web/pulls/7/reviews') return send(200, []);
   send(404, { message: p });
@@ -40,7 +41,7 @@ const gh = http.createServer(async (req, res) => {
 
 // 가짜 pkm-ai-server — 스크립트는 그 자리에서 실행, AI는 정해 둔 답(AI_ANSWER)을 구조화된 결과로
 const jobs = new Map(), aiCalls = [], secrets = {};
-let n = 0, AI_ANSWER = null;
+let n = 0, AI_ANSWER = null, CUT = false;   // CUT: 스크립트 출력을 앞부분만 넘긴다(잘린 출력)
 const ai = http.createServer(async (req, res) => {
   const send = (s, b) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); };
   let body = ''; for await (const c of req) body += c; body = body ? JSON.parse(body) : {};
@@ -51,7 +52,8 @@ const ai = http.createServer(async (req, res) => {
     const id = `job${++n}`;
     let job;
     if (body.plugin_script){
-      const out = await exec([path.join(body.plugin.root, body.plugin_script), ...body.args]);
+      let out = await exec([path.join(body.plugin.root, body.plugin_script), ...body.args]);
+      if (CUT && body.args.includes('diff')) out = out.slice(0, 200);
       job = { id, status: 'done', result: { exit_code: 0, stdout: out, stderr: '' } };
     } else { aiCalls.push(body); job = { id, status: 'done', result: { text: '', structured: AI_ANSWER } }; }
     jobs.set(id, job); return send(201, { job });
@@ -161,4 +163,48 @@ test('나한테 달린 답변은 확인하고 닫을 수 있고(버전째), 목�
   await runner.act(P, ID, { type: 'refresh', feed: R });
   assert.equal((await state()).feeds[R].ok, true);
   assert.deepEqual((await state()).hidden[R], {});
+});
+
+test('diff: 64KB가 넘는 출력도 잘리지 않고 끝까지 JSON으로 나온다', async () => {
+  GH.big = true;
+  try {
+    const out = await exec([SCRIPT, 'diff', '--repo=o/web', '--number=7', `--api=${API}`]);
+    assert.ok(out.length > 65536, `출력 ${out.length}바이트`);
+    const d = JSON.parse(out);
+    assert.deepEqual(d._lines['src/Big.ts'], [[1, 2000]]);
+  } finally { GH.big = false; }
+});
+
+test('바뀐 코드 결과가 잘리면 그 단계에서 멈추고, 빈 값은 두고 이어 하면 직접 리뷰를 남기고, 처음부터 다시 하면 정상으로 돈다', async () => {
+  for (const r of (await state()).runs) if (!['done', 'canceled'].includes(r.status)) await runner.act(P, ID, { type: 'cancel', run: r.id });
+  GH.requested = true; GH.head = 'd'.repeat(40); GH.posted = [];
+  await runner.act(P, ID, { type: 'refresh', feed: FEED });
+  const it = (await state()).feeds[FEED].items[0];
+  AI_ANSWER = { verdict: 'ok', summary: '코드를 못 받았어요', findings: [] };
+  CUT = true;
+  await runner.act(P, ID, { type: 'start', feed: FEED, item: it.id });
+  let r = await until(r => r.status === 'stopped');
+  assert.equal(r.steps[0].status, 'failed'); assert.match(r.steps[0].error, /결과를 읽지 못했어요/);   // 다음 단계로 넘기지 않는다
+  // 건너뛰면 결정 단계가 앞 단계 값을 못 채워 멈춘다 — 예전에 갇히던 자리
+  await runner.act(P, ID, { type: 'skip', run: r.id, step: '변경' });
+  r = await until(r => r.status === 'stopped');
+  assert.match(r.steps[2].error, /채우지 못한 값이 있어요: \{변경\.head\}/);
+  // 빈 값은 두고 이어 하기 — PR에서 커밋을 다시 읽고, AI가 못 봤으니 승인을 권하지 않는다
+  await runner.act(P, ID, { type: 'retry', run: r.id, step: '결정', lenient: true });
+  r = await until(r => r.status === 'input');
+  const s = r.steps[2];
+  assert.equal(s.output.verdict.title, 'AI가 코드를 못 봤어요'); assert.equal(s.ask.choices[0].value, 'done');
+  assert.ok(!s.ask.choices.some(c => c.recommended));
+  await runner.act(P, ID, { type: 'answer', run: r.id, step: '결정', value: 'done' });
+  r = await until(r => r.status === 'done');
+  assert.equal(r.steps[2].output.outcome.title, '직접 리뷰함'); assert.equal(GH.posted.length, 0);
+  // 다시 멈춘 것을 처음부터 다시 — 잘림이 없으면 처음 흐름 그대로
+  await runner.act(P, ID, { type: 'start', feed: FEED, item: it.id });
+  r = await until(r => r.status === 'stopped');
+  assert.equal(r.steps[0].status, 'failed');
+  CUT = false;
+  await runner.act(P, ID, { type: 'retry', run: r.id, step: '변경' });
+  r = await until(r => r.status === 'input');
+  assert.equal(r.steps[0].output.head, GH.head); assert.equal(r.steps[2].lenient, undefined);
+  assert.equal(r.steps[2].output.verdict.title, '큰 문제 없음');
 });
