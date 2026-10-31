@@ -52,8 +52,15 @@ test('AI 연결 없이는 켜지 않고, 켜면 돌리는 컴퓨터가 동기화
   const h = await runner.setRunner(P, { on: true, ai: conn });
   assert.equal(h.on, true); assert.equal(h.runner, '회사맥');
   assert.equal(JSON.parse(fs.readFileSync(path.join(DATA, P, '_플러그인/.state/runner.json'), 'utf8')).host, '회사맥');
+  // 승인 전에 실패한 목록은 승인하자마자 다시 가져온다(가져오는 주기를 기다리지 않는다)
+  const sf = path.join(DATA, P, '_플러그인/.state', `${ID}.json`);
+  fs.writeFileSync(sf, JSON.stringify({ v: 1, runs: [], applied: [], feeds: { '할 일': { items: [], first: {}, ok: false, at: new Date().toISOString(), error: `이 컴퓨터에서 승인하지 않은 플러그인이에요: ${ID}` } } }));
   await runner.approve(P, ID);
   assert.equal((await runner.machine(P, ID)).approved, true);
+  let f;
+  for (let i = 0; i < 50 && !(f = (await state()).feeds['할 일']).ok; i++) await new Promise(r => setTimeout(r, 100));
+  assert.equal(f.ok, true, f.error);
+  assert.deepEqual(f.items.map(i => i.id), ['A-1']);
 });
 
 test('처음 가져온 목록은 자동 시작하지 않고, 그 뒤 새로 들어온 것만 자동으로', async () => {

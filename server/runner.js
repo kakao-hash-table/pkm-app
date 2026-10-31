@@ -65,6 +65,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     onWrite(p);
   }
   const busy = new Set();   // 프로필|플러그인 — 한 번에 한 차례만
+  const retry = new Map();  // 프로필|플러그인 → 'failed'(실패한 목록) | 'all' — 승인·비밀값·설정을 바꾼 뒤 주기를 기다리지 않고 다시 가져온다
+  function kick(p, id, what){ const k = `${p}|${id}`; if (retry.get(k) !== 'all') retry.set(k, what); tick(p).catch(e => console.error(`플러그인 실행기: ${e.message}`)); }
   // 돌리는 컴퓨터는 프로필마다 하나 — 동기화되는 runner.json에 적는다. 다른 컴퓨터로 옮기면 앞 컴퓨터는 받는 대로 멈춘다
   const runnerFile = p => path.join(stateDir(p), 'runner.json');
   const runnerHost = p => (readJSON(runnerFile(p), {}) || {}).host || null;
@@ -388,7 +390,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         if (busy.has(key)) continue;
         busy.add(key);
         try {
-          const x = await pluginOf(p, x0.id), pc = plugConf(readConf(), p, x.id), st = readState(p, x.id);
+          const x = await pluginOf(p, x0.id), pc = plugConf(readConf(), p, x.id), st = readState(p, x.id), again = retry.get(key);
+          retry.delete(key);
           for (const a of inboxActions(p, x.id)){
             if (st.applied.includes(a.id)) continue;
             st.applied = [...st.applied, a.id].slice(-500);
@@ -396,7 +399,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
           }
           for (const feed of x.feeds){
             const f = st.feeds[feed.name];
-            if (!inWindow(feed) || (f && f.at && Date.now() - Date.parse(f.at) < everyOf(pc, feed) * 60000)) continue;
+            const force = again === 'all' || (again && f && !f.ok);
+            if (!force && (!inWindow(feed) || (f && f.at && Date.now() - Date.parse(f.at) < everyOf(pc, feed) * 60000))) continue;
             await refreshFeed(p, x, pc, feed, st, conf.ai);
           }
           await advance(p, x, pc, st, conf.ai);
@@ -473,6 +477,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     if (auto != null){ pc.auto = !!auto; pc.auto_since = auto ? (pc.auto_since && pc.auto ? pc.auto_since : now()) : null; }
     writeConf(c);
     if (auto != null && mine(p)){ const st = readState(p, id); st.auto = !!auto; writeState(p, id, st); }
+    if (settings && typeof settings === 'object') kick(p, id, 'all');   // 주소·토픽이 바뀌면 목록도 새로
     return { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since, every: pc.every || {}, gates: pc.gates || {} };
   }
   // 누른 것 — 켠 컴퓨터면 바로, 아니면 이 컴퓨터 이름의 받은편지함에 남겨 동기화로 보낸다
@@ -534,7 +539,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
   async function approve(p, id){
     const x = await pluginOf(p, id), conn = readConf().ai;
     const files = Object.fromEntries(x.scripts.map(s => [s.path, s.sha256]));
-    return (await ai(conn, '/v1/plugins', { method: 'POST', body: JSON.stringify({ id: x.id, root: x.path, version: x.manifest.version, permissions: x.manifest.permissions, files }) })).plugin;
+    const r = (await ai(conn, '/v1/plugins', { method: 'POST', body: JSON.stringify({ id: x.id, root: x.path, version: x.manifest.version, permissions: x.manifest.permissions, files }) })).plugin;
+    kick(p, id, 'failed');   // 승인 전에 실패한 목록을 바로 다시 가져온다
+    return r;
   }
   async function machine(p, id){
     const x = await pluginOf(p, id), conn = readConf().ai;
@@ -551,7 +558,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     if (!x.manifest.permissions.secrets.includes(name)) throw fail(400, '이 플러그인이 쓰지 않는 비밀값이에요');
     const conn = readConf().ai;
     if (value == null) return ai(conn, `/v1/secrets?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
-    return ai(conn, '/v1/secrets', { method: 'POST', body: JSON.stringify({ name, value }) });
+    const r = await ai(conn, '/v1/secrets', { method: 'POST', body: JSON.stringify({ name, value }) });
+    kick(p, id, 'failed');
+    return r;
   }
 
   return { tick, start, status, setRunner, setLocal, act, approve, machine, setSecret, here, search };
