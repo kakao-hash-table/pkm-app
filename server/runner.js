@@ -45,6 +45,7 @@ async function ai(conn, pathname, opt = {}){
   try { r = await fetch(conn.url + pathname, { ...opt, headers: { authorization: `Bearer ${conn.token}`, 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000) }); }
   catch { throw fail(502, `AI 서버(${conn.url})에 닿지 않아요. 이 컴퓨터에서 pkm-ai-server가 켜져 있는지 확인해 주세요`); }
   const body = await r.json().catch(() => ({}));
+  if (r.status === 404 && /^\/v1\/(plugins|secrets)/.test(pathname)) throw fail(409, `AI 서버(${conn.url})가 플러그인을 모르는 옛 버전이에요. pkm-ai-server를 업데이트한 뒤 다시 켜 주세요`);   // 켜 둔 서버가 업데이트 전 코드일 때
   if (!r.ok) throw fail(r.status === 401 ? 409 : r.status, body.error || `AI 서버 오류 ${r.status}`);
   return body;
 }
