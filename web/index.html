@@ -198,7 +198,30 @@ a.row:hover{background:var(--fill)}
 .row .chev{color:var(--text-3);align-self:center;font-size:1.25rem;line-height:1}
 @media (max-width:420px){.row{padding:14px 16px}}
 .pl-multi-row{align-items:center;flex-wrap:wrap}
+.col-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px;margin-top:8px}
+.row a.body{color:inherit;text-decoration:none}
+.row a.body:hover .title{text-decoration:underline}
 .tb-prog{display:flex;align-items:center;gap:12px;margin:8px 0}
+progress.meter{display:block;width:100%;height:8px;appearance:none;-webkit-appearance:none;border:0;border-radius:4px;background:var(--line);overflow:hidden;color:var(--primary)}
+progress.meter::-webkit-progress-bar{background:var(--line);border-radius:4px}
+progress.meter::-webkit-progress-value{background:var(--primary);border-radius:4px}
+progress.meter::-moz-progress-bar{background:var(--primary);border-radius:4px}
+progress.meter.thin{height:4px;margin:4px 0 12px}
+.row-meter{display:flex;flex:1 0 100%;align-items:center;gap:8px;margin-top:4px}
+.row-meter progress.meter{width:140px;flex:none;height:6px}
+.stack-bar{display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden;margin:0 0 6px}
+.tb-stat{margin:12px 0;max-width:480px}
+.tb-stat-h{display:flex;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:.875rem;color:var(--text-2)}
+.tb-stat-h b{color:var(--text)}
+.sb-ok{background:var(--primary)}
+.sb-no{background:var(--danger)}
+.sb-left{background:var(--line-strong)}
+.sb-dot.sb-left{background:var(--text-3)}
+.stack-legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0}
+.sb-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.week-bars{display:inline-flex;align-items:flex-end;gap:2px;width:44px;height:28px;flex:0 0 auto;align-self:center}
+.week-bars span{flex:1;background:var(--line-strong);border-radius:1px}
+.week-bars span.now{background:var(--primary)}
 @media (max-width:599px){.tb-prog{flex-direction:column-reverse;align-items:stretch;gap:4px}.tb-prog progress{max-width:none}}
 .tb-prog progress{flex:1 1 auto;max-width:280px;height:8px;appearance:none;border:0;border-radius:4px;background:var(--line);overflow:hidden}
 .tb-prog progress::-webkit-progress-bar{background:var(--line);border-radius:4px}
@@ -2647,7 +2670,7 @@ function vTbCard(bookId, noteId, idx, peek){
     <a class="back" href="#/knowledge/tb/${bookId}"><span aria-hidden="true">‹</span> ${esc(tbName(x.book).title)}</a>
     <p class="eyebrow">${x.chapter ? `${esc(x.chapter)} · ` : ''}노트 <span class="num">${n + 1}/${seq.length}</span></p>
     <article class="card tb-card">
-      <p class="meta tb-card-of">카드 <span class="num">${i + 1}/${C.cards.length}</span>${i === 0 ? ` · ${esc(x.title)}` : ''}</p>
+      <p class="meta tb-card-of">카드 <span class="num">${i + 1}/${C.cards.length}</span>${i === 0 ? ` · ${esc(x.title)}` : ''}</p>${meter(i + 1, C.cards.length, 'thin')}
       <h1 tabindex="-1">${esc(card.title)}</h1>
       <div class="md">${md(card.body)}</div>
     </article>
@@ -2664,7 +2687,7 @@ function vTbBooks(){
   if (!books.length) return empty('아직 가져온 교과서가 없어요', 'data의 교과서 폴더에 책 폴더를 넣으면 여기에 보여요.', `<button class="btn btn-tonal" type="button" data-act="reload">다시 불러오기</button>`);
   return `<ul class="list">${books.map(b => {
     const n = tbSeq(b), done = n.filter(x => tbRefined(x).length).length, nm = tbName(b), P = tbProgress(b), W = tbWrongs(b).length;
-    return `<li><a class="row" href="#/knowledge/tb/${tbBookId(b)}"><span class="body"><span class="title">${esc(nm.title)}</span><span class="meta">${P.n ? `<span>읽음 <span class="num">${P.pct}%</span></span>` : ''}${W ? `<span>오답 <span class="num">${W}</span></span>` : ''}${nm.sub ? `<span>${esc(nm.sub)}</span>` : ''}<span>노트 <span class="num">${n.length}</span></span>${tbCardSeq(b).length ? `<span>카드 <span class="num">${tbCardCount(b)}</span></span>` : ''}${done ? `<span>다듬은 노트 <span class="num">${done}</span></span>` : ''}${n.some(x => x.kind === 'quiz') ? '<span>문제은행</span>' : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
+    return `<li><a class="row" href="#/knowledge/tb/${tbBookId(b)}"><span class="body"><span class="title">${esc(nm.title)}</span><span class="meta">${nm.sub ? `<span>${esc(nm.sub)}</span>` : ''}<span>노트 <span class="num">${n.length}</span></span>${tbCardSeq(b).length ? `<span>카드 <span class="num">${tbCardCount(b)}</span></span>` : ''}${done ? `<span>다듬은 노트 <span class="num">${done}</span></span>` : ''}${n.some(x => x.kind === 'quiz') ? '<span>문제은행</span>' : ''}${W ? `<span>오답 <span class="num">${W}</span></span>` : ''}${P.n ? `<span class="row-meter">${meter(P.n, P.of)}<span class="num">읽음 ${P.pct}%</span></span>` : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
   }).join('')}</ul>`;
 }
 const tbRows = arr => `<ul class="list">${arr.map(x => `<li><a class="row" href="${tbHref(x)}"><span class="body"><span class="title">${esc(x.title)}</span>${tbLogPeek(x.book).read[x.id] ? '<span class="meta"><span>읽음</span></span>' : ''}</span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`;
@@ -2694,7 +2717,7 @@ function vTbBook(id){
     ${last ? `<p class="meta">이어 읽을 곳: ${esc(last.title)}</p>` : ''}
     ${tbNotes(book).length ? tbBar(tbProgress(book)) : ''}
     ${(() => { const st = tbQuizStats(book); if (!st.all) return ''; const left = st.all - st.done;
-      return `<div class="doc-actions tb-quiz-acts"><a class="btn btn-tonal" href="#/knowledge/tb/${tbBookId(book)}/quiz">${left ? `문제 풀기 · ${left}문제 남음` : '푼 결과 보기'}</a>${st.wrong ? `<a class="btn btn-tonal" href="#/knowledge/tb/${tbBookId(book)}/wrong">오답 노트 ${st.wrong}</a>` : ''}</div>`; })()}
+      return `${st.done ? `<div class="tb-stat"><p class="tb-stat-h"><b>문제</b><span class="num">${st.all}문제 중 ${st.done}문제 풀었어요</span></p>${stackBar([{ k:'ok', label:'맞힘', n:st.ok }, { k:'no', label:'오답', n:st.wrong }, { k:'left', label:'안 푼 문제', n:left }], `문제 ${st.all}개 중 맞힘 ${st.ok} · 오답 ${st.wrong} · 안 푼 문제 ${left}`)}</div>` : ''}<div class="doc-actions tb-quiz-acts"><a class="btn btn-tonal" href="#/knowledge/tb/${tbBookId(book)}/quiz">${left ? `문제 풀기 · ${left}문제 남음` : '푼 결과 보기'}</a>${st.wrong ? `<a class="btn btn-tonal" href="#/knowledge/tb/${tbBookId(book)}/wrong">오답 노트 ${st.wrong}</a>` : ''}</div>`; })()}
     ${TB_LINE()}
     ${fresh.length ? section(`2주 안에 바뀐 노트 <span class="count num">${fresh.length}</span>`, `<ul class="list">${fresh.slice(0, 3).map(freshRow).join('')}</ul>${fresh.length > 3 ? `<details class="more" data-key="fresh"><summary>${fresh.length - 3}개 더 보기</summary><ul class="list">${fresh.slice(3).map(freshRow).join('')}</ul></details>` : ''}`) : ''}
     ${body}
@@ -2719,6 +2742,19 @@ function vTbNote(bookId, id){
   </div>`;
 }
 
+/* ---------------- 막대 — 숫자만 쓰던 곳에 비율을 눈으로 ----------------
+   meter: 진행 막대 하나(네이티브 progress) · stackBar: 맞힘/오답/남음처럼 여러 칸(글로도 함께 적는다 — 색에만 기대지 않게) · weekBars: 최근 몇 주 막대 */
+const meter = (n, of, cls = '') => `<progress class="meter ${cls}" max="${Math.max(of, 1)}" value="${Math.min(n, of)}" aria-hidden="true"></progress>`;
+function stackBar(parts, label){
+  const tot = parts.reduce((a, p) => a + p.n, 0) || 1;
+  return `<div class="stack-bar" role="img" aria-label="${esc(label)}">${parts.filter(p => p.n).map(p => `<span class="sb-${p.k}" style="flex:${p.n} 1 0"></span>`).join('')}</div>
+    <p class="stack-legend meta">${parts.map(p => `<span><i class="sb-dot sb-${p.k}" aria-hidden="true"></i>${p.label} <span class="num">${p.n}</span></span>`).join('')}</p>`;
+}
+function weekBars(vals, label){
+  const max = Math.max(...vals, 1);
+  return `<span class="week-bars" role="img" aria-label="${esc(label)}">${vals.map((v, i) => `<span class="${i === vals.length - 1 ? 'now' : ''}" style="height:${v ? Math.max(12, Math.round(v / max * 100)) : 4}%"></span>`).join('')}</span>`;
+}
+
 /* ---------------- 교과서 기록: 읽은 노트·문제 풀기·오답 노트 ----------------
    기록은 프로필 데이터(01_지식/교과서 기록/<책>.md)라서 기기마다가 아니라 함께 동기화된다 */
 function tbLog(book){ const D = db(); D.tbLogs ||= []; let L = D.tbLogs.find(x => x.book === book); if (!L){ L = { book, read:{}, quiz:{} }; D.tbLogs.push(L); } return L; }
@@ -2733,7 +2769,7 @@ function tbMarkRead(x){
   const L = tbLog(x.book); if (L.read[x.id]) return false;
   L.read[x.id] = TODAY; scheduleSave(); return true;
 }
-const tbBar = P => `<div class="tb-prog"><progress max="${P.of || 1}" value="${P.n}" aria-label="읽은 노트"></progress><span class="meta num">본문 노트 ${P.of}개 중 ${P.n}개 읽음 · ${P.pct}%</span></div>`;
+const tbBar = P => `<div class="tb-stat"><p class="tb-stat-h"><b>읽기</b><span class="num">본문 노트 ${P.of}개 중 ${P.n}개 · ${P.pct}%</span></p>${meter(P.n, P.of)}</div>`;
 const mdInline = s => String(s || '').split('\n').map(inline).join('<br>');
 // 노트 끝(이전·다음 노트 칸)까지 내려오고, 글 길이에 맞는 시간(5~60초)이 지나야 읽은 것으로 — 훑고 넘긴 노트는 세지 않는다
 let tbReadObs = null, tbReadTimer = null, tbReadAt = { id:null, t0:0 };
@@ -2796,6 +2832,7 @@ function vTbQuiz(bookId, scope = ''){
   WL_BOOK = book; mdShift = 2;
   return `<div class="page tbq-page">${head}
     <p class="meta">${esc(q.chapter || note.title)} · ${esc(q.key)}${rec && !answered ? ` · ${rec.ok ? '전에 맞힌 문제' : '전에 틀린 문제'}` : ''} · 남은 문제 <span class="num">${leftN}</span></p>
+    ${meter(pool.length - leftN, pool.length, 'thin')}
     <h1 class="tbq-q" tabindex="-1">${mdInline(q.q)}</h1>
     <ol class="tbq-opts" aria-label="보기">${q.options.map(opt).join('')}</ol>
     ${answered ? `<section class="tbq-result ${ok === false ? 'no' : 'ok'}">
@@ -3154,22 +3191,26 @@ function vAction(board){
   let body = '';
   if (board === 'short'){
     if (!D.tasks.length) body = empty('아직 단기 일이 없어요', '끝났다고 말할 기준이 있는 일을 단기로 만들어요.', `<button class="btn btn-tonal" type="button" data-act="new-action" data-board="short">단기 만들기</button>`);
-    else body = `<div class="stab" role="group" aria-label="상태별 보기">${T_STATUS.map(s => `<button type="button" data-act="short-tab" data-to="${s}" aria-pressed="${S.shortTab === s}">${s} <span class="num">${D.tasks.filter(t => t.status === s).length}</span></button>`).join('')}</div>
+    else body = `<div class="stab" role="group" aria-label="상태별 보기">${T_STATUS.map(s => `<button type="button" data-act="short-tab" data-to="${s}" aria-pressed="${S.shortTab === s}">${s} <span class="num">${D.tasks.filter(t => t.status === s && !t.archived).length}</span></button>`).join('')}</div>
       <div class="board">${T_STATUS.map(s => {
-      let arr = D.tasks.filter(t => t.status === s);
+      let arr = D.tasks.filter(t => t.status === s && !t.archived);   // 보관한 완료는 보드에서 빠지고 보관함에서 본다
       if (s !== '완료') arr = arr.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
       const shown = s === '완료' ? arr.slice(0, 3) : arr, rest = s === '완료' ? arr.slice(3) : [];
-      const card = t => `<li class="tcard" data-id="${t.id}"><div class="t-head"><a href="#/action/short/${t.id}">${esc(t.title)}</a>${moreBtn(t)}</div>
+      const card = t => `<li class="tcard" data-id="${t.id}"><div class="t-head"><a href="#/action/short/${t.id}">${esc(t.title)}</a>${t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}" aria-label="${esc(t.title)} 보관하기">보관</button>` : ''}${moreBtn(t)}</div>
           <div class="meta">${waitText(t)}${dueText(t.due, t.status)}${t.area ? `<span>${esc(t.area)}</span>` : ''}</div>
-          ${taskActs(t, false)}</li>`;
+          ${t.status === '완료' ? '' : taskActs(t, false)}</li>`;
       return `<section class="col col-${s} ${S.shortTab === s ? 'on' : ''}" data-status="${s}" aria-labelledby="col-${s}"><h2 id="col-${s}">${statusBadge(s)}<span class="num">${arr.length}</span></h2>
-        ${arr.length ? `<ul>${shown.map(card).join('')}</ul>${rest.length ? `<details class="more"><summary>완료 ${rest.length}개 더 보기</summary><ul>${rest.map(card).join('')}</ul></details>` : ''}` : `<p class="empty-col">${s === '기다림' ? '남의 답을 기다리는 일이 없어요' : s === '완료' ? '아직 끝낸 일이 없어요' : '비어 있어요'}</p>`}
+        ${arr.length ? `<ul>${shown.map(card).join('')}</ul>${rest.length ? `<details class="more"><summary>완료 ${rest.length}개 더 보기</summary><ul>${rest.map(card).join('')}</ul></details>` : ''}` : `<p class="empty-col">${s === '기다림' ? '남의 답을 기다리는 일이 없어요' : s === '완료' ? (D.tasks.some(t => t.archived) ? '완료한 일은 모두 보관했어요' : '아직 끝낸 일이 없어요') : '비어 있어요'}</p>`}
+        ${s === '완료' ? `<div class="col-foot">${arr.length > 1 ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive-all">완료 ${arr.length}개 모두 보관하기</button>` : ''}${D.tasks.some(t => t.archived) ? `<a class="btn btn-text btn-sm" href="#/action/short/_archive">보관함 <span class="num">${D.tasks.filter(t => t.archived).length}</span></a>` : ''}</div>` : ''}
       </section>`; }).join('')}</div>`;
   } else if (board === 'long'){
+    const wkOf = L => [7, 6, 5, 4, 3, 2, 1, 0].map(w => { const to = addDays(TODAY, -7 * w), from = addDays(to, -6); return L.records.filter(x => x.date >= from && x.date <= to).reduce((s, x) => s + x.amt, 0); });   // 최근 8주, 오른쪽이 이번 주
+    const anyWk = D.longs.some(L => wkOf(L).some(Boolean));   // 한 줄이라도 막대가 있으면 모든 줄에 자리를 둔다(제목이 나란히)
     body = D.longs.length ? `<ul class="list">${D.longs.map(L => {
       const month = L.records.filter(x => x.date.slice(0,7) === TODAY.slice(0,7)).reduce((s, x) => s + x.amt, 0);
       const last = L.records.slice().sort((a, b) => b.date.localeCompare(a.date))[0];
-      return `<li><a class="row" href="#/action/long/${L.id}"><span class="body"><span class="title">${esc(L.title)}</span><span class="meta"><span>${esc(L.metric)}</span><span class="num">이번 달 ${fmtAmt(month, L.unit)}</span><span>${last ? `마지막 기록 ${dayDiff(TODAY, last.date) === 0 ? '오늘' : dayDiff(TODAY, last.date) + '일 전'}` : '기록 없음'}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`; }).join('')}</ul>`
+      const wk = wkOf(L);
+      return `<li><a class="row" href="#/action/long/${L.id}">${anyWk ? weekBars(wk, `최근 8주 기록, 오른쪽이 이번 주: ${wk.map(v => fmtAmt(v, L.unit)).join(', ')}`) : ''}<span class="body"><span class="title">${esc(L.title)}</span><span class="meta"><span>${esc(L.metric)}</span><span class="num">이번 달 ${fmtAmt(month, L.unit)}</span><span>${last ? `마지막 기록 ${dayDiff(TODAY, last.date) === 0 ? '오늘' : dayDiff(TODAY, last.date) + '일 전'}` : '기록 없음'}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`; }).join('')}</ul>`
       : empty('아직 장기가 없어요', '체력·독서처럼 끝없이 쌓는 것을 만들면, 단기와 루틴이 여기에 쌓여요.', `<button class="btn btn-tonal" type="button" data-act="new-action" data-board="long">장기 만들기</button>`);
   } else if (board === 'routine'){
     body = D.routines.length ? `<ul class="list">${D.routines.map(r => `<li class="rt-row ${r.enabled ? '' : 'off'}">
@@ -3187,6 +3228,19 @@ function vAction(board){
   return `<div class="page ${board === 'short' ? 'wide' : ''}">${head}${body}</div>`;
 }
 
+/* 보관함 — 보드에서 치운 완료 단기. 검색·데일리·돌아보기에는 그대로 남는다 */
+const ARCH = { ids:[], at:0 };
+function vTaskArchive(){
+  const list = db().tasks.filter(t => t.archived).sort((a, b) => (b.archived + (b.doneAt || '')).localeCompare(a.archived + (a.doneAt || '')));
+  const months = [...new Set(list.map(t => (t.doneAt || t.archived).slice(0, 7)))];
+  const row = t => `<li><div class="row"><a class="body" href="#/action/short/${t.id}"><span class="title">${esc(t.title)}</span><span class="meta">${t.doneAt ? `<span>${md2(t.doneAt)} 완료</span>` : ''}${t.area ? `<span>${esc(t.area)}</span>` : ''}</span></a>
+    <button class="btn btn-text btn-sm" type="button" data-act="task-unarchive" data-id="${t.id}" aria-label="${esc(t.title)} 보관함에서 꺼내기">꺼내기</button></div></li>`;
+  return `<div class="page"><a class="back" href="#/action/short"><span aria-hidden="true">‹</span> 단기보드</a>
+    <p class="eyebrow">단기</p><h1 tabindex="-1">보관함 <span class="count num">${list.length}</span></h1>
+    <p class="faint">완료 칸에서 치운 단기예요. 찾기·데일리·돌아보기에는 그대로 남아요. 꺼내면 완료 칸에 다시 보여요.</p>
+    ${list.length ? months.map(m => section(`${Number(m.slice(0, 4))}년 ${Number(m.slice(5, 7))}월 <span class="count num">${list.filter(t => (t.doneAt || t.archived).slice(0, 7) === m).length}</span>`, `<ul class="list">${list.filter(t => (t.doneAt || t.archived).slice(0, 7) === m).map(row).join('')}</ul>`)).join('')
+      : empty('보관한 단기가 없어요', '완료 칸의 보관하기를 누르면 여기로 옮겨요.', '<a class="btn btn-tonal" href="#/action/short">단기보드로</a>')}</div>`;
+}
 function vTask(id){
   const D = db(); const t = find('tasks', id); if (!t) return vNotFound();
   const m = t.from && find('meetings', t.from);
@@ -3196,9 +3250,9 @@ function vTask(id){
     ${conflictBanner()}
     <p class="eyebrow">단기</p><h1 tabindex="-1">${esc(t.title)}</h1>
     <dl class="meta-dl"><dt>마감</dt><dd>${t.due ? `${fmtDate(t.due)} · ${dueText(t.due, t.status)}` : '없음'}</dd><dt>쌓이는 곳</dt><dd>${t.area ? areaLink(t.area) : '없음'}</dd><dt>만든 날</dt><dd>${md2(t.created)}</dd>${t.status === '완료' ? `<dt>결과</dt><dd>${t.result ? esc(t.result) : `<button class="btn btn-text btn-sm" type="button" data-act="result" data-id="${t.id}" style="padding:0;min-height:28px">결과 한 줄 남기기</button>`}</dd>` : ''}${t.status === '기다림' ? `<dt>기다리는 사람</dt><dd>${t.waitOn ? esc(t.waitOn) : '적지 않음'} · ${md2(t.waitSince)}부터</dd>` : ''}${m ? `<dt>나온 곳</dt><dd><a href="${recHref(m)}">${esc(recKind(m).name)} · ${esc(m.title)}</a></dd>` : ''}</dl>
-    <div class="doc-actions state-bar" role="group" aria-label="상태">${statusBadge(t.status)}${taskActs(t)}</div>
+    <div class="doc-actions state-bar" role="group" aria-label="상태">${statusBadge(t.status)}${t.archived ? `<span class="meta">${md2(t.archived)} 보관함으로 옮김</span><button class="btn btn-text btn-sm" type="button" data-act="task-unarchive" data-id="${t.id}">보관함에서 꺼내기</button>` : t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}">보관하기</button>` : ''}${taskActs(t)}</div>
     <div class="doc-actions" style="margin-top:8px">${editBtn()}${obsBtn()}</div>
-    ${section('할 일', todos + `<form data-form="task-todo" data-id="${t.id}" class="form-row" style="margin-top:12px"><label class="field" style="flex:1 1 240px"><span class="sr-only">할 일</span><input name="t" id="ttodo-${t.id}" placeholder="할 일 하나"></label><button class="btn btn-ghost" type="submit">할 일 추가하기</button></form>`)}
+    ${section(`할 일${t.todos.length ? ` <span class="count num">${t.todos.filter(x => x.d).length}/${t.todos.length}</span>` : ''}`, (t.todos.length ? meter(t.todos.filter(x => x.d).length, t.todos.length, 'thin') : '') + todos + `<form data-form="task-todo" data-id="${t.id}" class="form-row" style="margin-top:12px"><label class="field" style="flex:1 1 240px"><span class="sr-only">할 일</span><input name="t" id="ttodo-${t.id}" placeholder="할 일 하나"></label><button class="btn btn-ghost" type="submit">할 일 추가하기</button></form>`)}
     ${section('완료 조건', t.done.filter(Boolean).length ? `<div class="md">${md(t.done.map(x => '- ' + x).join('\n'))}</div>` : noneText)}
     ${section('메모', t.memo ? `<div class="md">${md(t.memo)}</div>` : noneText)}
   </div>`;
@@ -4193,6 +4247,7 @@ function route(p){
       if (p[2]) return p[1] === 'daily' ? vDaily(p[2]) : vRecord(p[2]); return vTime(p[1] || 'daily');
     case 'action': {
       const b = ['short','long','routine','appt'].includes(p[1]) ? p[1] : 'short';
+      if (b === 'short' && p[2] === '_archive') return vTaskArchive();
       if (p[2]) return ({ short:vTask, long:vLong, routine:vRoutine, appt:vAppt })[b](p[2]);
       return vAction(b);
     }
@@ -4235,8 +4290,9 @@ function render(){
 let booted = false;
 
 /* ---------------- 토스트 ---------------- */
-function toast(msg, action){
-  const box = $('#toasts'); const el = document.createElement('div'); el.className = 'toast';
+function toast(msg, action, key){   // key: 같은 종류의 토스트는 쌓지 않고 바꿔 끼운다
+  const box = $('#toasts'); if (key) box.querySelectorAll(`.toast[data-key="${key}"]`).forEach(x => x.remove());
+  const el = document.createElement('div'); el.className = 'toast'; if (key) el.dataset.key = key;
   const acts = !action ? [] : Array.isArray(action) ? action : [action];
   el.innerHTML = `<p>${esc(msg)}</p>${acts.map(a => `<button type="button">${esc(a.label)}</button>`).join('')}`;
   el.querySelectorAll('button').forEach((bt, i) => bt.addEventListener('click', () => { acts[i].fn(); el.remove(); }));
@@ -4347,8 +4403,8 @@ function openAction(board, from){
 /* 단기 상태 변경 — 버튼·⋯ 메뉴·드래그가 모두 이 함수 하나로 */
 function moveTask(id, to, waitOn){
   const t = find('tasks', id); if (!t || t.status === to) return;
-  const prev = { status:t.status, waitOn:t.waitOn, waitSince:t.waitSince, doneAt:t.doneAt };
-  t.status = to;
+  const prev = { status:t.status, waitOn:t.waitOn, waitSince:t.waitSince, doneAt:t.doneAt, archived:t.archived };
+  t.status = to; if (to !== '완료') t.archived = '';   // 다시 열면 보관함에서도 꺼낸다
   if (to === '기다림'){ t.waitOn = (waitOn || '').trim(); t.waitSince = TODAY; }
   if (to === '완료') t.doneAt = TODAY;
   render();
@@ -4481,6 +4537,13 @@ document.addEventListener('click', e => {
     case 'ai-recall-check': { const p = find('perms', id), line = (String(p.body).match(new RegExp(`^- \\(${TODAY}\\) (.*)$`, 'm')) || [])[1] || '';
       aiAsk('recall-check:' + id, `내가 노트를 보지 않고 떠올려 쓴 한 줄을 원래 노트와 맞춰 봐 줘. 맞게 떠올린 것, 빠진 핵심, 틀린 것을 각각 한 줄로. 칭찬이나 점수는 빼고 짧게 한국어로.\n\n떠올린 한 줄: ${line}\n\n원래 노트 — ${p.title}\n${p.body.split(RECALL_H)[0].slice(0, 2000)}`); break; }
     case 'task-move': moveTask(id, b.dataset.to); break;
+    case 'task-archive': { const t = find('tasks', id); if (!t) break; const nx = b.closest('li') && (b.closest('li').nextElementSibling || b.closest('li').previousElementSibling); t.archived = TODAY; render(); focusEl(nx && $(`[data-id="${nx.dataset.id}"] a`) || $('#col-완료'));
+      // 연달아 보관하면 토스트 하나로 모으고, 되돌리기는 모은 것을 한꺼번에
+      if (Date.now() - ARCH.at > 7000) ARCH.ids = []; ARCH.ids.push(t.id); ARCH.at = Date.now(); const ids = ARCH.ids.slice();
+      toast(ids.length > 1 ? `${ids.length}개를 보관함으로 옮겼어요` : `'${t.title.slice(0, 24)}'를 보관했어요`, { label:'되돌리기', fn:() => { ids.forEach(i => { const x = find('tasks', i); if (x) x.archived = ''; }); ARCH.ids = []; render(); } }, 'archive'); break; }
+    case 'task-archive-all': { const arr = db().tasks.filter(t => t.status === '완료' && !t.archived); arr.forEach(t => { t.archived = TODAY; }); render();
+      toast(`완료 ${arr.length}개를 보관함으로 옮겼어요`, { label:'되돌리기', fn:() => { arr.forEach(t => { t.archived = ''; }); render(); } }); break; }
+    case 'task-unarchive': { const t = find('tasks', id); if (!t) break; t.archived = ''; render(); toast('보관함에서 꺼냈어요 · 완료 칸에 다시 보여요', { label:'되돌리기', fn:() => { t.archived = TODAY; render(); } }); break; }
     case 'sort-inbox': openSort(id); break;
     case 'profiles': openProfiles(); break;
     case 'storage': $('#dlg-profile').close(); openStorage(); break;

@@ -168,3 +168,11 @@ test('문제은행 노트를 문제로 읽고, 교과서 기록(읽은 노트·�
   assert.deepEqual(back, db.tbLogs[0]);
   assert.equal(MD.serialize(MD.parse(files))['01_지식/교과서 기록/책 A.md'], f);
 });
+
+test('단기의 보관(archived)은 프런트매터로 왕복한다', () => {
+  const db = Object.assign(MD.emptyDb(), { tasks:[{ id:'t1', title:'끝난 일', status:'완료', area:'', due:'', estimate:null, result:'', doneAt:'2026-10-20', archived:'2026-10-31', created:'2026-10-01', todos:[], done:[], memo:'' }] });
+  const files = MD.serialize({ db, settings });
+  const f = Object.entries(files).find(([p]) => p.includes('끝난 일'))[1];
+  assert.match(f, /archived: "?2026-10-31"?/);
+  assert.equal(MD.parse(files).db.tasks[0].archived, '2026-10-31');
+});

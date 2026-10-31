@@ -215,7 +215,7 @@
       const from = t.from && byId(D.meetings, t.from);
       files[place(F.project, t.title, t.id)] = writeDoc({
         type:'project', id:t.id, title:t.title, status:toKey(STATUS, t.status), area:t.area ? link(t.area) : null, due:t.due || null,
-        estimate:t.estimate || null, result:t.result || undefined, done_at:t.doneAt || undefined, created:t.created || null,
+        estimate:t.estimate || null, result:t.result || undefined, done_at:t.doneAt || undefined, archived:t.archived || undefined, created:t.created || null,
         waiting_on:t.waitOn || undefined, waiting_since:t.waitSince || undefined, from:from ? linkIn(((D.kinds || []).find(k => k.id === (from.kind || 'meeting')) || {}).folder || `02_시간/${clean(((D.kinds || []).find(k => k.id === (from.kind || 'meeting')) || { name:'기록' }).name)}`, recName(from)) : undefined
       }, [['할 일', (t.todos || []).map(x => `- [${x.d ? 'x' : ' '}] ${x.t}`).join('\n')], ['완료 조건', (t.done || []).filter(Boolean).map(x => `- ${x}`).join('\n')], ['메모', t.memo]]);
     });
@@ -349,7 +349,7 @@
       }
       else if (type === 'project'){
         const t = { id:id || newId('t'), title:String(f.title || base(d.path)), status:toVal(STATUS, f.status || 'todo'), area:unlink(f.area), due:f.due ? String(f.due) : '', estimate:f.estimate ? Number(f.estimate) : null,
-          result:f.result ? String(f.result) : '', doneAt:f.done_at ? String(f.done_at) : '', created:f.created ? String(f.created) : '', waitOn:f.waiting_on ? String(f.waiting_on) : '', waitSince:f.waiting_since ? String(f.waiting_since) : '',
+          result:f.result ? String(f.result) : '', doneAt:f.done_at ? String(f.done_at) : '', archived:f.archived ? String(f.archived).slice(0, 10) : '', created:f.created ? String(f.created) : '', waitOn:f.waiting_on ? String(f.waiting_on) : '', waitSince:f.waiting_since ? String(f.waiting_since) : '',
           todos:String(S['할 일'] || '').split('\n').map(l => l.match(/^\s*-\s+\[( |x|X)\]\s+(.*)$/)).filter(Boolean).map(m => ({ t:m[2].trim(), d:m[1] !== ' ' })),
           done:listLines(S['완료 조건']), memo:S['메모'] || '' };
         const fromT = unlink(f.from);
