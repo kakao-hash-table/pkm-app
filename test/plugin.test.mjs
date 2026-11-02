@@ -111,3 +111,78 @@ test('편집기 — 칸으로 나누고, 고친 칸만 끼워 넣고, 글자 수
   const t2 = pedApply(P2, ed[1], [{ title: '1-1. 일', body: '새 본문', fields: ['진행 완료'] }]);
   assert.match(t2, /- 진행상태: 진행 완료\n\n실행 내용\n\n새 본문\n\n- 함께한 사람: 나/); assert.match(t2, /#### 밖\n실행 내용\n무시/);
 });
+
+test('체크인 — 편집기 두 개를 묶고, 프롬프트 파일·AI 권한·점검 규칙을 검사한다', () => {
+  const man = ai => `---\npkm_plugin: 1\nid: ck-test\nname: 체크인\nversion: 0.1.0\n${ai ? 'permissions:\n  ai: [chat]\n' : ''}---\n`;
+  const ed = '## 주요\n- note: 노트\n- block: ##\n- combine: 300\n- only: ^\\d+\\.\n\n## 과제\n- note: 노트\n- block: ####\n- after: 협업 동료\n- choices: 진행상태=진행중|진행 완료\n- check: 하이라이트=체크|없음\n- period: 진행기간\n';
+  const files = (ai, ck, extra = []) => [{ path: 'plugin.md', size: 1, text: man(ai) }, { path: 'editors/e.md', size: 1, text: ed }, { path: 'checkins/c.md', size: 1, text: ck },
+    { path: 'prompts/style.md', size: 1, text: '문체' }, { path: 'prompts/score.md', size: 1, text: '{rubric}' }, { path: 'prompts/lint.md', size: 1, text: '# 주석\n## AI 티\n· → 가운뎃점\n' }, ...extra];
+  const ck = '## 마이노트\n- main: 주요\n- tasks: 과제\n- rubric: {rubric_prefix}\n- style: prompts/style.md\n- score: prompts/score.md\n- lint: prompts/lint.md\n- card: 올해 성과로 넣기\n';
+  const good = P.validate(files(true, ck));
+  assert.deepEqual(good.errors, []);
+  const e = good.editors;
+  assert.equal(e[0].combine, 300); assert.equal(e[0].only, '^\\d+\\.');
+  assert.deepEqual(e[1].after, ['협업 동료']); assert.deepEqual(e[1].choices, { 진행상태: ['진행중', '진행 완료'] }); assert.deepEqual(e[1].check, { 하이라이트: ['체크', '없음'] }); assert.deepEqual(e[1].period, ['진행기간']);
+  const c = good.checkins[0];
+  assert.equal(c.main, '주요'); assert.equal(c.card, '올해 성과로 넣기'); assert.equal(c.main_max, 5); assert.equal(c.highlight_max, 3);
+  assert.equal(c.prompts.style, '문체'); assert.equal(c.prompts.score, '{rubric}');
+  assert.ok(P.validate(files(false, ck)).errors.some(x => x.includes('permissions.ai에 chat')));
+  assert.ok(P.validate(files(true, ck.replace('- tasks: 과제', '- tasks: 없는 편집기'))).errors.some(x => x.includes('tasks')));
+  assert.ok(P.validate(files(true, ck + '- intake: prompts/none.md\n')).errors.some(x => x.includes('intake 프롬프트 파일이 없어요')));
+  assert.ok(P.validate(files(true, ck, [{ path: 'prompts/lint.md', size: 1, text: '규칙이 아닌 줄\n' }])).errors.some(x => x.includes('lint 규칙')));
+  assert.ok(P.validate([{ path: 'plugin.md', size: 1, text: man(true) }, { path: 'editors/e.md', size: 1, text: '## 칸\n- note: 노트\n- block: ##\n- check: 하이라이트=체크\n' }]).errors.some(x => x.includes('하이라이트')));
+});
+
+test('편집기 — 본문 뒤 칸(after)과 제목 고르기(only)', () => {
+  const app = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const fn = name => { const i = app.indexOf(`function ${name}(`); let d = 0, j = app.indexOf('{', i); for (; j < app.length; j++){ if (app[j] === '{') d++; else if (app[j] === '}' && --d === 0) break; } return app.slice(i, j + 1); };
+  const { pedParse, pedApply, pedSplit, pedPeriod } = new Function(`${app.match(/const hLevel = [^\n]+/)[0]}\n${app.match(/const pedNorm = [^\n]+/)[0]}\n${app.match(/const PED_PERIOD = [^\n]+/)[0]}\n${fn('pedParse')}\n${fn('pedApply')}\n${fn('pedSplit')}\n${fn('pedPeriod')}\nreturn { pedParse, pedApply, pedSplit, pedPeriod };`)();
+  const ed = P.validate([{ path: 'plugin.md', size: 1, text: '---\npkm_plugin: 1\nid: ed-test\nname: 편집\nversion: 0.1.0\n---\n' },
+    { path: 'editors/e.md', size: 1, text: '## 주요\n- note: 노트\n- block: ##\n- only: ^\\d+\\.\n- body_end: ^\\(\\d+자\\)\n\n## 과제\n- note: 노트\n- block: ####\n- fields: 진행상태\n- after: 협업 동료\n- body_start: ^실행\\s*$\n- body_end: ^- 협업 동료\\s*:\n' }]).editors;
+  const main = '## 1. 일\n\n본문\n\n(2자)\n\n## 참고. 빠진 것\n\n남은 글\n\n(4자)\n';
+  assert.deepEqual(pedParse(main, ed[0]).blocks.map(b => b.title), ['1. 일']);
+  const tasks = '#### 1-1. 일\n- 진행상태: 진행 완료 (0928 배포)\n\n실행\n\n가나\n\n- 협업 동료: a (가)\n- 8/3 이후 추가: 메모\n';
+  const P2 = pedParse(tasks, ed[1]), bk = P2.blocks[0];
+  assert.deepEqual(bk.fields.map(f => [f.name, f.after || false]), [['진행상태', false], ['협업 동료', true]]);
+  const out = pedApply(P2, ed[1], [{ title: bk.title, body: bk.body, fields: ['진행중 (0928 배포)', 'a (가), b (나)'] }]);
+  assert.match(out, /- 진행상태: 진행중 \(0928 배포\)/); assert.match(out, /- 협업 동료: a \(가\), b \(나\)\n- 8\/3 이후 추가: 메모/);
+  assert.deepEqual(pedSplit(['진행 예정', '진행중', '진행 완료'], '진행 중 (3단계 중 2단계)'), { opt: '진행중', rest: ' (3단계 중 2단계)' });
+  assert.equal(pedSplit(['진행 완료'], '진행 완���').opt, null);
+  assert.deepEqual(pedPeriod('2026-03 ~ 2026-07 (공유본은 06)'), { from: '2026-03', to: '2026-07', rest: ' (공유본은 06)' });
+  assert.deepEqual(pedPeriod('2026-09 ~ 종료 시점 미정'), { from: '2026-09', to: '', rest: '종료 시점 미정' });
+});
+
+test('퀵링크 — 검사기가 규칙을 보고, 화면은 제목 맨 앞만 링크로 바꾼다', () => {
+  const man = '---\npkm_plugin: 1\nid: ql-test\nname: 퀵링크\nversion: 0.1.0\nsettings:\n  - { key: rules, label: 규칙, type: lines }\n---\n';
+  const files = rules => [{ path: 'plugin.md', size: 1, text: man }, { path: 'links/l.md', size: 1, text: `## 카드 제목\n제목 앞을 링크로.\n- rules: ${rules}\n` }];
+  const good = P.validate(files('{rules}'));
+  assert.deepEqual(good.errors, []); assert.deepEqual(good.warnings, []);
+  assert.deepEqual(good.links, [{ name: '카드 제목', file: 'links/l.md', description: '제목 앞을 링크로.', rules: '{rules}' }]);
+  assert.deepEqual(P.validate(files('[A-Z]+-\\d+ → https://x.test/$&')).errors, []);
+  assert.deepEqual(P.validate(files('[A-Z]+-\\d+\thttps://x.test/$&')).errors, []);
+  assert.match(P.validate(files('([ → https://x.test/')).errors.join(), /정규식이 맞지 않아요/);
+  assert.match(P.validate(files('[A-Z]+ → javascript:alert(1)')).errors.join(), /http\(s\)/);
+  assert.match(P.validate(files('')).errors.join(), /rules/);
+  const bundled = P.validate(['plugin.md', 'links/퀵링크.md'].map(p => { const text = fs.readFileSync(new URL(`../plugins/quicklinks/${p}`, import.meta.url), 'utf8'); return { path: p, size: text.length, text }; }));
+  assert.equal(bundled.ok, true, bundled.errors.join('\n'));
+
+  const app = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const fn = name => { const i = app.indexOf(`function ${name}(`); let d = 0, j = app.indexOf('{', i); for (; j < app.length; j++){ if (app[j] === '{') d++; else if (app[j] === '}' && --d === 0) break; } return app.slice(i, j + 1); };
+  const { qlParse, qlMatch } = new Function(`${fn('qlParse')}\n${fn('qlMatch')}\nreturn { qlParse, qlMatch };`)();
+  const rules = qlParse([bundled.manifest.settings[0].default, '틀린 줄', '([ → https://x.test/', 'gh#(\\d+) -> https://github.test/pr/$1', 'X\tjavascript:alert(1)'].join('\n'));
+  assert.equal(rules.length, 2);
+  assert.equal(bundled.manifest.settings[0].type, 'pairs'); assert.deepEqual(bundled.manifest.settings[0].columns.map(c => c.check), ['regex', 'url']);
+  assert.match(P.validate([{ path: 'plugin.md', size: 1, text: man.replace('type: lines', 'type: pairs, columns: [하나]') }, files('{rules}')[1]]).errors.join(), /칸 두 개/);
+  assert.deepEqual(qlMatch('MPEN-1210 로그인 고치기', rules), { key: 'MPEN-1210', url: 'https://kakao.atlassian.net/browse/MPEN-1210', rest: '로그인 고치기' });
+  assert.deepEqual(qlMatch('MAP2-7', rules), { key: 'MAP2-7', url: 'https://kakao.atlassian.net/browse/MAP2-7', rest: '' });
+  assert.equal(qlMatch('로그인 고치기 MPEN-1210', rules), null);   // 맨 앞만
+  assert.equal(qlMatch('MPEN-12ab 고치기', rules), null);
+  assert.deepEqual(qlMatch('gh#42 리뷰', rules), { key: 'gh#42', url: 'https://github.test/pr/42', rest: '리뷰' });
+});
+
+test('pairs 설정 — 줄을 두 칸으로 나눠 보이고, 저장할 때 탭으로 묶고 틀린 칸을 짚는다', () => {
+  const app = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const { plPairRows } = new Function(`${app.match(/const plPairRows = [^\n]+/)[0]}\nreturn { plPairRows };`)();
+  assert.deepEqual(plPairRows('a\thttps://x/$&\n\nb → https://y\nc'), [['a', 'https://x/$&'], ['b', 'https://y'], ['c', '']]);
+  assert.deepEqual(plPairRows(''), []);
+});

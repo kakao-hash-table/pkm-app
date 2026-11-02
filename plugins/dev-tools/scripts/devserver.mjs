@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// 로컬 개발 서버 — 명령 찾기·고르기(pick), 띄우기(start), 멈추기(stop), 상태(status), 찾은 명령 보기(detect). 결과는 JSON 한 줄.
+// 로컬 개발 서버(개발 도구·FE 프로젝트 관리가 같은 파일을 갖는다 — 고칠 땐 둘 다) — 한 번에 띄우기(up), 명령 찾기·고르기(pick), 띄우기(start), 멈추기(stop), 상태(status), 찾은 명령 보기(detect). 결과는 JSON 한 줄.
+//   node devserver.mjs up     --path=<프로젝트> --command="pnpm dev" [--port=8090] [--answer=?|"pnpm dev"]
 //   node devserver.mjs pick   --path=<프로젝트> [--answer="pnpm dev"]
 //   node devserver.mjs start  --path=<프로젝트> --command="pnpm dev" [--answer=3000]
 //   node devserver.mjs stop   --path=<프로젝트>
@@ -25,8 +26,9 @@ export const statePath = dir => path.join(stateDir(), `${slug(dir)}.json`);
 export const logPath = dir => path.join(stateDir(), `${slug(dir)}.log`);
 const PORT_TOOLS = /(?:^|[\s;&|(])(?:npx\s+)?(?:next|vite|webpack(?:-dev-server)?|nuxt|nuxi|astro)(?=\s|$)/;
 
-// 실행할 명령: dev·serve·local → start* → pnpm 워크스페이스(apps/*, sites/*) → gradle bootRun → 설치
-export function detect(dir){
+// 실행할 명령: dev·serve·local → start* → pnpm 워크스페이스(apps/*, sites/*) → gradle bootRun(프로필) → 설치
+// want가 "./gradlew bootRun --args=--spring.profiles.active=dev,local" 꼴이면 그 프로필 명령도 찾은 명령으로 둔다(노트에 적은 실행 명령)
+export function detect(dir, want){
   const pkg = readJSON(path.join(dir, 'package.json')), cmds = [];
   const pm = has(dir, 'pnpm-lock.yaml', 'pnpm-workspace.yaml') ? 'pnpm' : has(dir, 'yarn.lock') ? 'yarn' : 'npm';
   const scripts = pkg && pkg.scripts && typeof pkg.scripts === 'object' ? pkg.scripts : {};
@@ -42,7 +44,11 @@ export function detect(dir){
       }
     }
   }
-  if (has(dir, 'gradlew') && has(dir, 'build.gradle', 'build.gradle.kts')) cmds.push({ argv: ['./gradlew', 'bootRun'], script: '', gradle: true });
+  if (has(dir, 'gradlew') && has(dir, 'build.gradle', 'build.gradle.kts')){
+    const prof = String(want || '').trim().match(/^\.\/gradlew bootRun --args=--spring\.profiles\.active=([\w,-]+)$/);
+    if (prof) cmds.push({ argv: ['./gradlew', 'bootRun', `--args=--spring.profiles.active=${prof[1]}`], script: '', gradle: true });
+    cmds.push({ argv: ['./gradlew', 'bootRun'], script: '', gradle: true });
+  }
   if (pkg) cmds.push({ argv: [pm, 'install'], script: '', install: true });
   return { pm: pkg ? pm : null, commands: cmds.map(c => ({ command: c.argv.join(' '), argv: c.argv, script: c.script, port: PORT_TOOLS.test(c.script), gradle: !!c.gradle, install: !!c.install })) };
 }
@@ -107,12 +113,53 @@ async function suggestPort(last, gradle){
 }
 const writeState = (dir, st) => { fs.mkdirSync(stateDir(), { recursive: true }); fs.writeFileSync(statePath(dir), JSON.stringify(st, null, 2) + '\n'); };
 
+// 띄우고 포트가 열릴 때까지 기다린다(최대 30초). done으로 끝난다
+async function launch(dir, c, port, extra){
+  const done = (obj, code = 0) => { process.stdout.write(JSON.stringify({ ...obj, ...(code ? {} : extra) }) + '\n'); process.exit(code); };
+  const failWith = msg => done({ error: msg }, 1);
+  const node = nodeFor(dir);
+  const env = { ...process.env, BROWSER: 'none', FORCE_COLOR: '0' };
+  if (port) Object.assign(env, { PORT: String(port), SERVER_PORT: String(port) });
+  if (node && node.bin) env.PATH = `${node.bin}${path.delimiter}${env.PATH || ''}`;
+  let nodeV = node && node.version;
+  if (!nodeV) try { nodeV = execFileSync('node', ['--version'], { encoding: 'utf8', env, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).trim().replace(/^v/, ''); } catch { nodeV = '?'; }
+  const argv = withPort(c, port), log = logPath(dir);
+  fs.mkdirSync(stateDir(), { recursive: true });
+  fs.writeFileSync(log, `$ ${argv.join(' ')} # ${dir} · node ${nodeV} · 포트 ${port ?? '-'}\n`);
+  const fd = fs.openSync(log, 'a');
+  let spawnErr = null, exited = null;
+  // detached: 새 세션·새 프로세스 그룹(setsid). 표준 입출력은 기록 파일로 — 작업의 파이프를 붙잡지 않아야 작업이 끝난다
+  const child = spawn(argv[0], argv.slice(1), { cwd: dir, env, detached: true, stdio: ['ignore', fd, fd] });
+  child.on('error', e => { spawnErr = e; });
+  child.on('exit', code => { exited = code ?? 'signal'; });
+  fs.closeSync(fd);
+  child.unref();
+  await sleep(200);
+  if (spawnErr || !child.pid) failWith(spawnErr && spawnErr.code === 'ENOENT' ? `${argv[0]}를 찾지 못했어요. 설치돼 있는지, pkm-ai-server의 PATH에 있는지 확인해 주세요` : `실행하지 못했어요: ${(spawnErr && spawnErr.message) || '알 수 없는 오류'}`);
+  const pid = child.pid, startedAt = new Date().toISOString();
+  writeState(dir, { pid, command: argv.join(' '), port, startedAt, cwd: dir, node: nodeV });
+  if (c.install) done({ pid, command: c.command, log, summary: `${c.command} 시작했어요. 끝나면 기록에 남아요` });
+
+  const until = Date.now() + (Number(process.env.DEV_TOOLS_WAIT_MS) || 30000);
+  while (Date.now() < until){
+    if (exited != null || !alive(pid)) failWith(`${c.command}이 바로 멈췄어요.\n${tail(log)}`);
+    const ports = groupPorts(pid);
+    if (ports.length){
+      const p = ports.includes(port) ? port : ports[0], url = `http://localhost:${p}/`;
+      done({ pid, port: p, url, command: c.command, log, summary: `${url} 에서 실행 중` });
+    }
+    await sleep(400);
+  }
+  done({ pid, port, url: `http://localhost:${port}/`, command: c.command, log, summary: `http://localhost:${port}/ 에서 시작했어요(아직 준비 중이에요)` });
+}
+
 async function main(){
   const [cmd, ...rest] = process.argv.slice(2);
   const opt = Object.fromEntries(rest.filter(a => a.startsWith('--')).map(a => { const i = a.indexOf('='); return i < 0 ? [a.slice(2), ''] : [a.slice(2, i), a.slice(i + 1)]; }));
   const done = (obj, code = 0) => { process.stdout.write(JSON.stringify(obj) + '\n'); process.exit(code); };
   const failWith = msg => done({ error: msg }, 1);
   if (!String(opt.path || '').trim()) failWith('프로젝트 폴더가 비어 있어요');
+  if (opt.path === '-') failWith('로컬 클론이 없어요. FE 프로젝트 관리의 [받기]로 먼저 받아 주세요');
   const dir = path.resolve(home(opt.path)), name = path.basename(dir), answer = String(opt.answer ?? '').trim();
   if (!isDir(dir)) failWith(`프로젝트 폴더가 없어요: ${dir}`);
   const s = status(dir);
@@ -148,7 +195,7 @@ async function main(){
     if (other && other.cwd && other.cwd !== dir && alive(other.pid)) failWith(`이름이 같은 다른 프로젝트(${other.cwd})가 실행 중이에요. 그쪽을 먼저 멈춰 주세요`);
     const want = String(opt.command || '').trim();
     if (!want) failWith('실행할 명령이 비어 있어요. 처음부터 다시 실행해 주세요');
-    const c = detect(dir).commands.find(c => c.command === want);
+    const c = detect(dir, want).commands.find(c => c.command === want);
     if (!c) failWith(`이 프로젝트에서 찾은 명령이 아니에요: ${want}`);
 
     let port = null;
@@ -161,40 +208,30 @@ async function main(){
       if (!(await portFree(port))) await ask(`${port}번은 이미 다른 프로그램이 쓰고 있어요`);
     }
 
-    const node = nodeFor(dir);
-    const env = { ...process.env, BROWSER: 'none', FORCE_COLOR: '0' };
-    if (port) Object.assign(env, { PORT: String(port), SERVER_PORT: String(port) });
-    if (node && node.bin) env.PATH = `${node.bin}${path.delimiter}${env.PATH || ''}`;
-    let nodeV = node && node.version;
-    if (!nodeV) try { nodeV = execFileSync('node', ['--version'], { encoding: 'utf8', env, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).trim().replace(/^v/, ''); } catch { nodeV = '?'; }
-    const argv = withPort(c, port), log = logPath(dir);
-    fs.mkdirSync(stateDir(), { recursive: true });
-    fs.writeFileSync(log, `$ ${argv.join(' ')} # ${dir} · node ${nodeV} · 포트 ${port ?? '-'}\n`);
-    const fd = fs.openSync(log, 'a');
-    let spawnErr = null, exited = null;
-    // detached: 새 세션·새 프로세스 그룹(setsid). 표준 입출력은 기록 파일로 — 작업의 파이프를 붙잡지 않아야 작업이 끝난다
-    const child = spawn(argv[0], argv.slice(1), { cwd: dir, env, detached: true, stdio: ['ignore', fd, fd] });
-    child.on('error', e => { spawnErr = e; });
-    child.on('exit', code => { exited = code ?? 'signal'; });
-    fs.closeSync(fd);
-    child.unref();
-    await sleep(200);
-    if (spawnErr || !child.pid) failWith(spawnErr && spawnErr.code === 'ENOENT' ? `${argv[0]}를 찾지 못했어요. 설치돼 있는지, pkm-ai-server의 PATH에 있는지 확인해 주세요` : `실행하지 못했어요: ${(spawnErr && spawnErr.message) || '알 수 없는 오류'}`);
-    const pid = child.pid, startedAt = new Date().toISOString();
-    writeState(dir, { pid, command: argv.join(' '), port, startedAt, cwd: dir, node: nodeV });
-    if (c.install) done({ pid, command: c.command, log, summary: `${c.command} 시작했어요. 끝나면 기록에 남아요` });
+    await launch(dir, c, port, {});
+  }
 
-    const until = Date.now() + (Number(process.env.DEV_TOOLS_WAIT_MS) || 30000);
-    while (Date.now() < until){
-      if (exited != null || !alive(pid)) failWith(`${c.command}이 바로 멈췄어요.\n${tail(log)}`);
-      const ports = groupPorts(pid);
-      if (ports.length){
-        const p = ports.includes(port) ? port : ports[0], url = `http://localhost:${p}/`;
-        done({ pid, port: p, url, command: c.command, log, summary: `${url} 에서 실행 중` });
-      }
-      await sleep(400);
+  if (cmd === 'up'){
+    // 띄우기 한 번에 — 명령은 넘겨받은 것(노트의 실행 명령·지난번 명령·찾은 첫 명령), 포트는 넘겨받은 것(노트) → 지난번 것 중 빈 것, 아니면 빈 곳. 묻지 않는다
+    // [명령 바꾸기]를 누르면 --answer=? 로 다시 와서 명령을 고르게 묻고, 고른 명령으로 띄운다
+    const extra = { change: { label: '명령 바꾸기', value: '?' } };
+    if (s.running) done({ running: true, url: s.url, port: s.port, summary: runningSummary() });
+    const other = readJSON(statePath(dir));
+    if (other && other.cwd && other.cwd !== dir && alive(other.pid)) failWith(`이름이 같은 다른 프로젝트(${other.cwd})가 실행 중이에요. 그쪽을 먼저 멈춰 주세요`);
+    const want = answer && answer !== '?' ? answer : String(opt.command || '').trim();
+    const { commands } = detect(dir, want);
+    if (!commands.length) failWith('실행할 명령을 찾지 못했어요. package.json의 dev·serve·start·local 스크립트나 gradlew + build.gradle을 찾아요');
+    const c = answer === '?' ? null : commands.find(c => c.command === want);
+    if (!c){
+      const node = nodeFor(dir);
+      done({ ask: {
+        question: `${name}에서 무엇을 실행할까요?`,
+        hint: [answer !== '?' && want && want !== '-' && `${clip(want, 40)}은(는) 이 프로젝트에서 찾은 명령이 아니에요`, node && (node.version ? `node ${node.version}로 실행해요` : `.nvmrc의 node ${node.want}가 nvm에 없어서 지금 node로 실행해요`)].filter(Boolean).join(' · '),
+        choices: commands.map((c, i) => ({ value: c.command, label: c.command, hint: c.install ? '패키지 설치' : c.gradle ? 'Spring Boot' : clip(c.script, 100), recommended: i === 0 })), inline: true
+      } });
     }
-    done({ pid, port, url: `http://localhost:${port}/`, command: c.command, log, summary: `http://localhost:${port}/ 에서 시작했어요(아직 준비 중이에요)` });
+    const fixed = Number(opt.port), port = c.install ? null : fixed > 0 && fixed < 65536 && await portFree(fixed) ? fixed : await suggestPort(s.last_port, c.gradle);
+    await launch(dir, c, port, extra);
   }
 
   if (cmd === 'stop'){
@@ -209,7 +246,7 @@ async function main(){
     done({ stopped: true, forced, summary: `멈췄어요${st.port ? ` (포트 ${st.port})` : ''}${forced ? ' · 강제로' : ''}` });
   }
 
-  failWith('명령은 pick, start, stop, status, detect예요');
+  failWith('명령은 up, pick, start, stop, status, detect예요');
 }
 
 const isMain = (() => { try { return fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url); } catch { return false; } })();

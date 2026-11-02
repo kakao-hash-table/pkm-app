@@ -149,7 +149,9 @@ export async function list(profileDir){
 async function sourceOf(rec, id, appDir){
   const s = rec.source || {};
   const inApp = (await bundled(appDir)).find(b => b.id === id);
-  if (inApp && (s.type === 'bundled' || (s.type === 'local' && path.dirname(path.resolve(s.path || '')) === path.resolve(appDir)))) return { local: inApp.path, kind: 'bundled' };
+  // 다른 컴퓨터의 앱 폴더(…/pkm-app/plugins/<id>)에서 설치해 동기화된 기록이면, 그 경로가 이 컴퓨터에 없어도 이 앱의 내장 플러그인으로 본다
+  const otherApp = s.type === 'local' && s.path && !fss.existsSync(s.path) && /(^|\/)plugins\/[^/]+\/?$/.test(s.path) && path.basename(s.path) === id;
+  if (inApp && (s.type === 'bundled' || otherApp || (s.type === 'local' && path.dirname(path.resolve(s.path || '')) === path.resolve(appDir)))) return { local: inApp.path, kind: 'bundled' };
   if (s.type === 'local' && s.path && fss.existsSync(s.path)) return { local: s.path, kind: 'local' };
   if (s.type === 'git' && s.url) return { git: s.url, ref: s.ref || null, kind: 'git' };
   return null;

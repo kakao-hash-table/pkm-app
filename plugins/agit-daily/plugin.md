@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: agit-daily
 name: 아지트 데일리
-version: 0.1.0
+version: 0.1.1
 author: pkm
 permissions:
   bundled: [scripts/daily.mjs]

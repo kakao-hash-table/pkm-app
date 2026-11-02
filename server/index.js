@@ -37,6 +37,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createRequire } from 'node:module';
@@ -302,6 +303,21 @@ const SEC = req => ({ 'x-content-type-options':'nosniff', 'referrer-policy':'no-
 const send = (res, code, body, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'content-type':type, 'cache-control':'no-store', ...SEC(res.req) }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
 async function body(req){ let s = ''; for await (const c of req){ s += c; if (s.length > 20e6) throw Object.assign(new Error('너무 커요'), { status:413 }); } return s ? JSON.parse(s) : {}; }
 
+/* Obsidian으로 열기 — 프로필 이름이 보관함 이름과 같다는 보장이 없어, Obsidian에 등록된 보관함 중 이 파일을 품은 것을 찾아 그 ID로 연다 */
+const OBS_CONF = process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Application Support', 'obsidian', 'obsidian.json')
+  : process.platform === 'win32' ? path.join(process.env.APPDATA || '', 'obsidian', 'obsidian.json') : path.join(os.homedir(), '.config', 'obsidian', 'obsidian.json');
+async function obsidianLink(p, rel){
+  const dir = path.join(DATA, p), abs = path.resolve(dir, String(rel || ''));
+  if (!rel || !abs.startsWith(dir + path.sep)) throw Object.assign(new Error('파일 경로가 맞지 않아요'), { status:400 });
+  let vaults = {}; try { vaults = JSON.parse(await fs.readFile(OBS_CONF, 'utf8')).vaults || {}; } catch {}
+  const real = fss.realpathSync.native(dir) + abs.slice(dir.length);   // 데이터 폴더가 심볼릭 링크여도 맞춘다
+  const hit = Object.entries(vaults).map(([id, v]) => { let vp = ''; try { vp = fss.realpathSync.native(v.path); } catch {} return { id, vp }; })
+    .filter(v => v.vp && real.startsWith(v.vp + path.sep)).sort((a, b) => b.vp.length - a.vp.length)[0];
+  if (!hit) return { url:null, dir };
+  const file = path.relative(hit.vp, real).split(path.sep).join('/').replace(/\.md$/, '');
+  return { url:`obsidian://open?vault=${encodeURIComponent(hit.id)}&file=${encodeURIComponent(file)}`, dir };
+}
+
 async function api(req, res, url){
   const parts = url.pathname.split('/').slice(2).map(decodeURIComponent);   // ['profiles'] · ['profile', p, ...]
   // 다른 사이트가 이 로컬 서버에 쓰기 요청을 보내지 못하게. 브라우저가 붙이는 Sec-Fetch-Site를 먼저 본다(프록시를 거쳐도 그대로라
@@ -333,6 +349,7 @@ async function api(req, res, url){
     if (req.method === 'GET' && sub === 'version') return send(res, 200, { version:await versionOf(p), sync:SYNC[p] ? { state:SYNC[p].state, at:SYNC[p].at, error:SYNC[p].error } : null });
     if (req.method === 'POST' && sub === 'save') return send(res, 200, await save(p, await body(req)));
     if (req.method === 'GET' && sub === 'image') return image(res, p, url.searchParams.get('name'));
+    if (req.method === 'GET' && sub === 'obsidian') return send(res, 200, await obsidianLink(p, url.searchParams.get('file')));
     if (sub === 'runner' && req.method === 'POST') return send(res, 200, await runner.setRunner(p, await body(req)));
     if (sub === 'jobs' && !parts[3] && req.method === 'GET') return send(res, 200, await jobs.status(p));
     if (sub === 'jobs' && parts[3] && parts[4] === 'run' && req.method === 'POST') return send(res, 200, await jobs.runNow(p, parts[3]));

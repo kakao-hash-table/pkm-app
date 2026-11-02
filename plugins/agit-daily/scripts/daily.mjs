@@ -115,7 +115,7 @@ function main(){
     const out = {
       summary:`한 일 ${c.done.length} · 할 일 ${c.todo.length + (withDoing ? c.doing.length : 0)}`,
       verdict:{ tone:'ok', title:`${md(date)} 데일리`, text:`한 일은 ${md(c.prev)} 약속과 계획, 할 일은 오늘 약속과 계획${withDoing ? '과 진행 중 카드' : ''}이에요. 붙여 넣은 뒤 아지트에서 고쳐도 돼요.` },
-      findings:[{ title:'아지트에 붙여 넣을 글', copy:text, ...(opts.agit ? { where:'아지트 열기', url:opts.agit } : {}) }]
+      findings:[{ title:'아지트에 붙여 넣을 글', copy:text, rich:true, ...(opts.agit ? { where:'아지트 열기', url:opts.agit } : {}) }]
     };
     if (ans.startsWith('done')) return { ...out, outcome:{ title:'다 썼어요', text:'' } };
     const toggle = c.doing.length ? [withDoing ? { value:'plain', label:'진행 중 카드 빼기' } : { value:'doing', label:`진행 중 카드 ${c.doing.length}개 더하기` }] : [];
