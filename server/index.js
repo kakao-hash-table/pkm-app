@@ -27,6 +27,11 @@
 // POST /api/profile/:p/gcal/sync         지금 맞추기 · POST …/gcal/disconnect 연결 끊기
 // POST /api/gcal/client {client_id, client_secret}   내 구글 OAuth 클라이언트 등록(토큰과 함께 ~/.pkm-app/gcal.json, 데이터 폴더 밖)
 // GET  /api/profile/:p/jobs               AI 예약 작업의 마지막 실행(이 컴퓨터) · POST …/jobs/:id/run  지금 돌리기(server/jobs.js)
+// GET  /api/profile/:p/chats              AI 챗봇 상태(로컬 AI 연결인지)와 방 목록 · GET …/chats/:room  방 하나(말·진행·확인 요청)
+// POST /api/profile/:p/chats {card? | project?, cwd?} 데이터 방, 카드 방, 프로젝트 방 열기(없으면 만든다) · DELETE …/chats/:room  카드 세션 지우기
+// POST …/chats/:room/send {id, text}  말 보내기 · …/cancel  그만두기 · …/reset  새 대화 · …/answer {request_id, allow}  확인 요청에 답하기(server/chats.js)
+// POST …/chats/:room/memo {text}  방 메모 적기(빈 글이면 지운다) · …/read  끝난 답을 읽었다고 적기(카드의 '새 답'을 지운다)
+// POST …/chats/:room/cwd {cwd|null}  카드 세션의 작업 폴더 고르기·비우기 · GET …/chats/_dirs?path=  폴더 고르기 화면의 하위 폴더 목록
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -38,8 +43,9 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
-import { createRunner } from './runner.js';
+import { createRunner, readConf } from './runner.js';
 import { createJobs } from './jobs.js';
+import { createChats } from './chats.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.PKM_DATA ? path.resolve(process.env.PKM_DATA) : path.join(ROOT, 'data');
@@ -215,6 +221,26 @@ const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((awai
 /* ---------- AI 예약 작업: 돌리는 컴퓨터가 정한 때에 AI에 맡기고 결과를 인박스로 ---------- */
 const jobs = createJobs({ DATA, listProfiles, settingsOf, here:p => runner.here(p), onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p); } });
 
+/* ---------- AI 챗봇: 같은 컴퓨터의 pkm-ai-server로 프로필 데이터·단기 카드 채팅(server/chats.js) ---------- */
+async function findCard(p, id){
+  const { files } = await readProfile(p), P = MD.parse(files), t = P.db.tasks.find(x => x.id === id);
+  if (!t || !P.paths[id]) return null;
+  return { id:t.id, title:t.title, status:t.status, path:P.paths[id], body:String(files[P.paths[id]] || '').replace(/^---\n[\s\S]*?\n---\n?/, '').trim().slice(0, 8000) };
+}
+// 프로젝트(프로젝트 파일럿) — 기록 파일과, 메모에 "프로젝트 파일럿 <id>/" 줄이 있는 단기 카드
+async function findProject(p, id){
+  if (!/^p[\w-]{2,40}$/.test(String(id))) return null;
+  let rec = null; try { rec = JSON.parse(await fs.readFile(path.join(DATA, p, '_플러그인', '.data', 'project-pilot', `${id}.json`), 'utf8')); } catch {}
+  const { files } = await readProfile(p), P = MD.parse(files), mark = `프로젝트 파일럿 ${id}/`;
+  const cards = P.db.tasks.filter(t => String(t.memo || '').includes(mark)).map(t => ({ id:t.id, title:t.title, status:t.status, path:P.paths[t.id] || '', open:(t.todos || []).filter(x => !x.d).map(x => x.t).slice(0, 8) }));
+  if (!rec && !cards.length) return null;
+  const plan = (rec && rec.plan) || {};
+  return { id, title:plan.name || (cards[0] && cards[0].title.split(' · ')[0]) || id, goal:rec ? String(rec.goal || '') : '', status:rec ? rec.status : '',
+    file:rec ? path.join(DATA, p, '_플러그인', '.data', 'project-pilot', `${id}.json`) : '', hub:rec && rec.hub && rec.hub.path ? path.join(DATA, p, rec.hub.path) : '',
+    work:rec && rec.work ? rec.work : '', cards };
+}
+const chats = createChats({ DATA, readConf, findCard, findProject });
+
 /* ---------- 교과서: 원본(Obsidian)이 정본, 바뀌면 다시 복제 ---------- */
 // 책 폴더의 .source.json 이 가리키는 원본을 지켜본다. 놓친 변경은 5분마다 한 번 더 맞춘다.
 const TB = {};   // 원본 경로 → { watcher, timer, profile, tbFolder }
@@ -311,6 +337,21 @@ async function api(req, res, url){
     if (sub === 'jobs' && !parts[3] && req.method === 'GET') return send(res, 200, await jobs.status(p));
     if (sub === 'jobs' && parts[3] && parts[4] === 'run' && req.method === 'POST') return send(res, 200, await jobs.runNow(p, parts[3]));
     if (sub === 'plugins' && parts[3] === 'state' && req.method === 'GET') return send(res, 200, await runner.status(p));
+    if (sub === 'chats'){
+      const rid = parts[3], act = parts[4];
+      if (!rid && req.method === 'GET') return send(res, 200, await chats.status(p));
+      if (rid === '_dirs' && req.method === 'GET') return send(res, 200, await chats.dirs(p, url.searchParams.get('path')));
+      if (!rid && req.method === 'POST'){ const b = await body(req); return send(res, 200, await chats.open(p, { card:b.card ? String(b.card) : null, project:b.project ? String(b.project) : null, cwd:b.cwd ? String(b.cwd) : null })); }
+      if (rid && !act && req.method === 'GET') return send(res, 200, chats.room(p, rid));
+      if (rid && !act && req.method === 'DELETE') return send(res, 200, await chats.remove(p, rid));
+      if (rid && req.method === 'POST' && act === 'send') return send(res, 202, await chats.send(p, rid, await body(req)));
+      if (rid && req.method === 'POST' && act === 'cancel') return send(res, 200, await chats.cancel(p, rid));
+      if (rid && req.method === 'POST' && act === 'reset') return send(res, 200, await chats.reset(p, rid));
+      if (rid && req.method === 'POST' && act === 'answer') return send(res, 200, await chats.answer(p, rid, await body(req)));
+      if (rid && req.method === 'POST' && act === 'read') return send(res, 200, chats.markRead(p, rid));
+      if (rid && req.method === 'POST' && act === 'memo'){ const b = await body(req); return send(res, 200, await chats.setMemo(p, rid, b.text)); }
+      if (rid && req.method === 'POST' && act === 'cwd'){ const b = await body(req); return send(res, 200, await chats.setCwd(p, rid, b.cwd ? String(b.cwd) : null)); }
+    }
     if (sub === 'plugins' && parts[3] && parts[4]){
       const id = parts[3], what = parts[4];
       if (what === 'machine' && req.method === 'GET') return send(res, 200, await runner.machine(p, id));
@@ -394,7 +435,7 @@ const server = http.createServer(async (req, res) => {
 if (process.argv[1] === fileURLToPath(import.meta.url)){
   for (const pr of await listProfiles()){ const n = await syncTemplates(pr.name); if (n) console.log(`${pr.name}: 템플릿 ${n}개를 앱 템플릿에 맞췄어요`); }
   await syncTextbooks(); setInterval(() => syncTextbooks().catch(() => {}), 300000).unref();
-  runner.start(); jobs.start();
+  runner.start(); jobs.start(); chats.start((await listProfiles()).map(x => x.name));
   server.listen(PORT, HOST, () => console.log(`PKM: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/  (데이터: ${DATA})`));
 }
-export { server, runner, gcal, jobs, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };
+export { server, runner, gcal, jobs, chats, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };

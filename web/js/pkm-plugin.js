@@ -13,15 +13,18 @@
   const HOURS_RE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
   const ignored = p => p.split('/').some(s => s.startsWith('.')) || /(^|\/)(node_modules|__pycache__)\//.test(p);
 
-  /* 워크플로우 문서: "## 이름" 아래 "- [키] 단계명 · 종류 [in 폴더]: 내용" (종류 = manual | ask | script | ai | agent(read|auto|full)). ask는 사람에게 글을 받는다(내용 = 예시 문구) */
+  /* 워크플로우 문서: "## 이름" 아래 (설명 줄) "- [키] 단계명 · 종류 [when {단계.필드}] [in 폴더]: 내용" (종류 = manual | ask | script | ai | agent(read|auto|full)). ask는 사람에게 글을 받는다(내용 = 예시 문구) */
   function parseWorkflows(text){
     const out = []; let cur = null, step = null;
     for (const line of String(text || '').split('\n')){
       const h = line.match(/^##\s+(.+?)\s*$/);
       if (h){ cur = { name: h[1], steps: [] }; out.push(cur); step = null; continue; }
-      const m = line.match(/^-\s+\[([^\]]+)\]\s+(.+?)\s+·\s+(manual|ask|script|ai|agent)(?:\((read|auto|full)\))?(?:\s+in\s+(\S+?))?\s*(?::\s*(.*))?$/);
-      if (m && cur){ step = { key: m[1].trim(), name: m[2].trim(), kind: m[3], mode: m[4] || null, cwd: m[5] || null, body: (m[6] || '').trim() }; cur.steps.push(step); continue; }
+      const ok = line.match(/^-\s+ok:\s*(.+?)\s*$/);   // 시작할 때 묻는 창의 확인 버튼 글자(첫 단계 앞에서만)
+      if (ok && cur && !cur.steps.length){ cur.ok = ok[1].slice(0, 20); continue; }
+      const m = line.match(/^-\s+\[([^\]]+)\]\s+(.+?)\s+·\s+(manual|ask|script|ai|agent)(?:\((read|auto|full)\))?(?:\s+when\s+(\{[^{}\s]+\}))?(?:\s+in\s+(\S+?))?\s*(?::\s*(.*))?$/);
+      if (m && cur){ step = { key: m[1].trim(), name: m[2].trim(), kind: m[3], mode: m[4] || null, when: m[5] || null, cwd: m[6] || null, body: (m[7] || '').trim() }; cur.steps.push(step); continue; }
       if (step && /^\s{2,}\S/.test(line)) step.body += (step.body ? '\n' : '') + line.trim();   // 두 칸 들여 쓴 줄은 앞 단계 내용에 이어 붙인다
+      else if (cur && !cur.steps.length && line.trim() && !/^-\s/.test(line)) cur.note = (cur.note ? cur.note + ' ' : '') + line.trim();   // 단계 앞 줄은 설명 — 시작할 때 묻는 창에 보인다
     }
     return out;
   }
@@ -42,7 +45,8 @@
   }
 
   /* 검색·편집기 문서도 피드와 같은 꼴: "## 이름" 아래 "- 키: 값" 줄, 다른 줄은 설명 */
-  const parseSearches = parseFeeds, parseEditors = parseFeeds;
+  const parseSearches = parseFeeds, parseEditors = parseFeeds, parseChats = parseFeeds;
+  const CHAT_SCOPES = ['profile', 'card', 'project'];
   const startsOf = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
   const reOk = v => { try { new RegExp(v); return true; } catch { return false; } };
 
@@ -107,6 +111,7 @@
           if (s.kind === 'agent' && MODES.indexOf(s.mode || 'read') > MODES.indexOf(mode)) err(`${where}: 에이전트 모드 ${s.mode}가 상한 ${mode}보다 높아요`);
           if ((s.kind === 'ai' || s.kind === 'agent') && /^prompts\/\S+\.md$/.test(s.body) && !byPath[s.body]) err(`${where}: 프롬프트 파일이 없어요 ${s.body}`);
           if (!['manual', 'ask'].includes(s.kind) && !s.body) err(`${where}: 내용이 비어 있어요`);
+          if (s.when && !w.steps.slice(0, w.steps.indexOf(s)).some(z => z.key === s.when.slice(1, -1).split('.')[0])) err(`${where}: when의 ${s.when}는 앞 단계 결과여야 해요`);
         }
       }
     }
@@ -163,7 +168,22 @@
           fields: String(d.fields || '').split(',').map(x => x.trim()).filter(Boolean) });
       }
     }
-    if (!workflows.length && !feeds.length && !searches.length && !editors.length) warn('워크플로우·피드·검색·편집기가 하나도 없어요(workflows/ feeds/ searches/ editors/)');
+    // 채팅 — 오른쪽 아래 AI 챗봇 창(profile: 프로필 데이터 고치기, card: 단기 카드마다 세션). 앱이 화면을 그리고,
+    // 에이전트는 pkm 서버와 같은 컴퓨터에 띄운 pkm-ai-server에서만 돈다(로컬 전용)
+    const chats = [];
+    for (const f of list.filter(f => /^chats\/[^/]+\.md$/.test(f.path))){
+      for (const d of parseChats(f.text)){
+        const where = `${f.path} › ${d.name}`, cmode = d.mode || 'auto';
+        if (!CHAT_SCOPES.includes(d.scope)) err(`${where}: scope는 ${CHAT_SCOPES.join(' 또는 ')}예요`);
+        if (!ai.includes('agent')) err(`${where}: permissions.ai에 agent가 없어요`);
+        if (!MODES.includes(cmode)) err(`${where}: mode는 ${MODES.join(', ')}`);
+        else if (MODES.indexOf(cmode) > MODES.indexOf(mode)) err(`${where}: 에이전트 모드 ${cmode}가 상한 ${mode}보다 높아요`);
+        if (d.prompt && (!/^prompts\/\S+\.md$/.test(d.prompt) || !byPath[d.prompt])) err(`${where}: 프롬프트 파일이 없어요 ${d.prompt}`);
+        if (chats.some(x => x.scope === d.scope)) err(`${where}: scope ${d.scope} 채팅이 이미 있어요`);
+        chats.push({ name: d.name, file: f.path, description: d.description, scope: d.scope, mode: cmode, prompt: d.prompt || null, cwd: d.cwd || null, label: d.label || null });
+      }
+    }
+    if (!workflows.length && !feeds.length && !searches.length && !editors.length && !chats.length) warn('워크플로우·피드·검색·편집기·채팅이 하나도 없어요(workflows/ feeds/ searches/ editors/ chats/)');
     if (mode === 'full') warn('에이전트가 모든 확인을 건너뛰는 full 모드를 요구해요');
 
     const manifest = { spec: SPEC, id: String(fm.id || ''), name: String(fm.name || ''), version: String(fm.version || ''), description: String(fm.description || doc.pre || '').slice(0, 500),
@@ -171,10 +191,10 @@
       collects, permissions: { ai, agent_mode: mode, scripts, bundled, secrets: secrets.map(x => x.name) }, secrets,
       settings: settings.map(s => ({ key: String(s.key), label: String(s.label), hint: s.hint ? String(s.hint) : '', type: SETTING_TYPES.includes(String(s.type)) ? String(s.type) : 'text',
         default: s.default == null ? (s.type === 'toggle' ? false : '') : s.type === 'toggle' ? s.default === true : String(s.default), placeholder: s.placeholder ? String(s.placeholder) : '' })) };
-    return { ok: !errors.length, manifest, workflows, feeds, searches, editors, scripts: bundled, errors, warnings };
+    return { ok: !errors.length, manifest, workflows, feeds, searches, editors, chats, scripts: bundled, errors, warnings };
   }
 
-  const api = { SPEC, DIR, MODES, LIMITS, validate, parseWorkflows, parseFeeds, parseSearches, parseEditors, startsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
+  const api = { SPEC, DIR, MODES, LIMITS, validate, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, startsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMPlugin = api;
 })(typeof self !== 'undefined' ? self : this);

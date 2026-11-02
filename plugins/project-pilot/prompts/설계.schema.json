@@ -1,0 +1,361 @@
+{
+ "type": "object",
+ "properties": {
+  "_plan": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "one_liner": {
+     "type": "string"
+    },
+    "strategy": {
+     "type": "string"
+    },
+    "metric": {
+     "type": "object",
+     "properties": {
+      "name": {
+       "type": "string"
+      },
+      "unit": {
+       "type": "string"
+      },
+      "target": {
+       "type": "number"
+      },
+      "period": {
+       "type": "string",
+       "enum": [
+        "월",
+        "주"
+       ]
+      }
+     },
+     "required": [
+      "name",
+      "unit",
+      "target",
+      "period"
+     ]
+    },
+    "tree": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       },
+       "assumed": {
+        "type": "boolean"
+       },
+       "note": {
+        "type": "string"
+       },
+       "source_url": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "name",
+       "value",
+       "assumed",
+       "source_url"
+      ]
+     }
+    },
+    "milestones": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string"
+       },
+       "target": {
+        "type": "string"
+       },
+       "by": {
+        "type": "string"
+       },
+       "next": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "name",
+       "target",
+       "next"
+      ]
+     }
+    },
+    "decisions": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "me_minutes": {
+     "type": "number"
+    },
+    "routine_at": {
+     "type": "string"
+    },
+    "subprojects": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "key": {
+        "type": "string"
+       },
+       "lens": {
+        "type": "string",
+        "enum": [
+         "오퍼",
+         "고객유치",
+         "홍보",
+         "전환",
+         "운영툴",
+         "리텐션",
+         "측정",
+         "규정",
+         "제품"
+        ]
+       },
+       "title": {
+        "type": "string"
+       },
+       "why": {
+        "type": "string"
+       },
+       "outcome": {
+        "type": "string"
+       },
+       "wave": {
+        "type": "integer"
+       },
+       "done": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "todos": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "text": {
+           "type": "string"
+          },
+          "who": {
+           "type": "string",
+           "enum": [
+            "ai",
+            "me"
+           ]
+          },
+          "minutes": {
+           "type": "number"
+          }
+         },
+         "required": [
+          "text",
+          "who",
+          "minutes"
+         ]
+        }
+       }
+      },
+      "required": [
+       "key",
+       "lens",
+       "title",
+       "why",
+       "outcome",
+       "wave",
+       "done",
+       "todos"
+      ]
+     }
+    },
+    "loops": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "key": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       },
+       "sub": {
+        "type": "string"
+       },
+       "every": {
+        "type": "string",
+        "enum": [
+         "daily",
+         "weekdays",
+         "weekly",
+         "monthly"
+        ]
+       },
+       "dow": {
+        "type": "integer"
+       },
+       "day": {
+        "type": "integer"
+       },
+       "at": {
+        "type": "string"
+       },
+       "task": {
+        "type": "string"
+       },
+       "me": {
+        "type": "string"
+       },
+       "me_minutes": {
+        "type": "number"
+       },
+       "metric": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "key",
+       "title",
+       "every",
+       "at",
+       "task",
+       "me",
+       "me_minutes",
+       "metric"
+      ]
+     }
+    },
+    "checkins": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "key": {
+        "type": "string"
+       },
+       "question": {
+        "type": "string"
+       },
+       "unit": {
+        "type": "string"
+       },
+       "every": {
+        "type": "string",
+        "enum": [
+         "weekly",
+         "monthly"
+        ]
+       },
+       "dow": {
+        "type": "integer"
+       },
+       "day": {
+        "type": "integer"
+       },
+       "at": {
+        "type": "string"
+       },
+       "to_metric": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "key",
+       "question",
+       "unit",
+       "every",
+       "at",
+       "to_metric"
+      ]
+     }
+    },
+    "risks": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "risk": {
+        "type": "string"
+       },
+       "guard": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "risk",
+       "guard"
+      ]
+     }
+    },
+    "first_week": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "title": {
+        "type": "string"
+       },
+       "url": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "title",
+       "url"
+      ]
+     }
+    }
+   },
+   "required": [
+    "name",
+    "one_liner",
+    "strategy",
+    "metric",
+    "tree",
+    "milestones",
+    "decisions",
+    "me_minutes",
+    "routine_at",
+    "subprojects",
+    "loops",
+    "checkins",
+    "risks",
+    "first_week",
+    "assumptions",
+    "sources"
+   ]
+  }
+ },
+ "required": [
+  "_plan"
+ ]
+}

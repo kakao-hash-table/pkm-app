@@ -50,6 +50,16 @@ test('데일리의 그날 시작 시각과 건너뛴 루틴이 왕복한다', ()
   assert.equal(back.dailies['2026-10-27'].start, '10:00');   // 시작만 옮긴 앞날도 파일이 남는다
 });
 
+test('데일리의 하루 마무리가 왕복하고, 비어 있으면 제목을 쓰지 않는다', () => {
+  const db = { ...MD.emptyDb(), dailies:{ '2026-10-31':{ memo:'', retro:'', wrap:'즐겨찾기 무한로딩 — 원인 찾음\n내일: 커서 페이징부터', did:[], plan:{} }, '2026-11-01':{ memo:'메모만', retro:'', wrap:'', did:[], plan:{} } } };
+  const files = MD.serialize({ db, settings });
+  assert.match(files['02_시간/데일리/2026-10-31.md'], /# 하루 마무리\n즐겨찾기 무한로딩 — 원인 찾음\n내일: 커서 페이징부터\n$/);
+  assert.doesNotMatch(files['02_시간/데일리/2026-11-01.md'], /하루 마무리/);
+  const back = MD.parse(files).db;
+  assert.equal(back.dailies['2026-10-31'].wrap, '즐겨찾기 무한로딩 — 원인 찾음\n내일: 커서 페이징부터');
+  assert.equal(back.dailies['2026-11-01'].wrap, '');
+});
+
 test('하루 여러 번 도는 루틴은 회차별로 체크·건너뛰기가 왕복한다', () => {
   const db = { ...MD.emptyDb(), routines:[{ id:'R1', title:'물 250ml', enabled:true, cron:'0 10-22/2 * * *', duration:5, block:'', area:'', amount:null, content:'' }, { id:'R2', title:'기상', enabled:true, cron:'30 6 * * *', duration:5, block:'', area:'', amount:null, content:'' }],
     routineDone:{ '2026-10-26':{ 'R1@10:00':true, 'R1@12:00':true, R2:true } },
@@ -175,4 +185,17 @@ test('단기의 보관(archived)은 프런트매터로 왕복한다', () => {
   const f = Object.entries(files).find(([p]) => p.includes('끝난 일'))[1];
   assert.match(f, /archived: "?2026-10-31"?/);
   assert.equal(MD.parse(files).db.tasks[0].archived, '2026-10-31');
+});
+
+test('단기 id는 카드마다 하나 — 없거나 겹치면 새 id를 주고 다시 쓸 목록(reid)에 올린다', () => {
+  const doc = (id, title) => `---\ntype: project\n${id ? `id: ${id}\n` : ''}title: ${title}\nstatus: todo\n---\n\n# 할 일\n\n# 완료 조건\n\n# 메모\n`;
+  const files = { '03_행동/단기보드/나.md': doc('tsame1', '나'), '03_행동/단기보드/가.md': doc('tsame1', '가'), '03_행동/단기보드/다.md': doc(null, '다'), '03_행동/단기보드/라.md': doc('tkeep1', '라') };
+  const r = MD.parse(files), ids = r.db.tasks.map(t => t.id);
+  assert.equal(new Set(ids).size, 4);
+  assert.equal(r.db.tasks.find(t => t.title === '가').id, 'tsame1');   // 겹치면 경로가 앞서는 파일이 원래 id를 갖는다(기기마다 같게)
+  assert.equal(r.db.tasks.find(t => t.title === '라').id, 'tkeep1');
+  assert.equal(r.reid.length, 2);
+  assert.deepEqual(r.reid.sort(), [r.db.tasks.find(t => t.title === '나').id, r.db.tasks.find(t => t.title === '다').id].sort());
+  const out = MD.serialize({ db:r.db, settings:{} });
+  assert.match(out[out.index[r.db.tasks.find(t => t.title === '다').id]], /^id: t/m);   // 새 id가 파일에 적힌다
 });

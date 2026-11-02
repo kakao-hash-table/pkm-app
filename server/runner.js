@@ -23,6 +23,18 @@ const KEEP_RUNS = 60;
 const now = () => new Date().toISOString();
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const clip = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+// 긴 인자 — pkm-ai-server는 인자 하나를 2000자까지 받는다. 넘는 값(앞 단계의 큰 JSON 등)은 이 컴퓨터의 임시 파일(0600)에 쓰고
+// --키=@file:<경로>로 넘긴다. 스크립트가 그 파일을 읽는다. 하루 지난 파일은 지운다
+const ARG_MAX = 1800, ARG_DIR = path.join(HOME, 'args');
+export function bigArg(a, tag){
+  if (a.length <= ARG_MAX) return a;
+  const m = a.match(/^(--[^=\s]+=)([\s\S]*)$/), head = m ? m[1] : '', val = m ? m[2] : a;
+  fs.mkdirSync(ARG_DIR, { recursive: true, mode: 0o700 });
+  for (const f of fs.readdirSync(ARG_DIR)){ const p = path.join(ARG_DIR, f); try { if (Date.now() - fs.statSync(p).mtimeMs > 86400000) fs.rmSync(p, { force: true }); } catch {} }
+  const f = path.join(ARG_DIR, `${tag}-${crypto.randomBytes(6).toString('hex')}.txt`);
+  fs.writeFileSync(f, val, { mode: 0o600 });
+  return `${head}@file:${f}`;
+}
 
 /* ---------- 이 컴퓨터의 설정 ---------- */
 export function readConf(){ try { return JSON.parse(fs.readFileSync(CONF, 'utf8')); } catch { return { profiles: {} }; } }
@@ -103,6 +115,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       if (k.includes('.')){
         const [step, ...rest] = k.split('.'), s = run.steps.find(x => x.key === step);
         v = s && s.output; for (const r of rest) v = v == null ? undefined : v[r];
+        if (v == null && s && s.when_skipped) v = '';   // when으로 건너뛴 단계 — 뒤 단계에는 빈 값으로
       } else v = vars[k];
       if (v == null){ misses.push(m); return blank ? '' : m; }
       return typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -227,6 +240,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
           if (step.answer != null && String(step.answer).trim()){ const v = String(step.answer).trim(); Object.assign(step, { status: 'done', output: { answer: v }, text: clip(v, 6000), finished: now(), ask: null }); run.updated = now(); continue; }
           Object.assign(step, { status: 'input', ask: normAsk({ question: d.name, free: true, placeholder: d.body }), started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
         }
+        if (d.when){   // when {단계.필드} — 그 값이 비었으면 이 단계를 건너뛴다(예: 고칠 점이 없으면 반영 AI를 부르지 않는다)
+          const v = fill(d.when, run, settings).trim();
+          if (!v || v === d.when || v === '{}' || v === '[]' || v === 'false'){ Object.assign(step, { status: 'skipped', when_skipped: true, finished: now() }); run.updated = now(); continue; }
+        }
         if (run.by === 'auto' && !step.gate_ok && conf.gates && conf.gates[gateKey(run.workflow, step.key)]){
           Object.assign(step, { status: 'input', ask: { type: 'gate', question: `${step.name}을 할까요?` }, started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
         }
@@ -271,7 +288,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
   const slim = run => { for (const s of run.steps) if (s.output && typeof s.output === 'object') for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k]; };
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true, confirm: c.confirm ? clip(c.confirm, 200) : '' }),
-    free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true });   // inline: 목록 줄에서 바로 고르는 버튼으로
+    free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true, value: a.value ? clip(a.value, 2000) : '' });   // value: 적는 칸에 미리 채울 글(고쳐서 보낸다)   // inline: 목록 줄에서 바로 고르는 버튼으로
 
   async function startStep(conn, x, run, step, d, settings){
     const miss = [], cwd = d.cwd ? fill(d.cwd, run, settings, miss) : null;
@@ -280,7 +297,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       const args = tokens(d.body).map(a => fill(a, run, settings, miss, !!step.lenient));
       if (step.answer != null) args.push(`--answer=${step.answer}`);
       if (miss.length && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${miss.join(' ')}`);
-      return (await scriptJob(conn, x, args[0], args.slice(1), cwd)).id;
+      return (await scriptJob(conn, x, args[0], args.slice(1).map(a => bigArg(a, `${run.id}-${String(step.key).replace(/[^\w-]/g, '')}`)), cwd)).id;
     }
     let prompt = d.body, schema = null;
     if (/^prompts\/[^\s]+\.md$/.test(prompt)){
@@ -288,7 +305,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       if (fs.existsSync(sf)) try { schema = JSON.parse(fs.readFileSync(sf, 'utf8')); } catch { throw fail(400, `${path.basename(sf)}이 JSON이 아니에요`); }
       prompt = fs.readFileSync(path.join(x.path, prompt), 'utf8');
     }
-    prompt = fill(prompt, run, settings);
+    const pm = []; prompt = fill(prompt, run, settings, pm);
+    const lost = pm.filter(k => k.includes('.') && run.steps.some(z => z.key === k.slice(1, -1).split('.')[0] && z.status !== 'skipped'));   // JSON 예시 같은 중괄호와 사람이 건너뛴 단계는 두고, 끝난 단계에 빠진 결과만 본다
+    if (lost.length && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${lost.join(' ')}`);
     if (step.answer != null) prompt += `\n\n사용자 추가 요청: ${step.answer}`;
     const provider = settings.provider || 'claude';
     const body = { plugin: { id: x.id, root: x.path }, provider, prompt, tag: `plugin:${x.id}` };
@@ -344,7 +363,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         if (!['failed', 'input', 'done'].includes(step.status) && !['canceled', 'stopped'].includes(run.status)) throw fail(409, '다시 할 수 있는 단계가 아니에요');
         const i = run.steps.indexOf(step);
         // lenient: 못 채운 값은 빈 값으로 두고 이 단계를 한다(앞 단계 결과가 비었을 때 처음부터 다시 말고 이어 가는 길)
-        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, output: s === step ? s.output : null, finished: null, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
+        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
         Object.assign(run, { status: 'queued', note: null, finished: null, updated: now() }); return;
       }
       case 'skip': {
@@ -425,7 +444,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const out = {};
     for (const x of list){
       const st = readState(p, x.id), pc = plugConf(c, p, x.id), full = await pluginOf(p, x.id);
-      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, workflows: full.workflows.map(w => ({ name: w.name, steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
+      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
         local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null, every: pc.every || {}, gates: pc.gates || {} } };
     }
     return { here: here(p), plugins: out };

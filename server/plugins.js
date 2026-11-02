@@ -90,8 +90,8 @@ export async function inspect({ git, ref, local }, appDir = APP_PLUGINS){
     const hashOf = p => (files.find(f => f.path === p) || {}).sha256 || null;
     return {
       stage, ok: result.ok, errors: result.errors, warnings: result.warnings, manifest: result.manifest, source, commit,
-      workflows: result.workflows.map(w => ({ name: w.name, file: w.file, steps: w.steps })),
-      feeds: result.feeds,
+      workflows: result.workflows.map(w => ({ name: w.name, file: w.file, note: w.note || '', ok: w.ok || '', steps: w.steps })),
+      feeds: result.feeds, chats: result.chats || [],
       files: files.map(f => ({ path: f.path, size: f.size, sha256: f.sha256 || null })),
       scripts: result.scripts.map(p => ({ path: p, sha256: hashOf(p), text: (files.find(f => f.path === p) || {}).text || '' }))
     };
@@ -138,7 +138,7 @@ export async function list(profileDir){
     let rec = {}; try { rec = JSON.parse(await fs.readFile(path.join(dir, INSTALL), 'utf8')); } catch {}
     const files = await readAll(dir), r = P.validate(files);
     const changed = Object.entries(rec.files || {}).filter(([p, h]) => (files.find(f => f.path === p) || {}).sha256 !== h).map(([p]) => p);
-    out.push({ id: e.name, path: dir, ok: r.ok, errors: r.errors, manifest: r.manifest, source: rec.source || null, commit: rec.commit || null,
+    out.push({ id: e.name, path: dir, ok: r.ok, errors: r.errors, manifest: r.manifest, chats: r.chats || [], source: rec.source || null, commit: rec.commit || null,
       installed_at: rec.installed_at || null, changed, scripts: r.scripts.map(p => ({ path: p, sha256: (files.find(f => f.path === p) || {}).sha256 || null })) });
   }
   return out;

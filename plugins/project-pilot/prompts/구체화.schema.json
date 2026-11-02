@@ -1,0 +1,96 @@
+{
+ "type": "object",
+ "properties": {
+  "_brief": {
+   "type": "object",
+   "properties": {
+    "goal": {
+     "type": "string"
+    },
+    "metric": {
+     "type": "string"
+    },
+    "target": {
+     "type": "string"
+    },
+    "deadline": {
+     "type": "string"
+    },
+    "minutes": {
+     "type": "number"
+    },
+    "budget": {
+     "type": "string"
+    },
+    "assets": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "exclude": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "questions": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "question": {
+        "type": "string"
+       },
+       "assume": {
+        "type": "string"
+       },
+       "blocking": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "question",
+       "assume",
+       "blocking"
+      ]
+     }
+    },
+    "verdict": {
+     "type": "string",
+     "enum": [
+      "ok",
+      "hard",
+      "refuse"
+     ]
+    },
+    "verdict_why": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "goal",
+    "metric",
+    "target",
+    "deadline",
+    "minutes",
+    "budget",
+    "assets",
+    "exclude",
+    "assumptions",
+    "questions",
+    "verdict",
+    "verdict_why"
+   ]
+  }
+ },
+ "required": [
+  "_brief"
+ ]
+}

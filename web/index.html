@@ -412,6 +412,10 @@ mark{background:var(--primary-weak);color:inherit;font-weight:700;border-radius:
 .bq-more:hover{text-decoration:underline}
 .bq-done{color:var(--text-2)}
 .bq-retro{margin-top:8px}
+.bq-wrap{display:flex;flex-direction:column;gap:8px}
+.bq-wrap .t-acts{justify-content:flex-end}
+.wrap-note{border-left:3px solid var(--kc,#E0531F)}
+.wrap-note p{margin:0}
 .chips{display:flex;flex-wrap:wrap;gap:8px;border:0;padding:0;margin:8px 0 0}
 .chip,.choice .chip,.choice .chip:has(input:checked){position:relative;display:inline-flex;padding:0;border:0;background:none}
 .chip input{position:absolute;opacity:0;width:1px;height:1px}
@@ -517,6 +521,9 @@ mark{background:var(--primary-weak);color:inherit;font-weight:700;border-radius:
 .memo{background:var(--surface);border-radius:var(--r-lg);padding:18px 20px}
 .memo+.memo{margin-top:12px}
 .memo p{white-space:pre-wrap}
+.memo .md,.memo-src .md{padding:0;background:none;border-radius:0}
+.memo-title{margin:0 0 8px;font-size:1.0625rem;font-weight:700}
+.memo .md details.more,.memo-src .md details.more{margin-top:4px}
 .memo .foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
 .memo .foot .faint{margin-right:auto}
 .meta-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 20px;margin:16px 0 0;font-size:.9375rem}
@@ -544,6 +551,7 @@ mark{background:var(--primary-weak);color:inherit;font-weight:700;border-radius:
 .md ul,.md ol{margin:6px 0;padding-left:1.25em}
 .md li{margin:2px 0}
 .md p{margin:8px 0}
+.md p.pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .md .md-h{margin:16px 0 6px}
 .tb-ro{margin:8px 0 0}
 .md .callout{margin:10px 0;padding:4px 12px;background:var(--surface-2);border-left:3px solid var(--text-3);border-radius:8px}
@@ -591,6 +599,23 @@ details.more>summary{cursor:pointer;color:var(--primary);font-weight:600;min-hei
 .t-acts{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px}
 .t-acts .more-btn,.more-btn{min-width:44px;padding:0;font-size:1.125rem;letter-spacing:1px;color:var(--text-3)}
 .tcard[draggable="true"]{cursor:grab}
+.tcard.t-ai{box-shadow:inset 3px 0 0 var(--primary),0 1px 2px rgba(0,0,0,.04)}
+.kind.k-ai{background:var(--primary-weak);color:var(--on-primary-weak)}
+.tgroup>details{background:var(--surface);border-radius:var(--r-md);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.tgroup summary{list-style:none;cursor:pointer;padding:12px 14px 10px 16px;display:flex;flex-direction:column;gap:6px;border-radius:var(--r-md)}
+.tgroup summary::-webkit-details-marker{display:none}
+.tgroup summary:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.tg-head{display:flex;align-items:center;gap:8px;font-weight:700}
+.tg-head::before{content:'';width:7px;height:7px;border-right:2px solid var(--text-2);border-bottom:2px solid var(--text-2);transform:rotate(-45deg);transition:transform .15s;flex:none}
+.tgroup details[open] .tg-head::before{transform:rotate(45deg)}
+.tg-name{flex:1;min-width:0;overflow-wrap:anywhere}
+.tg-head .num{color:var(--text-2);font-weight:600;font-size:.875rem}
+.tg-bar{display:flex;align-items:center;gap:8px;color:var(--text-2);font-size:.8125rem}.tg-bar .meter{flex:1}
+.tgroup .meta{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:.8125rem}
+.tgroup ul{padding:0 8px 8px!important}
+.tgroup .tcard{box-shadow:inset 0 0 0 1px var(--line);padding:12px 12px 10px 14px}
+.tgroup .tcard.t-ai{box-shadow:inset 3px 0 0 var(--primary),inset 0 0 0 1px var(--line)}
+@media (prefers-reduced-motion:reduce){.tg-head::before{transition:none}}
 .tcard.dragging{opacity:.5}
 .col.drop{outline:2px dashed var(--primary);outline-offset:-2px}
 .wait{color:var(--s-review);font-weight:600}
@@ -676,6 +701,133 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .choice small{color:var(--text-2);font-size:.875rem}
 
 /* 토스트 */
+/* AI 챗봇 — 오른쪽 아래 떠 있는 버튼과 채팅 창(ai-chat 플러그인, 같은 컴퓨터의 pkm-ai-server에 연결돼 있을 때만) */
+.chat-fab{position:fixed;right:24px;bottom:24px;z-index:30;display:flex;align-items:center;gap:8px;min-height:52px;padding:0 20px 0 16px;border:0;border-radius:999px;background:var(--primary-fill);color:var(--on-primary);font:inherit;font-weight:700;box-shadow:var(--shadow-pop);cursor:pointer}
+.chat-fab:focus-visible{outline:3px solid var(--primary);outline-offset:3px}
+.chat-fab .dot,.ch-ico .dot{width:10px;height:10px;border-radius:50%;background:var(--s-review);box-shadow:0 0 0 2px var(--surface)}
+.chat-fab .dot{position:absolute;top:6px;right:8px}
+.chat{position:fixed;right:24px;bottom:24px;z-index:40;width:min(440px,calc(100vw - 48px));height:min(640px,calc(100vh - 48px));display:flex;flex-direction:column;background:var(--surface);color:var(--text);border-radius:var(--r-xl);box-shadow:var(--shadow-pop);overflow:hidden}
+.chat[hidden]{display:none}
+.chat-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.chat-side,.chat-split,.chat-grip{display:none}
+@media (min-width:840px){
+  .chat{flex-direction:row;width:min(var(--chat-w,720px),calc(100vw - 48px));height:min(var(--chat-h,640px),calc(100vh - 48px))}
+  .chat-split{display:block;flex:0 0 6px;margin:0 -3px;z-index:1;cursor:col-resize;touch-action:none;background:linear-gradient(var(--line),var(--line)) center/1px 100% no-repeat}
+  .chat-split:hover,.chat-split:focus-visible,.chat-split.on{background:linear-gradient(var(--primary),var(--primary)) center/3px 100% no-repeat;outline:0}
+  .chat-grip{display:block;position:absolute;top:0;left:0;z-index:2;width:24px;height:24px;cursor:nwse-resize;touch-action:none;border-radius:var(--r-xl) 0 0 0}
+  .chat-grip::before{content:"";position:absolute;top:7px;left:7px;width:8px;height:8px;border-top:2px solid var(--line-strong);border-left:2px solid var(--line-strong)}
+  .chat-grip:hover::before,.chat-grip:focus-visible::before,.chat-grip.on::before{border-color:var(--primary)}
+  .chat-grip:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+  .chat-head select{display:none}
+  .chat-head h2{flex:1}
+  .chat-side{display:flex;flex-direction:column;flex:0 0 var(--chat-side,180px);min-width:0;min-height:0;background:var(--fill)}
+  .chat-side h3{font-size:.8125rem;color:var(--text-2);margin:0;padding:16px 16px 8px}
+  .chat-side ul{list-style:none;margin:0;padding:0 8px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+  .chat-side button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:44px;padding:8px 10px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+  .chat-side button:hover{background:var(--surface)}
+  .chat-side button[aria-current="true"]{background:var(--primary-weak);font-weight:700}
+  .chat-side .t{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.875rem}
+  .chat-side .s{display:flex;align-items:center;gap:6px;font-size:.75rem;font-weight:400;color:var(--text-3)}
+  .chat-side .s[data-state="run"]{color:var(--primary)}
+  .chat-side .s[data-state="ask"]{color:var(--s-review)}
+  .chat-side .s[data-state="bad"]{color:var(--danger)}
+  .chat-side .s[data-state="new"]{color:var(--s-done);font-weight:700}
+  .chat-side .s[data-state="reply"]{color:var(--text-2)}
+  .chat-side .s .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+}
+.chat-head{display:flex;align-items:center;gap:8px;padding:12px 12px 8px 20px;border-bottom:1px solid var(--line)}
+.chat-head h2{font-size:1rem;margin:0;white-space:nowrap}
+.chat-head select{flex:1;min-width:0;min-height:36px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font:inherit;font-size:.875rem;padding:0 8px}
+.chat-tools{display:flex;gap:4px;padding:6px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.chat-tools .faint{font-size:.8125rem;margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-memo{padding:8px 12px 10px 20px;border-bottom:1px solid var(--line);background:var(--fill);display:flex;flex-direction:column;gap:6px}
+.chat-memo .m-head{display:flex;align-items:center;gap:8px}
+.chat-memo .m-head b{font-size:.8125rem;color:var(--text-2)}
+.chat-memo .m-head .faint{font-size:.75rem;margin-right:auto;color:var(--text-2)}
+.chat-side .s:has(.mm){min-width:0;max-width:100%;white-space:nowrap;gap:0}
+.chat-side .s .mm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-memo .m-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;max-height:96px;overflow-y:auto;font-size:.9375rem}
+.chat-memo textarea{width:100%;min-height:64px;max-height:160px;resize:vertical;border:1px solid var(--line-strong);border-radius:var(--r-md);padding:8px 10px;font:inherit;background:var(--surface);color:var(--text)}
+.chat-memo .m-acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.chat-memo .m-empty{align-self:flex-start;margin-left:-8px}
+.chat-log{flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;gap:14px;overscroll-behavior:contain}
+.chat-log:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.ch-me{align-self:flex-end;max-width:85%;background:var(--primary-weak);color:var(--text);border-radius:16px 16px 4px 16px;padding:8px 14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.ch-me:focus{outline:2px solid var(--primary);outline-offset:2px}
+.ch-ai{align-self:stretch;display:flex;flex-direction:column;gap:8px;min-width:0}
+.ch-ai .md{overflow-wrap:anywhere}
+.ch-ai .md pre{white-space:pre-wrap}
+.ch-st{font-size:.8125rem;color:var(--text-2);display:flex;gap:8px;align-items:center}
+.ch-st.bad{color:var(--danger)}
+.ch-st.wait{color:var(--s-review)}
+.ch-proc summary{font-size:.8125rem;color:var(--text-3);cursor:pointer;min-height:28px;display:flex;align-items:center}
+.ch-proc ol{margin:6px 0 0;padding-left:20px;font-size:.8125rem;color:var(--text-2);display:flex;flex-direction:column;gap:4px}
+.ch-proc .tool{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.75rem}
+.ch-ask{border:1px solid var(--s-review);background:var(--s-review-bg);border-radius:var(--r-md);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.ch-ask b{color:var(--text)}
+.ch-ask pre{margin:0;max-height:160px;overflow:auto;background:var(--surface);border-radius:var(--r-sm);padding:8px 10px;font-size:.75rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.ch-ask .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.ch-ask fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.ch-ask legend{font-weight:700;margin-bottom:4px}
+.ch-empty{color:var(--text-2);font-size:.9375rem;margin:auto 8px;text-align:center}
+.ch-sums{display:flex;flex-direction:column;gap:6px}
+.ch-sums h3{font-size:.8125rem;color:var(--text-2);margin:8px 4px 0}
+.ch-sums h3:first-child{margin-top:0}
+.ch-sums ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.ch-sums button{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;width:100%;min-height:44px;padding:8px 10px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.ch-sums button:hover{background:var(--fill)}
+.ch-sums .k{font-size:.75rem;font-weight:700;color:var(--text-3);padding-top:2px}
+.ch-sums .q{font-weight:700;overflow-wrap:anywhere}
+.ch-sums .a{color:var(--text-2);overflow-wrap:anywhere}
+.ch-sums .a.bad{color:var(--danger)}
+.ch-sums .a.ask{color:var(--s-review);font-weight:700}
+.ch-sums .a.guess,.ch-sums .q.guess{color:var(--text-3);font-weight:400}
+.ch-sums .when{grid-column:1/-1;font-size:.75rem;color:var(--text-3)}
+.ch-sums .note{font-size:.75rem;color:var(--text-3);margin:4px 4px 0}
+.ch-pick{display:flex;flex-direction:column;gap:10px}
+.ch-pick h3{font-size:1rem;margin:0}
+.ch-quick,.ch-crumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.ch-crumb{font-size:.875rem;color:var(--text-2)}
+.ch-dirs{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:var(--r-md);max-height:280px;overflow-y:auto}
+.ch-dirs li+li{border-top:1px solid var(--line)}
+.ch-dirs button{display:flex;gap:8px;align-items:center;width:100%;min-height:44px;padding:8px 12px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.ch-dirs button:hover{background:var(--fill)}
+.ch-type summary{font-size:.8125rem;color:var(--text-3);cursor:pointer;min-height:32px;display:flex;align-items:center}
+.ch-pick-acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.chat-form{border-top:1px solid var(--line);padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.chat-form textarea{width:100%;min-height:52px;max-height:160px;resize:vertical;border:1px solid var(--line-strong);border-radius:var(--r-md);padding:10px 12px;font:inherit;background:var(--surface);color:var(--text)}
+.chat-send{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.chat-send .faint{margin-right:auto;font-size:.75rem}
+.ch-ico{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:36px;min-height:36px;padding:0 9px;margin:-4px 0 0;border:0;border-radius:var(--r-sm);background:transparent;color:var(--text-3);font:inherit;cursor:pointer}
+.ch-ico:hover{background:var(--fill);color:var(--primary)}
+.ch-ico .i{position:relative;display:inline-flex}
+.ch-ico .dot{position:absolute;top:-3px;right:-5px}
+.ch-ico .lbl{font-size:.75rem;font-weight:700;white-space:nowrap}
+.ch-ico:not([data-state="none"]) svg path{fill:currentColor;fill-opacity:.16}
+.t-acts .ch-ico{margin:0 auto 0 -8px}
+.ch-ico[data-state="idle"],.ch-ico[data-state="reply"]{color:var(--text-2)}
+.ch-ico[data-state="reply"] .lbl{font-weight:400}
+.ch-ico[data-state="run"]{color:var(--primary)}
+.ch-ico[data-state="run"] .dot{background:var(--primary)}
+.ch-ico[data-state="ask"]{color:var(--s-review)}
+.ch-ico[data-state="new"]{color:var(--s-done)}
+.ch-ico[data-state="new"] .dot,.chat-fab[data-state="new"] .dot{background:var(--s-done)}
+.ch-ico[data-state="bad"]{color:var(--danger)}
+.ch-ico[data-state="bad"] .dot{background:var(--danger)}
+@media (prefers-reduced-motion:no-preference){.ch-ico[data-state="run"] .dot{animation:ch-pulse 1.6s ease-in-out infinite}}
+@keyframes ch-pulse{50%{opacity:.3}}
+body.has-chat-fab main{padding-bottom:120px}
+@media (max-width:839px){
+  .chat-fab{right:16px;bottom:calc(76px + env(safe-area-inset-bottom));padding:0 16px}
+  .chat-fab .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .chat{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}
+  .chat-head{padding-top:calc(10px + env(safe-area-inset-top))}
+  .chat-form{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+  .ch-ico{min-width:44px;min-height:44px}
+  .ch-proc summary{min-height:44px}
+  body.has-chat-fab main{padding-bottom:calc(168px + env(safe-area-inset-bottom))}
+}
+@media (prefers-reduced-motion:no-preference){.chat:not([hidden]){animation:rise .16s ease-out}}
 .toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:50;pointer-events:none;display:flex;flex-direction:column;gap:8px;width:min(480px,calc(100vw - 32px))}
 @media (max-width:839px){.toasts{bottom:calc(84px + env(safe-area-inset-bottom))}}
 .toast{pointer-events:auto;display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;background:var(--toast-bg);color:#F2F4F6;border-radius:14px;padding:8px 8px 8px 18px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:rise .18s ease-out}
@@ -702,7 +854,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .pl-excerpt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--text-2);font-size:.875rem;margin-top:6px;overflow-wrap:anywhere}
 .row .title{overflow-wrap:anywhere}
 .pl-ilist>li{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.pl-ilist>li:last-child{border-bottom:0}
-.pl-ihead{display:flex;flex-direction:column;gap:4px;min-width:0}.pl-ihead .title{color:inherit;text-decoration:none;font-weight:600;overflow-wrap:anywhere}.pl-ihead .title:hover{text-decoration:underline}
+.pl-ihead{display:flex;flex-direction:column;gap:4px;min-width:0}.pl-ihead .title{color:inherit;text-decoration:none;font-weight:600;overflow-wrap:anywhere}.pl-ihead a.title:hover{text-decoration:underline}
 .pl-gone .pl-ihead{opacity:.72}
 .pl-state{padding:10px 14px;border-radius:var(--r-md);background:var(--s-wait-bg)}.pl-state>b{display:block}.pl-state>span{display:block;margin-top:2px;overflow-wrap:anywhere;color:var(--text-2)}
 .pl-state.pl-ok{background:var(--s-done-bg)}.pl-state.pl-ok>b{color:var(--s-done)}.pl-state.pl-bad{background:var(--danger-bg)}.pl-state.pl-bad>b{color:var(--danger)}
@@ -712,7 +864,7 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .pl-finds{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;counter-reset:f}
 .pl-finds>li{padding:10px 12px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
 .pl-find-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pl-where{font-weight:700;overflow-wrap:anywhere}.pl-where code{font-size:.8125rem;overflow-wrap:anywhere}
-.pl-find-title{display:block;margin-top:6px}.pl-find-text{margin:4px 0 0;color:var(--text-2);overflow-wrap:anywhere}
+.pl-find-title{display:block;margin-top:6px}.pl-find-text{margin:4px 0 0;color:var(--text-2);overflow-wrap:anywhere;white-space:pre-wrap}
 .pl-say{margin-top:8px;padding:8px 10px;border-left:3px solid var(--danger);background:var(--danger-bg);border-radius:0 var(--r-md) var(--r-md) 0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .pl-hide-row{display:flex;align-items:stretch}.pl-hide-row>.row{flex:1;min-width:0}
 .pl-x{flex:none;width:48px;border:0;background:none;color:var(--text-2);font-size:1.375rem;line-height:1;cursor:pointer;border-radius:var(--r-md)}.pl-x:hover{color:var(--text);background:var(--s-wait-bg)}
@@ -722,10 +874,10 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .pl-upd{margin:0 0 12px}.pl-changes{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.pl-changes li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pl-changes code{overflow-wrap:anywhere;font-size:.8125rem}
 .pl-start-row{align-items:center;flex-wrap:wrap}.pl-start-row .title{color:inherit;text-decoration:none}.pl-start-row .title:hover{text-decoration:underline}
 @media (max-width:599px){.pl-start-row .btn,.pl-card-acts .btn{min-height:44px}}
-.ai-state>span{display:block;margin-top:2px;overflow-wrap:anywhere}.ai-state ul{margin:6px 0 0;padding-left:20px}
+.ai-state>span{display:block;margin-top:2px;overflow-wrap:anywhere;white-space:pre-line}.ai-state ul{margin:6px 0 0;padding-left:20px}
 .pl-card{margin:16px 0}.pl-card-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.pl-card-acts .btn{margin-top:0}
 .pl-quiet{display:inline-flex;gap:4px;flex-wrap:wrap}
-.pl-answer{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}
+.pl-answer{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}.pl-ask-q{font-size:1rem;margin:8px 0 0}
 .pl-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
 .pl-md{padding:0;background:none}
 .pl-warn{margin:12px 0;padding:12px 16px 12px 32px;border-radius:var(--r-md);background:var(--s-review-bg);color:var(--s-review);font-weight:600}
@@ -784,6 +936,29 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 <nav class="tabbar" aria-label="영역"><ul id="nav-tab"></ul></nav>
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<!-- AI 챗봇 — ai-chat 플러그인을 설치하고 이 컴퓨터의 pkm-ai-server에 연결돼 있을 때만 보인다 -->
+<button class="chat-fab" id="chat-fab" type="button" data-ch="open" aria-controls="chat" aria-expanded="false" hidden>
+  <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span class="lbl">AI 챗봇</span>
+</button>
+<aside class="chat" id="chat" role="dialog" aria-modal="false" aria-labelledby="chat-h" hidden>
+  <div class="chat-grip" data-ch-drag="win" tabindex="0" role="button" aria-label="채팅 창 크기 조절 · 화살표로 바꾸고 두 번 누르면 처음 크기" title="끌어서 창 크기 조절 · 두 번 누르면 처음 크기"></div>
+  <nav class="chat-side" aria-labelledby="chat-side-h"><h3 id="chat-side-h">채팅방</h3><ul id="chat-rooms"></ul></nav>
+  <div class="chat-split" data-ch-drag="side" tabindex="0" role="separator" aria-orientation="vertical" aria-controls="chat-rooms" aria-label="채팅방 목록 너비" title="끌어서 목록 너비 조절 · 두 번 누르면 처음 너비"></div>
+  <div class="chat-main">
+  <div class="chat-head"><h2 id="chat-h" tabindex="-1">AI 챗봇</h2><select id="chat-room" aria-label="채팅 고르기"></select>
+    <button class="btn btn-text btn-sm" type="button" data-ch="close">닫기</button></div>
+  <div class="chat-tools" id="chat-tools"></div>
+  <section class="chat-memo" id="chat-memo" aria-label="메모" hidden></section>
+  <div class="chat-log" id="chat-log" tabindex="0" aria-label="대화 기록"></div>
+  <p class="sr-only" role="status" id="chat-say"></p>
+  <form class="chat-form" id="chat-form" novalidate>
+    <label class="sr-only" for="chat-in">보낼 말</label>
+    <textarea id="chat-in" rows="2" spellcheck="false" placeholder="예: 내일까지 '견적서 보내기' 단기를 만들어 줘"></textarea>
+    <div class="chat-send"><span class="faint" id="chat-hint">Enter 보내기 · Shift+Enter 줄바꿈</span><button class="btn btn-ghost btn-sm" type="button" data-ch="cancel" id="chat-stop" hidden>그만두기</button><button class="btn btn-primary btn-sm" type="submit" id="chat-go">보내기</button></div>
+  </form>
+  </div>
+</aside>
 
 <!-- 복사하기(클립보드를 못 쓸 때) -->
 <dialog id="dlg-copy" aria-labelledby="copy-title">
@@ -1231,6 +1406,9 @@ function adopt(n, files, version){
   IDX[n] = norm.index; VER[n] = version;
   MOVES[n] = {};
   for (const [id, p] of Object.entries(norm.index)) if (P.paths[id] && P.paths[id] !== p) MOVES[n][p] = P.paths[id];
+  // id가 없거나 다른 카드와 겹쳐 새 id를 받은 단기 — 마지막 저장본에서 빼서 다음 저장 때 파일에 적게 한다
+  for (const id of P.reid || []){ const p = norm.index[id]; if (p) delete LAST[n][p]; }
+  if ((P.reid || []).length) setTimeout(scheduleSave, 0);
 }
 async function loadProfile(n){
   const r = await STORE.load(n);
@@ -1351,7 +1529,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const eul = w => w + ((w.charCodeAt(w.length - 1) - 0xAC00) % 28 ? '을' : '를');
-const uid = p => p + Math.random().toString(36).slice(2, 7);
+const uid = p => p + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 6);   // 시각+무작위 — 기기 둘이 같은 때 만들어도 겹치지 않게
 const dnum = s => { const [y,m,d] = s.slice(0,10).split('-').map(Number); return Date.UTC(y, m-1, d) / 864e5; };
 const dayDiff = (a, b) => dnum(a) - dnum(b);
 const wd = s => WD[new Date(s.slice(0,10) + 'T00:00:00').getDay()];
@@ -1474,12 +1652,12 @@ function inline(s){
   return out;
 }
 function mdList(lines){
-  const items = lines.map(l => { const m = l.match(/^(\s*)[-*]\s(.*)$/); return { d: Math.floor(m[1].length / 2), t: m[2] }; });
+  const items = lines.map(l => { const m = l.match(/^(\s*)[-*]\s([\s\S]*)$/); return { d: Math.floor(m[1].length / 2), t: m[2] }; });
   let html = '', depth = -1;
   items.forEach(it => {
     if (it.d > depth){ html += '<ul>'.repeat(it.d - depth); depth = it.d; }
     else { html += '</li>'; while (depth > it.d){ html += '</ul></li>'; depth--; } }
-    html += '<li>' + inline(it.t);
+    html += '<li>' + it.t.split('\n').map(inline).join('<br>');
   });
   html += '</li>'; while (depth > 0){ html += '</ul></li>'; depth--; } html += '</ul>';
   return html;
@@ -1522,7 +1700,9 @@ function md(src){
       while (i < L.length && (/^\d+\.\s/.test(L[i]) || (items.length && /^\s{2,}[-*]\s/.test(L[i])))){ const n = L[i++]; if (/^\d+\.\s/.test(n)) items.push({ t:n.replace(/^\d+\.\s/, ''), sub:[] }); else items[items.length - 1].sub.push(n.replace(/^\s{2,}/, m => ' '.repeat(Math.max(0, m.length - 3)))); }
       out += `<ol>${items.map(it => `<li>${inline(it.t)}${it.sub.length ? mdList(it.sub) : ''}</li>`).join('')}</ol>`; continue; }
     if (/^>/.test(l)){ const buf = []; while (i < L.length && /^>/.test(L[i])) buf.push(L[i++].replace(/^>\s?/, '')); out += `<blockquote>${buf.map(inline).join('<br>')}</blockquote>`; continue; }
-    if (/^\s*[-*]\s/.test(l)){ const buf = []; while (i < L.length && /^\s*[-*]\s/.test(L[i])) buf.push(L[i++]); out += mdList(buf); continue; }
+    if (/^\s*[-*]\s/.test(l)){ const buf = [];   // 들여 쓴 이어지는 줄(예: "  → [[노트]]")은 앞 항목에 붙인다
+      while (i < L.length && (/^\s*[-*]\s/.test(L[i]) || (/^\s{2,}\S/.test(L[i]) && !isBlock(L[i].trim())))){ const n = L[i++]; if (/^\s*[-*]\s/.test(n)) buf.push(n); else buf[buf.length - 1] += '\n' + n.trim(); }
+      out += mdList(buf); continue; }
     if (!l.trim()){ i++; continue; }
     const buf = []; while (i < L.length && L[i].trim() && !isBlock(L[i])) buf.push(L[i++]);
     out += `<p>${buf.map(inline).join('<br>')}</p>`;
@@ -1541,7 +1721,24 @@ function mdCollapsed(src, n = 8){
   const rest = lines.slice(cut).filter(l => /^[-*]\s/.test(l)).length;
   return `<div class="md">${md(lines.slice(0, cut).join('\n'))}<details class="more"><summary>나머지 ${rest}개 더 보기</summary>${md(lines.slice(cut).join('\n'))}</details></div>`;
 }
-const section = (title, inner, extra = '') => `<section class="section" ${extra}><h2>${title}</h2>${inner}</section>`;
+/* 임시노트: 평문 첫 줄은 제목으로, 나머지는 마크다운으로. 길면 첫 단락 뒤를 접는다 */
+function fleetingHtml(f, fold = true){
+  const L = f.text.replace(/\r/g, '').trim().split('\n');
+  const title = L.length > 1 && L[0].trim() && !/^(#|>|\s*[-*]\s|\d+\.\s|\s*\||```)/.test(L[0]) ? L.shift().trim() : '';
+  let cut = -1, heads = 0, inCode = false;
+  if (fold && L.filter(l => l.trim()).length > 10) for (let i = 0; i < L.length; i++){
+    if (L[i].startsWith(FENCE)) inCode = !inCode;
+    if (!inCode && /^#{1,6}\s/.test(L[i]) && ++heads === 2){ cut = i; break; }
+  }
+  if (fold && cut < 0 && L.filter(l => l.trim()).length > 10) cut = L.findIndex((l, i) => i >= 6 && !l.trim());
+  const prev = mdShift; if (title) mdShift = 3;   // 본문 제목은 노트 제목(h3) 아래 단계로
+  const body = cut > 0
+    ? `${md(L.slice(0, cut).join('\n'))}<details class="more" data-key="fl-${f.id}"><summary>나머지 펼치기</summary>${md(L.slice(cut).join('\n'))}</details>`
+    : md(L.join('\n'));
+  mdShift = prev;
+  return `${title ? `<h3 class="memo-title">${inline(title)}</h3>` : ''}<div class="md">${body}</div>`;
+}
+const section = (title, inner, extra = '') =>`<section class="section" ${extra}><h2>${title}</h2>${inner}</section>`;
 const noneText = '<p class="md none">아직 적지 않았어요</p>';
 
 /* ---------------- 공통 조각 ---------------- */
@@ -1674,7 +1871,7 @@ function freeBlocks(D){
 }
 const plannedIds = D => new Set(Object.values(planOf(D)).flat().map(e => e.id));
 const fillRank = t => t.status === '진행' ? 0 : t.due && dayDiff(t.due, TODAY) <= 1 ? 1 : 2;
-const candidates = D => { const pl = plannedIds(D), drop = (D.dailies[PD] || {}).dropped || []; return D.tasks.filter(t => (t.status === '진행' || t.status === '대기') && !pl.has(t.id) && !drop.includes(t.id)).sort((a, b) => fillRank(a) - fillRank(b) || (a.due || '9999').localeCompare(b.due || '9999')); };
+const candidates = D => { const pl = plannedIds(D), drop = (D.dailies[PD] || {}).dropped || []; return D.tasks.filter(t => t.status === '진행' && !pl.has(t.id) && !drop.includes(t.id)).sort((a, b) => fillRank(a) - fillRank(b) || (a.due || '9999').localeCompare(b.due || '9999')); };
 /* 채우기: 여유 비율은 남은 빈 시간 전체에 적용(블록마다 아님). 우선순위 순으로, 들어갈 수 있는 블록 중 남는 자리가 가장 작은 곳에 넣는다 */
 function fillBlocks(){
   const D = db(), P = pset(), plan = planOf(D), free = freeBlocks(D), carry = [], now = NM();
@@ -1685,7 +1882,7 @@ function fillBlocks(){
   });
   let budget = fut.reduce((n, b) => n + b.len, 0) * P.fill_ratio - fut.reduce((n, b) => n + (b.len - b.room), 0);
   const futIds = new Set(fut.flatMap(b => b.ids.map(e => e.id)));   // 뒤 블록에 이미 있는 할 일은 다시 넣지 않는다
-  const queue = [...carry.filter(e => !futIds.has(e.id)).map(e => ({ t:find('tasks', e.id), min:e.min })), ...candidates(D).filter(t => !carry.some(e => e.id === t.id)).map(t => ({ t, min:null }))];
+  const queue = [...carry.filter(e => !futIds.has(e.id) && (find('tasks', e.id) || {}).status === '진행').map(e => ({ t:find('tasks', e.id), min:e.min })), ...candidates(D).filter(t => !carry.some(e => e.id === t.id)).map(t => ({ t, min:null }))];
   let added = 0;
   for (const { t, min } of queue){
     const e = min || estOf(t);
@@ -1742,7 +1939,7 @@ function vPlan(date){
   });
   flush();
   const futureFree = free.filter(f => f.to > now).reduce((n, f) => n + f.to - Math.max(f.from, now), 0);
-  const carryN = free.filter(f => f.to <= now).reduce((n, f) => n + (plan[f.key] || []).filter(e => !slotDone(e, find('tasks', e.id))).length, 0);
+  const carryN = free.filter(f => f.to <= now).reduce((n, f) => n + (plan[f.key] || []).filter(e => { const t = find('tasks', e.id); return t && t.status === '진행' && !slotDone(e, t); }).length, 0);
   const cand = candidates(D).length;
   const fillBar = !futureFree ? '' : futureFree < 15 ? `<div class="fill-bar"><p><b>남은 빈 시간 ${fmtMin(futureFree)}</b><span class="faint">채울 만한 자리가 없어요</span></p></div>`
     : `<div class="fill-bar"><p><b>남은 빈 시간 ${fmtMin(futureFree)}</b><span class="faint">넣을 수 있는 할 일 ${cand}개${carryN ? ` · 못 끝낸 ${carryN}개` : ''}</span></p>
@@ -1757,7 +1954,7 @@ function vPlan(date){
     <div class="plan-head"><div><h2>${md2(date)} ${wd(date)}요일${isT ? ' · 오늘' : ''}</h2><p class="sub"><span class="num">${st}–${P.day_end}</span>${moved ? ` <span class="faint">· 이날만 시작을 ${P.day_start}에서 옮겼어요</span>` : ''}</p></div>
       <span class="doc-actions" style="margin:0">${isT ? '' : `<a class="btn btn-tonal btn-sm" href="#/time/plan/${TODAY}">오늘로</a>`}<button class="btn btn-ghost btn-sm" type="button" data-act="day-start">이날 시작 바꾸기</button><button class="btn btn-ghost btn-sm" type="button" data-act="day-settings">하루 설정</button>${date <= TODAY ? `<a class="btn btn-ghost btn-sm" href="#/time/daily/${date}">데일리</a>` : ''}</span></div>
     ${onboardCard()}
-    ${tip('plan', '약속·루틴을 놓고 남는 시간을 <strong>빈 시간</strong> 블록으로 나눠요. <strong>남은 빈 시간 채우기</strong>를 누르면 진행 중인 일 → 마감이 가까운 일 순으로 채워요. 다른 날도 위 날짜를 눌러 미리 짤 수 있어요.')}
+    ${tip('plan', '약속·루틴을 놓고 남는 시간을 <strong>빈 시간</strong> 블록으로 나눠요. <strong>남은 빈 시간 채우기</strong>를 누르면 단기의 진행 칸에 있는 일을 마감이 가까운 순으로 채워요. 다른 날도 위 날짜를 눌러 미리 짤 수 있어요.')}
     <section class="section" style="margin-top:0"><h3 class="sr-only">하루 시간표</h3>${date < TODAY ? `<ol class="timeline">${items.join('')}</ol>` : tl}${isT ? autoTag('루틴을 체크하면 연결된 장기 누적 기록에 한 줄 추가') : ''}</section>`;
 }
 /* ---------------- 화면: 지금 ----------------
@@ -1794,7 +1991,8 @@ function vNow(){
       todo++; cards.push(nowCard(r.block ? `tl-kind blk-${r.block}` : '', `${r.block ? BLOCKS[r.block].label : '루틴'} · ${span(x)}`, `<a href="#/action/routine/${r.id}">${esc(r.title)}</a>`, left(x) + (r.area ? `<span>${areaLink(r.area)}에 쌓여요</span>` : ''), routineBtns(x),r.block && r.block !== 'action' ? blockBody(D, r) : ''));
     } else {   // 빈 시간·행동 블록 — 넣어 둔 할 일 하나하나가 카드
       const kick = `${x.action ? esc(x.r.title) : '빈 시간'} · ${span(x)}`, cls = x.action ? 'tl-kind blk-action' : '';
-      const open = (plan[x.key] || []).map(e => ({ e, t:find('tasks', e.id) })).filter(({ e, t }) => t && !slotDone(e, t));
+      const inBlk = (plan[x.key] || []).map(e => ({ e, t:find('tasks', e.id) })).filter(({ t }) => t && (t.status === '진행' || t.status === '완료'));   // 지금 할 것은 진행 칸 것만(대기·기다림으로 돌린 일은 숨김)
+      const open = inBlk.filter(({ e, t }) => !slotDone(e, t));
       const nb = free.find(f => f.from >= x.to), k = x.key.replace(':', '');
       todo += open.length; open.forEach(({ e, t }) => {
         const part = slotsOf(D, t.id).some(o => o.key !== x.key && !o.e.done);   // 다른 블록에도 있으면 이 블록 분량만 끝낸다
@@ -1804,26 +2002,27 @@ function vNow(){
       });
       if (open.length) return;
       const cand = x.to - NOW_MIN < 15 ? [] : candidates(D).slice(0, 3), short = x.to - NOW_MIN < 15;
-      cards.push(nowCard(`nc-empty ${cls}`, kick, (plan[x.key] || []).length ? '이 블록에 넣은 할 일을 다 끝냈어요' : '이 블록에 넣은 할 일이 없어요', left(x) + (!short && !cand.length ? '<span>단기에 남은 할 일이 없어요</span>' : ''),
+      cards.push(nowCard(`nc-empty ${cls}`, kick, inBlk.length ? '이 블록에 넣은 할 일을 다 끝냈어요' : '이 블록에 넣은 진행 중인 할 일이 없어요', left(x) + (!short && !cand.length ? '<span>단기에 남은 할 일이 없어요</span>' : ''),
         !short && !cand.length ? `<button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="short">할 일 만들기</button>` : '',
         cand.length ? `<ul class="bq-list">${cand.map(t => `<li class="bq"><span class="bq-t">${esc(t.title)} <span class="faint">${t.status}</span></span><button class="btn btn-tonal btn-sm" type="button" id="now-take-${t.id}" data-act="now-take" data-id="${t.id}" data-block="${x.key}" aria-label="${esc(t.title)} 지금 하기">지금 하기</button></li>`).join('')}</ul>` : ''));
     }
   });
   const ask = shiftAsk(D, P);   // 시작을 옮길지 묻는 동안은 지나간 루틴을 묻지 않는다(옮기면 지나간 게 아니게 된다)
   const missed = ask ? [] : L.filter(x => x.kind === 'routine' && x.to <= NOW_MIN && !rDone(D, TODAY, x) && !rSkipped(D, TODAY, x));
-  const carryN = free.filter(f => f.to <= NOW_MIN).reduce((n, f) => n + (plan[f.key] || []).filter(e => !slotDone(e, find('tasks', e.id))).length, 0);
+  const carryN = free.filter(f => f.to <= NOW_MIN).reduce((n, f) => n + (plan[f.key] || []).filter(e => { const t = find('tasks', e.id); return t && t.status === '진행' && !slotDone(e, t); }).length, 0);
   const nx = L.find(x => x.from > NOW_MIN && x.kind !== 'blocked');
   const nextLine = nx ? `<p class="now-next"><span class="faint">다음</span> <span class="num">${toHM(nx.from)}</span> ${nx.kind === 'appt' ? esc(nx.a.title) : nx.kind === 'routine' ? esc(nx.r.title) : `${nx.action ? esc(nx.r.title) : '빈 시간'}${(plan[nx.key] || []).length ? ` · 할 일 ${plan[nx.key].length}개` : ''}`}</p>` : '';
   const waits = D.tasks.filter(t => t.status === '기다림').length;
   const allEmpty = !L.some(x => x.kind === 'appt' || x.kind === 'routine') && !D.tasks.length && !D.inbox.length && !D.fleeting.length;
+  const wrapSec = lastWrap(D);   // 전날(시간 블록)에 적은 하루 마무리 — 이어서 하기
   const quiet = NOW_MIN < s0 ? ['아직 하루 전이에요', `하루는 ${toHM(s0)}에 시작해요.`] : NOW_MIN >= s1 ? ['오늘 하루를 마쳤어요', '한 줄 회고를 남기거나 내일 계획을 미리 짜 보세요.'] : ['지금은 정해 둔 것이 없어요', '다음 일정까지 쉬어도 돼요.'];
   const quietCard = `<div class="empty now-quiet"><h3>${quiet[0]}</h3><p>${quiet[1]}</p>${NOW_MIN >= s1 ? `<p style="margin-top:12px"><a class="btn btn-text btn-sm" href="#/time/daily/${TODAY}">한 줄 회고 쓰기</a> <a class="btn btn-text btn-sm" href="#/time/plan/${addDays(TODAY, 1)}">내일 계획 짜기</a></p>` : ''}</div>`;
   const firstRun = `<div class="empty"><h2>오늘 할 것이 아직 없어요</h2><p>떠오른 생각 하나를 메모하는 것부터 시작해요. 약속·루틴을 만들면 하루가 블록으로 나뉘고, 지금 할 것이 여기에 카드로 떠요.</p><button class="btn btn-primary" type="button" data-act="capture">메모하기</button><p style="margin-top:12px"><button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="appt">약속 만들기</button> <button class="btn btn-text btn-sm" type="button" data-act="new-action" data-board="short">할 일 만들기</button>${P.onboarded === false ? ` <a class="btn btn-text btn-sm" href="#/time/plan/${TODAY}">하루 계획 세우기</a>` : ''}</p></div>`;
   return `<div class="page">
     <header class="page-head"><div><h1 tabindex="-1">지금</h1><p class="sub">${md2(TODAY)} ${wd(TODAY)}요일 · <span class="num" data-clock>${nowHM()}</span></p></div>
       <span class="doc-actions" style="margin:0"><a class="btn btn-ghost btn-sm" href="#/time/plan/${TODAY}">오늘 계획</a></span></header>
-    ${allEmpty ? firstRun : `${ask}
-    <section class="section" style="margin-top:0" aria-labelledby="now-h"><h2 id="now-h" tabindex="-1">지금 할 것${todo ? ` <span class="count">${todo}</span>` : ''}</h2>${cards.length ? `<ul class="now-list">${cards.join('')}</ul>` : quietCard}${nextLine}</section>
+    ${allEmpty ? firstRun : `${ask}${wrapSec}
+    <section class="section" ${wrapSec ? '' : 'style="margin-top:0" '}aria-labelledby="now-h"><h2 id="now-h" tabindex="-1">지금 할 것${todo ? ` <span class="count">${todo}</span>` : ''}</h2>${cards.length ? `<ul class="now-list">${cards.join('')}</ul>` : quietCard}${nextLine}</section>
     ${missed.length ? `<section class="section" aria-labelledby="missed-h"><h2 id="missed-h">지나간 루틴 <span class="count">${missed.length}</span></h2><p class="faint" style="margin:-4px 0 12px">했으면 [했어요], 못 했으면 [건너뛰기]를 눌러요. 건너뛴 것은 실패로 세지 않아요.</p>
       <ul class="now-list">${missed.map(x => nowCard(x.r.block ? `tl-kind blk-${x.r.block}` : '', `${x.r.block ? BLOCKS[x.r.block].label : '루틴'} · ${span(x)}`, esc(kName(x)), '', routineBtns(x))).join('')}</ul></section>` : ''}
     ${(() => { const dis = S.recDismiss || [], kindFor = a => D.kinds.find(x => a.title.toLowerCase().includes(x.name.toLowerCase())) || D.kinds[0], k = D.kinds[0], ended = k ? D.appts.filter(a => a.start.slice(0, 10) === TODAY && a.end.slice(0, 10) === TODAY && toMin(hm(a.end)) <= NOW_MIN && NOW_MIN - toMin(hm(a.end)) <= 180 && !D.meetings.some(m => m.appt === a.id) && !dis.includes(a.id)) : [];
@@ -1841,6 +2040,15 @@ const BLOCKS = {
   action:{ label:'행동 블록', name:'집중 시간' }
 };
 const blockChip = k => `<span class="blk-chip blk-${k}">${BLOCKS[k].label}</span>`;
+const wrapForm = (date, id, d, titled) => `<form data-form="wrap" data-date="${date}" class="bq-retro bq-wrap"><label class="field"><span>${titled ? '' : '하루 마무리 '}<span class="hint">어디까지 했고 내일 무엇부터 이어서 할지 — 내일 '지금'에 보여요</span></span><textarea name="wrap" id="${id}" rows="3" placeholder="예: 즐겨찾기 무한로딩 — 원인은 찾음, 내일 커서 페이징 고치기부터">${esc(d.wrap || '')}</textarea></label><div class="t-acts"><button class="btn btn-tonal btn-sm" type="submit">마무리 저장하기</button></div></form>`;
+/* 지난 하루 마무리 — 시간 블록(예: 취침 전 정리)에 적은 마지막 마무리를 '지금' 위에 띄워 전날 하던 일을 이어 가게 한다 */
+function lastWrap(D){
+  const d = Object.keys(D.dailies).filter(k => k <= TODAY && (D.dailies[k].wrap || '').trim()).sort().pop();
+  if (!d) return '';
+  const label = d === TODAY ? '오늘 마무리' : d === addDays(TODAY, -1) ? '어제 마무리' : `${md2(d)} 마무리`;
+  return `<section class="section" style="margin-top:0" aria-labelledby="wrap-h"><h2 id="wrap-h">이어서 하기 <span class="count">${label}</span></h2>
+    <div class="md wrap-note"><p class="pre">${esc(D.dailies[d].wrap.trim())}</p></div><a class="bq-more" href="#/time/daily/${d}">${md2(d)} 데일리 열기 ›</a></section>`;
+}
 function blockBody(D, r){
   const li = (txt, btn) => `<li class="bq"><span class="bq-t">${txt}</span>${btn}</li>`;
   if (r.block === 'inbox'){
@@ -1859,7 +2067,7 @@ function blockBody(D, r){
   if (r.block === 'time'){
     const d = D.dailies[TODAY] || { retro:'' };
     const noMeet = D.appts.filter(a => a.start.slice(0, 10) === TODAY && hm(a.end) <= nowHM() && !D.meetings.some(m => m.appt === a.id));
-    return `<form data-form="retro" data-date="${TODAY}" class="form-row bq-retro"><label class="field" style="flex:1 1 200px"><span class="sr-only">오늘 한 줄 회고</span><input name="retro" id="bq-retro-${r.id}" value="${esc(d.retro)}" placeholder="오늘 하루를 한 줄로"></label><button class="btn btn-ghost btn-sm" type="submit">회고 저장하기</button></form>
+    return `${wrapForm(TODAY, `bq-wrap-${r.id}`, d)}<form data-form="retro" data-date="${TODAY}" class="form-row bq-retro"><label class="field" style="flex:1 1 200px"><span class="sr-only">오늘 한 줄 회고</span><input name="retro" id="bq-retro-${r.id}" value="${esc(d.retro)}" placeholder="오늘 하루를 한 줄로"></label><button class="btn btn-ghost btn-sm" type="submit">회고 저장하기</button></form>
       ${noMeet.length ? `<ul class="bq-list">${noMeet.map(a => li(`<span class="kind">기록 없음</span> ${esc(a.title)}`, `<button class="btn btn-tonal btn-sm" type="button" data-act="write-record" data-id="${a.id}">기록 쓰기</button>`)).join('')}</ul>` : ''}
       <a class="bq-more" href="#/time/daily/${TODAY}">시간 열기 ›</a>`;
   }
@@ -2172,13 +2380,13 @@ const estChips = (name, cur, legend) => `<fieldset class="chips"><legend class="
 const blockLabel = f => `${toHM(f.from)}–${toHM(f.to)}`;
 function openBlkAdd(key){
   const D = db(), f = freeBlocks(D).find(x => x.key === key), form = $('#dlg-blkadd form'), here = new Set((planOf(D)[key] || []).map(e => e.id));
-  const list = D.tasks.filter(t => (t.status === '진행' || t.status === '대기') && !here.has(t.id)).sort((a, b) => (plannedIds(D).has(a.id) ? 1 : 0) - (plannedIds(D).has(b.id) ? 1 : 0) || fillRank(a) - fillRank(b) || (a.due || '9999').localeCompare(b.due || '9999'));
+  const list = D.tasks.filter(t => t.status === '진행' && !here.has(t.id)).sort((a, b) => (plannedIds(D).has(a.id) ? 1 : 0) - (plannedIds(D).has(b.id) ? 1 : 0) || fillRank(a) - fillRank(b) || (a.due || '9999').localeCompare(b.due || '9999'));
   form.reset(); form.dataset.block = key;
   const used = (planOf(D)[key] || []).map(e => ({ e, t:find('tasks', e.id) })).filter(({ e, t }) => !slotDone(e, t)).reduce((n, { e, t }) => n + slotMin(e, t), 0);
   $('#ba-sub').textContent = f.to <= NM() ? `${blockLabel(f)} · 지나간 시간이에요. 이때 한 일을 넣고 완료로 체크해요` : `${blockLabel(f)} · ${fmtMin(Math.max(0, f.to - Math.max(f.from, NM()) - used))} 남음`;
   $('#ba-list').innerHTML = '<legend class="sr-only">넣을 할 일과 얼마나 할지</legend>' + (list.length ? list.map(t => `<div class="cand"><label><input type="checkbox" name="ids" value="${t.id}"><span><b>${esc(t.title)}</b><small>${t.status}${t.due ? ` · ${md2(t.due)}까지` : ''}${slotsOf(D, t.id).length ? ` · 다른 블록에도 있어요(${slotsOf(D, t.id).map(x => x.key).join(', ')})` : ''}</small></span></label>
       ${estChips('est-' + t.id, t.estimate, `${esc(t.title)} — 얼마나 할까요`)}</div>`).join('')
-    : '<p class="faint">넣을 할 일이 없어요. 진행·대기 중인 단기가 모두 이 블록에 들어가 있어요.</p>');
+    : '<p class="faint">넣을 할 일이 없어요. 블록에는 단기의 <b>진행</b> 칸에 있는 할 일만 넣어요. 대기에 있는 일은 단기에서 [시작하기]로 진행으로 옮겨 주세요.</p>');
   $('#ba-submit').hidden = !list.length;
   openDlg('dlg-blkadd'); (form.querySelector('input') || form.querySelector('[data-act=close-dlg]')).focus();
 }
@@ -2232,7 +2440,7 @@ function searchDocs(){
   D.inbox.forEach(x => add('inbox', line1(x.text), x.text, '#/inbox', dd(x.created)));
   D.tasks.forEach(x => add('task', x.title, [x.memo, x.result, (x.todos || []).map(t => t.t).join('\n'), (x.done || []).join('\n')].join('\n'), `#/action/short/${x.id}`, x.status));
   D.meetings.forEach(m => { const k = recKind(m); add('rec', m.title, [...k.fields.map(([f]) => m[f] || ''), (m.attendees || []).join(' '), m.todos.map(t => t.t).join('\n')].join('\n'), recHref(m), `${k.name} · ${dd(m.date)}`); });
-  Object.entries(D.dailies).forEach(([d, x]) => { if (x.memo || x.retro) add('daily', `${d.slice(0, 4)}년 ${md2(d)} 데일리`, `${x.memo}\n${x.retro}`, `#/time/daily/${d}`, ''); });
+  Object.entries(D.dailies).forEach(([d, x]) => { if (x.memo || x.retro || x.wrap) add('daily', `${d.slice(0, 4)}년 ${md2(d)} 데일리`, `${x.memo}\n${x.retro}\n${x.wrap || ''}`, `#/time/daily/${d}`, ''); });
   D.appts.forEach(a => add('appt', a.title, `${a.location}\n${a.memo}`, `#/action/appt/${a.id}`, dd(a.start)));
   D.longs.forEach(L => add('long', L.title, `${L.metric}\n${L.why}\n${L.retro}`, `#/action/long/${L.id}`, ''));
   D.routines.forEach(r => add('routine', r.title, r.content, `#/action/routine/${r.id}`, cronText(r.cron)));
@@ -2563,7 +2771,7 @@ function vKnowledge(tab){
       ? empty('아직 임시노트가 없어요', '메모하기로 인박스에 담은 것 중 내 생각을 임시노트로 보내요. 다듬은 임시노트는 영구노트로 옮겨 가요.', `<button class="btn btn-tonal" type="button" data-act="capture">메모하기</button>`)
       : empty('정리할 메모가 없어요', '임시노트를 모두 다듬거나 지웠어요. 새 생각은 메모하기로 인박스에 담아요.', `<button class="btn btn-tonal" type="button" data-act="capture">메모하기</button>`, humorLine());
     else body = `<div class="auto-zone">${D.fleeting.slice().sort((a, b) => b.created.localeCompare(a.created)).map(f => `<article class="memo" aria-label="임시노트, ${relTime(f.created)}">
-        ${S.inline === f.id ? inlineEdit('fleeting', f) : `<p>${esc(f.text)}</p>
+        ${S.inline === f.id ? inlineEdit('fleeting', f) : `${fleetingHtml(f)}
         <div class="foot"><span class="faint">${relTime(f.created)}</span>
           <button class="btn btn-text btn-sm" type="button" data-act="inline-edit" data-id="${f.id}">고치기</button>
           <a class="btn btn-tonal btn-sm" href="#/refine/fleeting/${f.id}">다듬기</a></div>`}</article>`).join('')}
@@ -2930,14 +3138,14 @@ function vRefine(kind, id, idx){
   return `<div class="page">
     <a class="back" href="${back}"><span aria-hidden="true">‹</span> ${esc(backLabel)}</a>
     <h1 tabindex="-1">다듬기</h1>
-    <section class="section"><h2>${tbx ? '원래 노트' : '원래 메모'}</h2><div class="md"><p class="faint" style="margin:0 0 4px">${esc(srcLabel)}</p><p style="margin:0">${esc(srcText)}</p>${tbx ? `<details class="more"><summary>본문 펼치기</summary>${md(tbBody(tbx))}</details>` : ''}</div></section>
+    <section class="section"><h2>${tbx ? '원래 노트' : '원래 메모'}</h2><div class="md"><p class="faint" style="margin:0 0 4px">${esc(srcLabel)}</p>${kind === 'fleeting' ? `<div class="memo-src">${fleetingHtml(find('fleeting', id), false)}</div>` : `<p style="margin:0">${esc(srcText)}</p>`}${tbx ? `<details class="more"><summary>본문 펼치기</summary>${md(tbBody(tbx))}</details>` : ''}</div></section>
     <form class="section stack" data-form="refine" data-kind="${kind}" data-id="${id}" data-idx="${idx ?? ''}" novalidate>
       <fieldset class="choice"><legend>어디에 둘까요 <span class="faint">— 회사·시스템을 떠나도 통하나요?</span></legend>
         <label><input type="radio" name="to" value="perm" checked><span><b>영구노트</b><small>네, 언제 어디서든 통해요</small></span></label>
         <label><input type="radio" name="to" value="ctx"><span><b>맥락노트</b><small>아니요, 특정 회사·시스템·시점에 묶여 있어요</small></span></label>
       </fieldset>
       <label class="field"><span id="rf-label">한 문장으로 쓴 생각 <span class="hint">${tbx ? '제목이 돼요. 교과서 문장 대신 내 말로 써요.' : '제목이 돼요. 제목만 읽어도 무슨 말인지 알 수 있게요.'}</span></span>
-        <input name="title" id="rf-title" value="${tbx ? '' : esc(srcText.split(/[.。]/)[0].slice(0, 60))}" aria-describedby="rf-err"></label>
+        <input name="title" id="rf-title" value="${tbx ? '' : esc(firstLine(srcText).split(/[.。]/)[0].slice(0, 60))}" aria-describedby="rf-err"></label>
       <p class="err" id="rf-err" hidden>한 문장을 적어 주세요</p>
       <label class="field"><span id="rf-body">내 말로 풀어 쓰기 <span class="hint">선택</span></span><textarea name="body"></textarea></label>
       ${pool.length ? `<fieldset class="choice" data-only="perm"><legend>이어지는 생각 <span class="faint">— 고르면 서로 연결해요</span></legend>
@@ -2991,7 +3199,7 @@ function vTime(tab, date){
   else body = vKind(tab);
   return `<div class="page">${head}${body}</div>`;
 }
-const hasDay = (D, d) => { const x = D.dailies[d]; return !!(x.memo || x.retro || (x.start && x.start !== pset().day_start) || (x.skipped || []).length || Object.values(x.plan || {}).some(a => a.length) || todayDid(d).length); };
+const hasDay = (D, d) => { const x = D.dailies[d]; return !!(x.memo || x.retro || x.wrap || (x.start && x.start !== pset().day_start) || (x.skipped || []).length || Object.values(x.plan || {}).some(a => a.length) || todayDid(d).length); };
 function todayDid(date = TODAY){
   const D = db(), out = [], done = D.routineDone[date] || {};
   D.routines.forEach(r => Object.keys(done).filter(k => done[k] && k.split('@')[0] === r.id).sort().forEach(k => out.push({ k:'루틴', t:kName({ r, k }), href:`#/action/routine/${r.id}` })));
@@ -3026,6 +3234,7 @@ function vDaily(date){
         <label class="field" style="flex:1 1 260px"><span class="sr-only">한 줄 회고</span><input name="retro" id="retro-${date}" value="${esc(x.retro)}" placeholder="오늘 하루를 한 줄로"></label>
         <button class="btn btn-primary" type="submit">회고 저장하기</button>
       </form></section>
+    <section class="section"><h2>하루 마무리</h2>${wrapForm(date, `wrap-${date}`, x, true)}</section>
   </div>`;
 }
 /* 기간 돌아보기 — 여러 날을 모아 본다(주간·월간 보고 재료). 보고 형식은 기록 종류(3층)로 남긴다 */
@@ -3196,11 +3405,13 @@ function vAction(board){
       let arr = D.tasks.filter(t => t.status === s && !t.archived);   // 보관한 완료는 보드에서 빠지고 보관함에서 본다
       if (s !== '완료') arr = arr.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
       const shown = s === '완료' ? arr.slice(0, 3) : arr, rest = s === '완료' ? arr.slice(3) : [];
-      const card = t => `<li class="tcard" data-id="${t.id}"><div class="t-head"><a href="#/action/short/${t.id}">${esc(t.title)}</a>${t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}" aria-label="${esc(t.title)} 보관하기">보관</button>` : ''}${moreBtn(t)}</div>
-          <div class="meta">${waitText(t)}${dueText(t.due, t.status)}${t.area ? `<span>${esc(t.area)}</span>` : ''}</div>
-          ${t.status === '완료' ? '' : taskActs(t, false)}</li>`;
+      const card = (t, inGroup) => { const w = whoOf(t), name = inGroup ? shortTitle(t) : t.title;
+        return `<li class="tcard${w.aiOnly ? ' t-ai' : ''}" data-id="${t.id}"><div class="t-head"><a href="#/action/short/${t.id}" ${name !== t.title ? `aria-label="${esc(t.title)}"` : ''}>${esc(name)}</a>${t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}" aria-label="${esc(t.title)} 보관하기">보관</button>` : ''}${moreBtn(t)}</div>
+          <div class="meta">${w.aiOnly ? '<span class="kind k-ai">AI가 진행</span>' : w.me ? `<span class="kind">내 할 일 ${w.me}</span>` : ''}${waitText(t)}${dueText(t.due, t.status)}${t.area && !inGroup ? `<span>${esc(t.area)}</span>` : ''}</div>
+          ${chCardActs(t)}</li>`; };
+      const cards = list => groupCards(list, s).map(g => g.pid ? tgroup(g, s, card) : card(g.t)).join('');
       return `<section class="col col-${s} ${S.shortTab === s ? 'on' : ''}" data-status="${s}" aria-labelledby="col-${s}"><h2 id="col-${s}">${statusBadge(s)}<span class="num">${arr.length}</span></h2>
-        ${arr.length ? `<ul>${shown.map(card).join('')}</ul>${rest.length ? `<details class="more"><summary>완료 ${rest.length}개 더 보기</summary><ul>${rest.map(card).join('')}</ul></details>` : ''}` : `<p class="empty-col">${s === '기다림' ? '남의 답을 기다리는 일이 없어요' : s === '완료' ? (D.tasks.some(t => t.archived) ? '완료한 일은 모두 보관했어요' : '아직 끝낸 일이 없어요') : '비어 있어요'}</p>`}
+        ${arr.length ? `<ul>${cards(shown)}</ul>${rest.length ? `<details class="more"><summary>완료 ${rest.length}개 더 보기</summary><ul>${cards(rest)}</ul></details>` : ''}` : `<p class="empty-col">${s === '기다림' ? '남의 답을 기다리는 일이 없어요' : s === '완료' ? (D.tasks.some(t => t.archived) ? '완료한 일은 모두 보관했어요' : '아직 끝낸 일이 없어요') : '비어 있어요'}</p>`}
         ${s === '완료' ? `<div class="col-foot">${arr.length > 1 ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive-all">완료 ${arr.length}개 모두 보관하기</button>` : ''}${D.tasks.some(t => t.archived) ? `<a class="btn btn-text btn-sm" href="#/action/short/_archive">보관함 <span class="num">${D.tasks.filter(t => t.archived).length}</span></a>` : ''}</div>` : ''}
       </section>`; }).join('')}</div>`;
   } else if (board === 'long'){
@@ -3228,6 +3439,38 @@ function vAction(board){
   return `<div class="page ${board === 'short' ? 'wide' : ''}">${head}${body}</div>`;
 }
 
+/* 프로젝트 묶음 — 프로젝트 파일럿이 만든 단기(메모의 "프로젝트 파일럿 <id>/<키>" 줄)는 상태 칸마다 프로젝트 하나로 접어 둔다.
+   펼친 상태는 이 기기에 기억한다. 남은 할 일이 모두 🤖이면 AI가 진행하는 카드로 따로 보인다 */
+const PILOT_RE = /프로젝트 파일럿 (p[\w-]+)\//;
+const pilotOf = t => (String(t.memo || '').match(PILOT_RE) || [])[1] || null;
+function whoOf(t){
+  const open = (t.todos || []).filter(x => !x.d), ai = open.filter(x => /^🤖/u.test(x.t)).length, me = open.filter(x => /^🙋/u.test(x.t)).length;
+  return { ai, me, aiOnly: ai > 0 && me === 0 && t.status !== '완료' };
+}
+// 묶음 안에서는 "<프로젝트> · " 앞머리를 뺀다
+const shortTitle = t => { const i = String(t.title).indexOf(' · '); return i > 0 && i < 40 ? t.title.slice(i + 3) : t.title; };
+function groupCards(list, s){
+  const out = [], at = {};
+  for (const t of list){
+    const pid = pilotOf(t);
+    if (!pid){ out.push({ t }); continue; }
+    if (at[pid] == null){ at[pid] = out.length; out.push({ pid, items: [] }); }
+    out[at[pid]].items.push(t);
+  }
+  return out;
+}
+function tgroup(g, s, card){
+  const first = g.items[0], name = first.area || String(first.title).split(' · ')[0];
+  const todos = g.items.flatMap(t => t.todos || []), done = todos.filter(x => x.d).length;
+  const ai = g.items.filter(t => whoOf(t).aiOnly).length, me = g.items.reduce((n, t) => n + whoOf(t).me, 0);
+  const open = LS.get(`pkm:v1:tg:${S.profile}:${g.pid}:${s}`, false);
+  return `<li class="tgroup"><details data-tg="${g.pid}:${s}" ${open ? 'open' : ''}><summary>
+      <span class="tg-head"><span class="tg-name">${esc(name)}</span><span class="num">${g.items.length}</span>${chProjectBtn(g.pid, name)}</span>
+      ${todos.length ? `<span class="tg-bar">${meter(done, todos.length, 'thin')}<span class="num">할 일 ${done}/${todos.length}</span></span>` : ''}
+      <span class="meta">${ai ? `<span class="kind k-ai">AI가 진행 ${ai}</span>` : ''}${me ? `<span class="kind">내 할 일 ${me}</span>` : ''}</span>
+    </summary><ul>${g.items.map(t => card(t, true)).join('')}</ul></details></li>`;
+}
+
 /* 보관함 — 보드에서 치운 완료 단기. 검색·데일리·돌아보기에는 그대로 남는다 */
 const ARCH = { ids:[], at:0 };
 function vTaskArchive(){
@@ -3249,9 +3492,9 @@ function vTask(id){
     <a class="back" href="#/action/short"><span aria-hidden="true">‹</span> 단기보드</a>
     ${conflictBanner()}
     <p class="eyebrow">단기</p><h1 tabindex="-1">${esc(t.title)}</h1>
-    <dl class="meta-dl"><dt>마감</dt><dd>${t.due ? `${fmtDate(t.due)} · ${dueText(t.due, t.status)}` : '없음'}</dd><dt>쌓이는 곳</dt><dd>${t.area ? areaLink(t.area) : '없음'}</dd><dt>만든 날</dt><dd>${md2(t.created)}</dd>${t.status === '완료' ? `<dt>결과</dt><dd>${t.result ? esc(t.result) : `<button class="btn btn-text btn-sm" type="button" data-act="result" data-id="${t.id}" style="padding:0;min-height:28px">결과 한 줄 남기기</button>`}</dd>` : ''}${t.status === '기다림' ? `<dt>기다리는 사람</dt><dd>${t.waitOn ? esc(t.waitOn) : '적지 않음'} · ${md2(t.waitSince)}부터</dd>` : ''}${m ? `<dt>나온 곳</dt><dd><a href="${recHref(m)}">${esc(recKind(m).name)} · ${esc(m.title)}</a></dd>` : ''}</dl>
+    <dl class="meta-dl"><dt>마감</dt><dd>${t.due ? `${fmtDate(t.due)} · ${dueText(t.due, t.status)}` : '없음'}</dd><dt>쌓이는 곳</dt><dd>${t.area ? areaLink(t.area) : '없음'}</dd><dt>만든 날</dt><dd>${md2(t.created)}</dd><dt>ID</dt><dd><code class="num">${esc(t.id)}</code> <button class="btn btn-text btn-sm" type="button" data-act="copy-task-id" data-id="${t.id}" style="padding:0 4px;min-height:28px" aria-label="ID ${esc(t.id)} 복사">복사</button></dd>${t.status === '완료' ? `<dt>결과</dt><dd>${t.result ? esc(t.result) : `<button class="btn btn-text btn-sm" type="button" data-act="result" data-id="${t.id}" style="padding:0;min-height:28px">결과 한 줄 남기기</button>`}</dd>` : ''}${t.status === '기다림' ? `<dt>기다리는 사람</dt><dd>${t.waitOn ? esc(t.waitOn) : '적지 않음'} · ${md2(t.waitSince)}부터</dd>` : ''}${m ? `<dt>나온 곳</dt><dd><a href="${recHref(m)}">${esc(recKind(m).name)} · ${esc(m.title)}</a></dd>` : ''}</dl>
     <div class="doc-actions state-bar" role="group" aria-label="상태">${statusBadge(t.status)}${t.archived ? `<span class="meta">${md2(t.archived)} 보관함으로 옮김</span><button class="btn btn-text btn-sm" type="button" data-act="task-unarchive" data-id="${t.id}">보관함에서 꺼내기</button>` : t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}">보관하기</button>` : ''}${taskActs(t)}</div>
-    <div class="doc-actions" style="margin-top:8px">${editBtn()}${obsBtn()}</div>
+    <div class="doc-actions" style="margin-top:8px">${editBtn()}${obsBtn()}${chCards() ? (() => { const r = chCardRoom(t.id); return `<button class="btn btn-ghost btn-sm" type="button" data-ch="card" data-id="${t.id}">${CH_ICON}AI Chat${r ? ` · ${CH_LABEL[chState(r)]}` : ''}</button>`; })() : ''}</div>
     ${section(`할 일${t.todos.length ? ` <span class="count num">${t.todos.filter(x => x.d).length}/${t.todos.length}</span>` : ''}`, (t.todos.length ? meter(t.todos.filter(x => x.d).length, t.todos.length, 'thin') : '') + todos + `<form data-form="task-todo" data-id="${t.id}" class="form-row" style="margin-top:12px"><label class="field" style="flex:1 1 240px"><span class="sr-only">할 일</span><input name="t" id="ttodo-${t.id}" placeholder="할 일 하나"></label><button class="btn btn-ghost" type="submit">할 일 추가하기</button></form>`)}
     ${section('완료 조건', t.done.filter(Boolean).length ? `<div class="md">${md(t.done.map(x => '- ' + x).join('\n'))}</div>` : noneText)}
     ${section('메모', t.memo ? `<div class="md">${md(t.memo)}</div>` : noneText)}
@@ -3337,8 +3580,8 @@ function vLong(id){
       </form></section>
     ${lrView(L)}
     ${section('여기에 쌓이는 것', feeders.length ? `<ul class="list">${feeders.map(f => `<li><a class="row" href="${f.href}"><span class="body"><span class="title">${esc(f.t)}</span><span class="meta"><span>${f.k}</span><span>${esc(f.s)}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>` : '<p class="md none">아직 연결된 단기·루틴이 없어요</p>')}
-    ${section('왜 관리하나', L.why ? `<div class="md"><p>${esc(L.why)}</p></div>` : noneText)}
-    ${section('회고', L.retro ? `<div class="md"><p>${esc(L.retro)}</p></div>` : noneText)}
+    ${section('왜 관리하나', L.why ? `<div class="md"><p class="pre">${esc(L.why)}</p></div>` : noneText)}
+    ${section('회고', L.retro ? `<div class="md"><p class="pre">${esc(L.retro)}</p></div>` : noneText)}
   </div>`;
 }
 
@@ -3393,7 +3636,7 @@ const EDIT = {
     links:(D, x) => { const n = D.perms.filter(p => p.links.includes(x.id)).length; return n ? `이 노트를 가리키는 영구노트 ${n}개의 연결이 끊겨요.` : ''; } },
   ctxs:{ name:'맥락노트', back:id => `#/knowledge/ctx/${id}`, list:'#/knowledge/ctx', fields:[['title','주제'],['group','묶음 — 폴더 이름, 하위 묶음은 /로 나눠요'],['summary','한 줄 요약'],['body','내용','area']], touch:true,
     links:() => '바뀐 기록도 함께 지워져요.' },
-  dailies:{ name:'데일리', back:id => `#/time/daily/${id}`, list:'#/time/daily', fields:[['memo','메모','area'],['retro','한 줄 회고']],
+  dailies:{ name:'데일리', back:id => `#/time/daily/${id}`, list:'#/time/daily', fields:[['memo','메모','area'],['retro','한 줄 회고'],['wrap','하루 마무리','area']],
     links:() => '이날 한 일 목록은 단기·루틴·노트에서 자동으로 모은 것이라 지워지지 않아요.' },
   meetings:{ name:'기록', back:id => recHref(find('meetings', id)), list:x => `#/time/${x.kind || 'meeting'}`,
     fields:x => { const k = recKind(x); return [['title','제목'],['date','날짜','date'],['time','시각','time'], ...(k.people ? [['attendees','함께한 사람 — 쉼표로 구분','list']] : []), ...k.fields.map(([f, l]) => [f, l, 'area'])]; },
@@ -3548,8 +3791,11 @@ function plNowLinks(){
 }
 function plCount(id){
   const x = PL.st && PL.st.plugins[id]; if (!x) return 0;
-  const runs = (x.state.runs || []).filter(plMine).length;
-  return runs + x.feeds.filter(f => !f.start && f.count !== 'no').reduce((n, f) => n + plVisible(x, f).length, 0);
+  const inl = new Set(x.feeds.filter(f => f.view === 'inline').map(f => f.name));
+  const runs = (x.state.runs || []).filter(r => plMine(r) && !(r.gone && inl.has(r.feed))).length;   // 지난 회차처럼 inline 목록에서 빠진 것은 쌓아 두지 않는다
+  // 시작 버튼이 있는 목록은 count: yes일 때만 센다(내가 할 일 목록처럼 항목 자체가 내 차례인 것)
+  const live = (f, it) => (x.state.runs || []).some(r => r.feed === f.name && r.item.id === it.id && !['done', 'canceled'].includes(r.status));
+  return runs + x.feeds.filter(f => (!f.start && f.count !== 'no') || (f.start && f.count === 'yes')).reduce((n, f) => n + (f.start ? ((x.state.feeds[f.name] || {}).items || []).filter(it => !live(f, it)).length : plVisible(x, f).length), 0);
 }
 async function plLoad(force){
   if (!plOK() || PL.loading) return;
@@ -3647,7 +3893,7 @@ function plFinds(list){
     <div class="pl-find-head">${plUrl(f.url) ? `<a class="pl-where" href="${esc(plUrl(f.url))}" target="_blank" rel="noopener"><code>${esc(f.where || '')}</code> <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<code class="pl-where">${esc(f.where || '')}</code>`}${f.tag ? plBadge(f.tag, 'bad') : ''}${f.note ? plBadge(f.note, 'wait') : ''}</div>
     ${f.title ? `<b class="pl-find-title">${esc(f.title)}</b>` : ''}
     ${f.text ? `<p class="pl-find-text">${esc(f.text)}</p>` : ''}
-    ${f.copy ? `<div class="pl-say"><p class="pl-text">${esc(f.copy)}</p><button class="btn btn-text btn-sm" type="button" data-pl="copy" data-text="${esc(f.copy)}" data-msg="${k + 1}번째 리뷰 문구를 복사했어요" aria-label="${k + 1}번째 리뷰 문구 복사">문구 복사</button></div>` : ''}
+    ${f.copy ? `<div class="pl-say"><p class="pl-text">${esc(f.copy)}</p><button class="btn btn-text btn-sm" type="button" data-pl="copy" data-text="${esc(f.copy)}" data-msg="${f.title ? `‘${esc(f.title)}’ 문구를 복사했어요` : `${k + 1}번째 문구를 복사했어요`}" aria-label="${f.title ? `‘${esc(f.title)}’ 문구 복사` : `${k + 1}번째 문구 복사`}">문구 복사</button></div>` : ''}
   </li>`).join('')}</ol>`;
 }
 // 묻는 단계의 선택지를 버튼으로(ask.inline). 누른 뒤에는 같은 자리에 '하는 중'을 둔다
@@ -3666,7 +3912,7 @@ function plInlineFeed(id, x, f){
   const row = ({ it, gone }) => {
     const r = runs.find(z => z.item.id === it.id && z.status !== 'canceled');   // 최근 것(runs는 새것이 앞)
     const stale = r && it.version != null && r.item.version != null && r.item.version !== it.version && !['queued', 'running', 'waiting'].includes(r.status);
-    const startBtn = (text, cls = 'btn-tonal') => plIsRunner() || plRunner() ? `<button class="btn ${cls} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-label="${esc(it.title)}" ${PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(text)}</button>` : '';
+    const startBtn = (text, cls = 'btn-tonal') => plIsRunner() || plRunner() ? `<button class="btn ${cls} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-label="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(text)}" ${PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(text)}</button>` : '';
     let tone = '', head = '', body = '', acts = '';
     const s = r && plStepNow(r), vd = r && plVerdictOf(r);
     if (r && ['done', 'stopped', 'canceled'].includes(r.status)) delete PL.picked[r.id];
@@ -3691,14 +3937,14 @@ function plInlineFeed(id, x, f){
     const more = r && !stale ? `<a class="btn btn-text btn-sm" href="#/plugins/${id}/run/${r.id}">자세히</a>` : '';
     const state = head || body ? `<div class="pl-state ${tone ? `pl-${tone}` : ''}" ${tone === 'wait' ? 'role="status"' : ''}>${head ? `<b>${head}</b>` : ''}${body}</div>` : '';
     return `<li class="pl-irow${gone ? ' pl-gone' : ''}">
-      <div class="pl-ihead"><a class="title" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>
+      <div class="pl-ihead">${plUrl(it.url) ? `<a class="title" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<span class="title">${esc(it.title)}</span>`}
         <span class="meta">${(it.tags || []).map(t => plBadge(t, /변경|멈|오류/.test(t) ? 'bad' : 'wait')).join('')}${(it.meta || []).slice(0, 4).map(m => `<span>${esc(m)}</span>`).join('')}${gone ? '<span>목록에서 빠짐</span>' : ''}</span></div>
       ${state}
       ${acts || more ? `<div class="pl-iacts">${acts}${more}</div>` : ''}
     </li>`;
   };
   const list = rows.length ? `<ul class="list pl-ilist">${rows.map(row).join('')}</ul>` : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p>` : '';
-  return section(`${esc(f.name)}${rows.length ? ` <span class="count">${rows.filter(z => !z.gone).length}</span>` : ''}`, `${err}${list}`);
+  return section(`${esc(f.name)}${rows.length ? ` <span class="count">${rows.filter(z => !z.gone).length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${err}${list}`);
 }
 
 /* 플러그인 화면 — 피드 섹션, 작업을 돌리는 플러그인은 내 차례·진행 중·시작 전·끝난 작업 */
@@ -3764,13 +4010,21 @@ function vPlugins(id){
 /* 검색·편집기만 있는 플러그인 — 돌리는 컴퓨터 없이 지금 이 컴퓨터에서 쓴다 */
 const plLocalOnly = id => { const x = PL.st && PL.st.plugins[id]; return !!x && !x.feeds.length && !(x.workflows || []).length; };
 const plNoScripts = id => { const li = (PL.list || []).find(z => z.id === id); return !!li && !((li.manifest.permissions || {}).bundled || []).length; };
+const plChat = id => { const x = PL.st && PL.st.plugins[id]; return !!x && (x.chats || []).length > 0; };   // AI 챗봇 — 스크립트는 없어도 AI 연결과 승인이 필요하다
+const plApLabel = id => plNoScripts(id) ? '이 컴퓨터에서 승인' : '스크립트 승인';
 function plMissing(id){
   const m = PL.machine[id] || {}, here = plHere(), left = [], local = plLocalOnly(id);
-  if (local && plNoScripts(id)) return [];   // 편집기만 — 준비할 것이 없다
+  if (local && plNoScripts(id) && !plChat(id)) return [];   // 편집기만 — 준비할 것이 없다
+  if (plChat(id)){
+    if (!here.ai) left.push('pkm 서버의 AI 연결');
+    if (m.connected && !m.approved) left.push(plApLabel(id));
+    if (here.ai && CH.st && CH.st.plugin && !CH.st.ok) left.push('이 컴퓨터의 pkm-ai-server');
+    return left;
+  }
   if (!local && plRunner() && !plIsRunner()) return [];   // 다른 컴퓨터가 돌리고 있으면 이 기기는 볼 것이 없다
   if (!here.ai) left.push('pkm 서버의 AI 연결');
   if (!local && !plIsRunner()) left.push('돌리는 컴퓨터');
-  if (m.connected && !m.approved) left.push('스크립트 승인');
+  if (m.connected && !m.approved) left.push(plApLabel(id));
   if (!local) for (const s of m.secrets || []) if (!s.set_at) left.push(s.label);   // 검색 플러그인의 토큰은 쓰는 곳 것만 넣으면 된다 — 빠진 곳은 찾을 때 알려 준다
   return left;
 }
@@ -3819,6 +4073,7 @@ function vPluginRun(id, rid){
      ${agent ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="redo" data-id="${id}" data-run="${r.id}" data-step="${esc(agent.key)}">AI에게 다시 시키기</button>` : ''}
      <span class="pl-quiet">${btn('confirm', '끝난 것으로 옮기기', 'btn-text')}${cancel}</span>`];
   else if (r.status === 'input' && vd && s.ask && s.ask.inline) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), `${plChoices(id, r, s)}${cancel}`];
+  else if (r.status === 'input' && vd && s.ask) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), ''];   // 판정을 먼저 보이고, 묻는 말은 아래 폼에서
   else if (r.status === 'input') card = ['wait', esc(s.ask.question || '답이 필요해요'), esc(s.ask.hint || ''), ''];
   else if (r.status === 'stopped' && /할당이 풀렸어요|이미 끝났어요/.test(s.error || '')){   // 동료 눈에 보이는 변경은 막았다 — 그만두는 게 기본
     card = ['bad', /할당이 풀렸어요/.test(s.error) ? `${esc(key || '이 티켓')} 할당이 풀렸어요` : `${esc(key || '이 티켓')}이 지라에서 끝났어요`, esc(String(s.error || '').split('\n')[0].replace(/^.*?(할당이 풀렸어요|이미 끝났어요)\s*/, '').replace(/^\((.*)\)\.\s*/, '$1 · ')),
@@ -3849,11 +4104,13 @@ function vPluginRun(id, rid){
   if (!sent && r.status === 'input' && s.ask && !['confirm', 'gate'].includes(s.ask.type) && !s.ask.inline){
     const a = s.ask, choices = a.choices || [], quick = !a.free && choices.length && choices.length <= 3;   // 고를 것이 셋 이하면 버튼 하나로 바로
     form = quick ? `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
+      ${vd ? `<h2 class="pl-ask-q">${esc(a.question)}</h2>${a.hint ? `<p class="faint" style="white-space:pre-line;margin:0">${esc(a.hint)}</p>` : ''}` : ''}
       <div class="pl-quick" role="group" aria-label="${esc(a.question)}">${choices.map((c, k) => `<button class="btn ${c.recommended || (!choices.some(x => x.recommended) && !k) ? 'btn-primary' : 'btn-ghost'}" type="submit" name="v" value="${esc(c.value)}">${esc(c.label)}</button>`).join('')}</div>
       <div class="dlg-actions" style="justify-content:flex-start">${cancel}</div></form>`
     : `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
+      ${vd ? `<h2 class="pl-ask-q">${esc(a.question)}</h2>${a.hint ? `<p class="faint" style="white-space:pre-line;margin:0 0 8px">${esc(a.hint)}</p>` : ''}` : ''}
       ${choices.length ? `<fieldset class="choice"><legend class="sr-only">${esc(a.question)}</legend>${choices.map(c => `<label><input type="radio" name="v" value="${esc(c.value)}" ${c.recommended ? 'checked' : ''}><span><b>${esc(c.label)}${c.recommended ? ' (추천)' : ''}</b>${c.hint ? `<small>${esc(c.hint)}</small>` : ''}</span></label>`).join('')}</fieldset>` : ''}
-      ${a.free || !choices.length ? `<label class="field"><span>${choices.length ? '목록에 없으면 적어 주세요' : esc(a.question)}</span><textarea name="t" rows="3" placeholder="${esc(a.placeholder || '')}" aria-describedby="pl-ans-err"></textarea></label>` : ''}
+      ${a.free || !choices.length ? `<label class="field"><span>${choices.length ? '목록에 없으면 적어 주세요' : esc(a.question)}</span><textarea name="t" rows="${a.value ? 4 : 3}" placeholder="${esc(a.placeholder || '')}" aria-describedby="pl-ans-err">${esc(a.value || '')}</textarea></label>` : ''}
       <p class="err" id="pl-ans-err" hidden>${choices.length ? '하나를 골라 주세요' : '내용을 적어 주세요'}</p>
       <div class="dlg-actions" style="justify-content:flex-start"><button class="btn btn-primary" type="submit">${choices.length ? '이걸로 이어 하기' : '이 내용으로 이어 하기'}</button>${cancel}</div></form>`;
   }
@@ -3869,8 +4126,8 @@ function vPluginRun(id, rid){
     <h1 tabindex="-1">${esc(r.item.title)}</h1>
     <div class="ai-state ${card[0]} pl-card" role="status"><b id="pl-card-h" tabindex="-1">${card[1]}</b>${card[2] ? `<span>${card[2]}</span>` : ''}${card[3] && card[3].trim() ? `<div class="pl-card-acts">${card[3]}</div>` : ''}</div>
     ${tools.trim() ? `<div class="pl-card-acts" style="margin:12px 0 0">${tools}</div>` : ''}
-    ${form}
     ${vd && vd.findings.length ? section(`짚은 곳 <span class="count">${vd.findings.length}</span>`, plFinds(vd.findings)) : ''}
+    ${form}
     ${co && co.warnings && co.warnings.length ? `<ul class="pl-warn">${co.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
     ${rep && rep.summary ? section('AI 요약', plMd(rep.summary)) : ''}
     ${rep && rep.risks && !/^없음\.?$/.test(rep.risks) ? section('AI가 남긴 확인할 것', plMd(rep.risks, 800)) : ''}
@@ -3902,8 +4159,9 @@ function vPluginSetup(id){
   const runRow = plIsRunner() ? kv('돌리는 컴퓨터', '이 컴퓨터', `<button class="btn btn-text btn-sm" type="button" data-pl="runner-off">멈추기</button>`)
     : plRunner() ? kv('돌리는 컴퓨터', esc(plRunner()), `<button class="btn btn-ghost btn-sm" type="button" data-pl="runner-move" ${here.ai ? '' : 'disabled'}>이 컴퓨터로 옮기기</button>`)
     : kv('돌리는 컴퓨터', '아직 없어요', `<button class="btn ${here.ai ? 'btn-primary' : 'btn-ghost'} btn-sm" type="button" data-pl="runner-on" ${here.ai ? '' : 'disabled aria-describedby="pl-need-ai"'}>이 컴퓨터에서 돌리기</button>${here.ai ? '' : '<small id="pl-need-ai" class="faint">AI 연결이 먼저 필요해요</small>'}`);
-  const apRow = !here.ai ? '' : !m.at ? kv('스크립트 승인', '확인하는 중…') : m.error ? kv('스크립트 승인', esc(m.error)) : m.approved ? kv('스크립트 승인', '승인했어요')
-    : kv('스크립트 승인', m.approved_before ? '설치 뒤 바뀐 파일이 있어 멈췄어요' : '아직 승인하지 않았어요', `<button class="btn btn-primary btn-sm" type="button" data-pl="approve" data-id="${id}">${m.approved_before ? '바뀐 내용 보고 승인하기' : '승인하기'}</button>`);
+  const apL = plApLabel(id);
+  const apRow = !here.ai ? '' : !m.at ? kv(apL, '확인하는 중…') : m.error ? kv(apL, esc(m.error)) : m.approved ? kv(apL, '승인했어요')
+    : kv(apL, m.approved_before ? '설치 뒤 바뀐 파일이 있어 멈췄어요' : '아직 승인하지 않았어요', `<button class="btn btn-primary btn-sm" type="button" data-pl="approve" data-id="${id}">${m.approved_before ? '바뀐 내용 보고 승인하기' : '승인하기'}</button>`);
   const scripts = PL.scripts[id];
   if (!scripts && !PL.busy.startsWith('scripts:')){ PL.busy = `scripts:${id}`; papi(`/plugins/${id}/scripts`).then(r => { PL.scripts[id] = r.scripts; }).catch(() => { PL.scripts[id] = []; }).finally(() => { PL.busy = ''; plRepaint(); }); }
   const scriptList = scripts && scripts.length ? `<details class="more"><summary>실행할 스크립트 ${scripts.length}개 내용 보기</summary>${scripts.map(sc => `<details class="pl-script"><summary><code>${esc(sc.path)}</code> <span class="faint num">${esc((sc.sha256 || '').slice(0, 6))}</span></summary><pre tabindex="0">${esc(sc.text)}</pre></details>`).join('')}</details>` : '';
@@ -3938,7 +4196,15 @@ function vPluginSetup(id){
         ? `<li><span class="pl-gate-name">${k + 1} ${esc(s.name)}</span><span class="faint">항상 내가 해요</span></li>`
         : `<li><span class="pl-gate-name">${k + 1} ${esc(s.name)} <span class="faint">${KIND[s.kind] || ''}</span></span><label class="check"><input type="checkbox" name="g" value="${esc(`${autoWf.name}|${s.key}`)}" ${(x.local.gates || {})[`${autoWf.name}|${s.key}`] ? 'checked' : ''}><span>하기 전에 내 확인</span></label></li>`).join('')}</ol>
       <div><button class="btn btn-ghost" type="submit">단계 저장하기</button></div></form>`;
-  const card = elsewhere ? `<div class="ai-state ok"><b>${esc(plRunner())}에서 돌려요</b><span>토큰과 설정은 ${esc(plRunner())}에서 바꿔요. 여기서는 목록을 보고 답할 수 있어요.</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">목록 보기</a></div></div>`
+  // AI 챗봇: 같은 컴퓨터의 pkm-ai-server인지, full 모드·동시 실행 수
+  const cst = plChat(id) && CH.st && CH.st.plugin ? CH.st : null;
+  const chatRows = !plChat(id) || !here.ai ? '' : !cst ? kv('이 컴퓨터의 pkm-ai-server', '확인하는 중…')
+    : !cst.ok ? kv('이 컴퓨터의 pkm-ai-server', esc(cst.message || '쓸 수 없어요'))
+    : kv('이 컴퓨터의 pkm-ai-server', '연결됨 · 이 pkm 서버와 같은 컴퓨터예요') + kv('에이전트 모드', cst.full ? 'AI가 이 컴퓨터에서 묻지 않고 파일을 고치고 명령을 실행해요(full). 꼭 물어야 할 것만 채팅에서 물어요' : '자동 권한(auto) · pkm-ai-server 설정 agent.allow_full을 켜면 확인 없이 돌아요')
+      + kv('동시에 도는 세션', `${cst.concurrency}개${cst.concurrency < 2 ? ' · 카드 세션을 여럿 동시에 돌리려면 pkm-ai-server 설정 agent.concurrency를 올려요' : ''}`);
+  if (plChat(id) && !cst) chLoad();
+  const card = plChat(id) && ready ? `<div class="ai-state ok"><b>준비됐어요</b><span>오른쪽 아래 AI 챗봇 버튼과 단기 카드의 AI Chat 아이콘으로 써요</span><div><button class="btn btn-primary btn-sm" type="button" data-ch="open">AI 챗봇 열기</button></div></div>`
+    : elsewhere ? `<div class="ai-state ok"><b>${esc(plRunner())}에서 돌려요</b><span>토큰과 설정은 ${esc(plRunner())}에서 바꿔요. 여기서는 목록을 보고 답할 수 있어요.</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">목록 보기</a></div></div>`
     : ready && plLocalOnly(id) ? `<div class="ai-state ok"><b>준비됐어요</b><span>이 컴퓨터에서 바로 써요</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">플러그인 보기</a></div></div>`
     : ready ? `<div class="ai-state ok"><b>준비됐어요</b><span>${esc(plWho())}에서 가져와요</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">목록 보기</a></div></div>`
     : m.at || !here.ai ? `<div class="ai-state wait"><b>준비가 ${left.length}개 남았어요</b><span>${esc(left.join(' · '))}</span></div>` : '';
@@ -3947,7 +4213,7 @@ function vPluginSetup(id){
     <h1 tabindex="-1">${esc(mf.name)} 준비와 설정</h1>
     ${card}
     <section class="section"><h2>이 컴퓨터 · ${esc(here.host || '')}</h2><p class="faint" style="margin:-4px 0 12px">여기 값은 이 컴퓨터에만 있어요. 다른 컴퓨터에서 돌리려면 거기서 다시 넣어요.</p>
-      <dl class="pl-kvs">${elsewhere ? runRow : plLocalOnly(id) && plNoScripts(id) ? kv('준비', '따로 준비할 것이 없어요') : aiRow + (plLocalOnly(id) ? '' : runRow) + apRow + secretRows}</dl>${elsewhere ? '' : scriptList + secretForms}</section>
+      <dl class="pl-kvs">${elsewhere ? runRow : plLocalOnly(id) && plNoScripts(id) && !plChat(id) ? kv('준비', '따로 준비할 것이 없어요') : aiRow + (plLocalOnly(id) ? '' : runRow) + apRow + chatRows + secretRows}</dl>${elsewhere ? '' : scriptList + secretForms}</section>
     ${settings && !elsewhere ? `<section class="section"><h2>설정 · 이 컴퓨터</h2><form data-pl-form="settings" data-id="${id}" novalidate class="pl-settings">${settings}<div><button class="btn btn-ghost" type="submit">설정 저장하기</button></div></form></section>` : ''}
     ${autoFeed && !elsewhere ? section('자동 시작', `<p class="pl-auto">${esc(autoFeed.name)}에 새로 들어오면 자동 시작 · <b>${x.local.auto ? '켜짐' : '꺼짐'}</b> <button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${x.local.auto ? '' : '1'}" ${plIsRunner() ? '' : 'disabled'}>${x.local.auto ? '끄기' : '켜기'}</button></p>${plIsRunner() ? '' : '<p class="faint">이 컴퓨터에서 돌리기를 켠 뒤에 켤 수 있어요</p>'}${gatesBody}`) : ''}
     ${everyBody ? section('가져오는 주기', everyBody) : ''}
@@ -3978,7 +4244,7 @@ function vPluginAdd(){
   const review = !ins ? '' : !ins.ok ? `<div class="ai-state bad" role="alert"><b>설치할 수 없어요 — 규격에 맞지 않는 곳이 ${ins.errors.length}개 있어요</b><ul>${ins.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul><div><button class="btn btn-ghost btn-sm" type="button" data-pl="inspect-reset">다른 주소로 다시 하기</button></div></div>` : `
     <section class="section pl-review" aria-labelledby="pl-rv-h"><h2 id="pl-rv-h" tabindex="-1">${esc(mf.name)} <span class="faint num">${esc(mf.version)}</span></h2>${mf.description ? `<p class="pl-text">${esc(mf.description)}</p>` : ''}
       ${changes}
-      <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}</ul>
+      <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}${(ins.chats || []).map(c => `<li>${c.scope === 'card' ? `단기 카드마다 「${esc(c.label || c.name)}」 세션 — 이 컴퓨터의 작업 폴더에서, 카드끼리 동시에` : `오른쪽 아래 AI 챗봇 버튼 — 「${esc(c.name)}」, 이 프로필 데이터를 말로 고쳐요`}</li>`).join('')}</ul>
       <h3>쓰는 권한</h3><ul>
         ${mf.permissions.ai.includes('agent') ? `<li class="pl-danger"><b>AI가 파일을 고치고 명령을 실행해요</b> (에이전트 · 상한 ${esc(mf.permissions.agent_mode)})</li>` : mf.permissions.ai.includes('chat') ? '<li>AI와 대화만 해요</li>' : ''}
         ${(mf.secrets || []).map(sv => `<li>비밀값 ${esc(sv.label)}(<code>${esc(sv.name)}</code>)을 써요</li>`).join('')}
@@ -3986,10 +4252,10 @@ function vPluginAdd(){
         ${mf.permissions.scripts.length ? `<li>이 컴퓨터에 등록해야 해요: ${esc(mf.permissions.scripts.join(', '))}</li>` : ''}</ul>
       ${ins.scripts.length ? `<details class="more"><summary>스크립트 내용 보기</summary>${ins.scripts.map(sc => `<details class="pl-script"><summary><code>${esc(sc.path)}</code> <span class="faint num">${esc((sc.sha256 || '').slice(0, 6))}</span></summary><pre tabindex="0">${esc(sc.text)}</pre></details>`).join('')}</details>` : ''}
       ${ins.warnings.length ? `<ul class="pl-warn">${ins.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
-      <h3>알아 둘 것</h3><p class="faint">가져온 목록과 작업 기록은 ${esc(S.profile)} 프로필과 함께 동기화돼요. 비밀값과 설정은 이 컴퓨터에만 둬요.${!plHere().ai && window.PKMAI && PKMAI.conn() ? ' 브라우저를 닫아도 돌 수 있게, 이 브라우저의 AI 연결을 이 컴퓨터의 pkm 서버에도 넣어요.' : ''}</p>
+      <h3>알아 둘 것</h3><p class="faint">${(ins.chats || []).length && !(ins.feeds || []).length ? '채팅 기록과 AI 세션은 이 컴퓨터에만 둬요. pkm 서버와 같은 컴퓨터에 띄운 pkm-ai-server에 연결돼 있을 때만 돌아요.' : `가져온 목록과 작업 기록은 ${esc(S.profile)} 프로필과 함께 동기화돼요. 비밀값과 설정은 이 컴퓨터에만 둬요.`}${!plHere().ai && window.PKMAI && PKMAI.conn() ? ' 브라우저를 닫아도 돌 수 있게, 이 브라우저의 AI 연결을 이 컴퓨터의 pkm 서버에도 넣어요.' : ''}</p>
       <div class="dlg-actions" style="justify-content:flex-start;margin-top:16px"><button class="btn btn-text" type="button" data-pl="inspect-reset">닫기</button>
         ${same ? '' : `<button class="btn btn-primary" type="button" data-pl="install" ${PL.busy === 'install' ? 'aria-disabled="true"' : ''}>${PL.busy === 'install' ? (have ? '업데이트하는 중…' : '설치하는 중…') : have ? `${esc(mf.version)}으로 ${up ? '업데이트' : '바꾸기'}` : `${esc(S.profile)} 프로필에 설치하기`}</button>`}</div>
-      ${same ? '' : `<p class="faint">${have ? `설치한 ${esc(have.manifest ? have.manifest.version : '')}은 휴지통으로 옮기고, 설정값·토큰·가져온 목록은 그대로 둬요. ` : ''}${have ? '업데이트' : '설치'}하면 위 스크립트를 이 컴퓨터에서 실행하는 것도 승인해요.</p>`}</section>`;
+      ${same ? '' : `<p class="faint">${have ? `설치한 ${esc(have.manifest ? have.manifest.version : '')}은 휴지통으로 옮기고, 설정값·토큰·가져온 목록은 그대로 둬요. ` : ''}${have ? '업데이트' : '설치'}하면 ${(ins.scripts || []).length ? '위 스크립트를 ' : '이 플러그인의 AI 사용을 '}이 컴퓨터에서 승인해요.</p>`}</section>`;
   return `<div class="page">
     <a class="back" href="#/plugins/_manage"><span aria-hidden="true">‹</span> 플러그인 관리</a>
     <h1 tabindex="-1">${up ? '플러그인 업데이트' : '플러그인 더하기'}</h1>
@@ -4067,8 +4333,8 @@ document.addEventListener('click', async e => {
       const a = { type:'start', feed:b.dataset.feed, item:b.dataset.item, ...(b.dataset.wf ? { workflow:b.dataset.wf } : {}) }, ttl = b.dataset.title || b.dataset.label || b.dataset.item;
       const wf = b.dataset.wf && (PL.st.plugins[id].workflows || []).find(w => w.name === b.dataset.wf), first = wf && wf.steps[0];
       if (first && first.kind === 'ask'){   // 첫 단계가 묻는 단계면 누르는 자리에서 바로 묻는다
-        const ai = wf.steps.some(s => ['ai', 'agent'].includes(s.kind));
-        plAsk({ title:`${ttl} — ${first.name}`, body:ai ? '<p class="faint">AI가 고친 뒤 커밋하지 않고 둬요. 바뀐 것은 내가 확인해요.</p>' : '', ok:ai ? 'AI에게 맡기기' : '시작하기', field:{ label:'적을 것', placeholder:first.placeholder || '' } },
+        const ai = wf.steps.some(s => ['ai', 'agent'].includes(s.kind)), note = wf.note;   // 워크플로우 설명 줄이 먼저
+        plAsk({ title:`${ttl} — ${first.name}`, body:note ? `<p class="faint">${esc(note)}</p>` : ai ? '<p class="faint">AI가 고친 뒤 커밋하지 않고 둬요. 바뀐 것은 내가 확인해요.</p>' : '', ok:wf.ok || (ai ? 'AI에게 맡기기' : '시작하기'), field:{ label:'적을 것', placeholder:first.placeholder || '' } },
           v => { if (!v.trim()) return false; plAct(id, { ...a, answer:v.trim() }, `${ttl} · ${wf.name} 시작했어요`); });
         break;
       }
@@ -4100,9 +4366,10 @@ document.addEventListener('click', async e => {
       if (!on){ await set(false); const going = (x.state.runs || []).some(r => ['running', 'waiting'].includes(r.status)); toast(`자동 시작을 껐어요${going ? '. 하던 작업은 마저 해요' : ''}`, { label:'되돌리기', fn:() => set(true) }); break; }
       const wf = x.workflows.find(w => w.name === feed.start);
       const agentWf = wf && wf.steps.some(s => s.kind === 'agent');
-      plAsk({ title:`${esc(feed.name)}에 새로 들어온 것을 자동으로 시작할까요?`, ok:'자동 시작 켜기',
+      const autoNames = x.feeds.filter(f => f.start_mode === 'auto').map(f => f.name);
+      plAsk({ title:`${esc(autoNames.join('·'))}에 새로 들어온 것을 자동으로 시작할까요?`, ok:'자동 시작 켜기',
         body:`<p>켜면 ${esc(plWho())}가 이렇게 해요.</p><ol class="pl-ol"><li>${feed.days === 'weekdays' ? '평일 ' : ''}${feed.hours ? esc(feed.hours.replace('-', '–')) + '에 ' : ''}${feed.every}분마다 새로 들어온 것을 확인해요</li><li>하나씩 차례로 해요</li>${wf ? wf.steps.map(s => `<li>${esc(s.name)}${s.kind === 'manual' || (x.local.gates || {})[`${wf.name}|${s.key}`] ? ' <b>— 내 확인</b>' : ''}</li>`).join('') : ''}</ol>
-          ${agentWf ? `<p>물어볼 게 있으면 지라를 바꾸기 전에 내 차례로 올려요. 작업은 티켓마다 따로 만든 작업 폴더에서 해서, 지금 쓰는 저장소 폴더는 건드리지 않아요. <b>push와 PR은 하지 않아요.</b></p>` : '<p>고를 것이 있으면 내 차례로 올리고, 내가 누르기 전에는 그 다음을 하지 않아요.</p>'}
+          ${feed.auto_note ? `<p>${esc(feed.auto_note)}</p>` : agentWf ? `<p>물어볼 게 있으면 지라를 바꾸기 전에 내 차례로 올려요. 작업은 티켓마다 따로 만든 작업 폴더에서 해서, 지금 쓰는 저장소 폴더는 건드리지 않아요. <b>push와 PR은 하지 않아요.</b></p>` : '<p>고를 것이 있으면 내 차례로 올리고, 내가 누르기 전에는 그 다음을 하지 않아요.</p>'}
           <p class="faint">지금 목록에 있는 ${n}개는 자동으로 시작하지 않아요. AI는 'AI 연결'에서 정한 한도 안에서만 써요.</p>` }, () => set(true).then(() => toast('자동 시작을 켰어요')));
       break;
     }
@@ -4117,7 +4384,7 @@ document.addEventListener('click', async e => {
       async () => { try { await papi(`/plugins/${id}/secret`, { name:b.dataset.name, value:null }); await plMachine(id, true); toast(`${b.dataset.label}을 지웠어요`); } catch (er) { toast(er.message); } }); break;
     case 'peek': { const i = b.parentElement.querySelector('input'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; b.textContent = show ? '가리기' : '보기'; b.setAttribute('aria-pressed', String(show)); break; }
     case 'remove': plAsk({ title:`${plName(id)} 플러그인을 지울까요?`, body:'<p>플러그인 파일을 휴지통으로 옮겨요. 가져오기와 자동 시작이 멈춰요. 만든 작업 폴더와 브랜치, 이 컴퓨터에 넣어 둔 토큰은 그대로 남아요.</p>', ok:'플러그인 지우기', danger:true },
-      async () => { try { await STORE.json(`/api/profile/${encodeURIComponent(S.profile)}/plugins/${id}`, { method:'DELETE' }); await plLoad(true); go('#/plugins/_manage'); toast('플러그인을 지웠어요'); } catch (er) { toast(er.message); } }); break;
+      async () => { try { await STORE.json(`/api/profile/${encodeURIComponent(S.profile)}/plugins/${id}`, { method:'DELETE' }); await plLoad(true); chLoad(); go('#/plugins/_manage'); toast('플러그인을 지웠어요'); } catch (er) { toast(er.message); } }); break;
     case 'inspect-path': plInspect({ local:b.dataset.path }); break;
     case 'every-all': {
       const v = Number($('#pl-ev-all').value), x = PL.st.plugins[id], every = Object.fromEntries(x.feeds.map(f => [f.name, v === f.every_default ? null : v]));
@@ -4151,8 +4418,9 @@ document.addEventListener('click', async e => {
         if (plHere().ai){ try { await papi(`/plugins/${id2}/approve`, {}); } catch (er) { toast(`설치했어요. 승인은 준비 화면에서 해 주세요 — ${er.message}`); } }
         if (!plRunner() && plHere().ai) await plRunnerSet(true);
         PL.inspect = null; PL.busy = ''; await plLoad(true); plMachine(id2, true);
-        go(`#/plugins/${id2}/setup`);
-        toast(r.previous ? `${r.manifest.name}을 ${r.previous} → ${r.version}으로 업데이트했어요` : `${r.manifest.name} 플러그인을 설치했어요${first ? ". 하단 메뉴에 '플러그인'이 생겼어요" : ''}`);
+        go(`#/plugins/${id2}/setup`); chLoad();
+        const chat = (r.manifest && PL.st && PL.st.plugins[id2] && (PL.st.plugins[id2].chats || []).length);
+        toast(r.previous ? `${r.manifest.name}을 ${r.previous} → ${r.version}으로 업데이트했어요` : chat ? `${r.manifest.name} 플러그인을 설치했어요. 준비가 끝나면 오른쪽 아래에 채팅 버튼이 생겨요` : `${r.manifest.name} 플러그인을 설치했어요${first ? ". 하단 메뉴에 '플러그인'이 생겼어요" : ''}`);
       } catch (er) { PL.busy = ''; render(); toast(`설치하지 못했어요 — ${er.message}`); }
       break;
     }
@@ -4257,7 +4525,449 @@ function route(p){
   }
 }
 let lastHash = null;
+/* ---------------- AI 챗봇 (ai-chat 플러그인) ----------------
+   서버(server/chats.js)가 방·말·진행 상황을 갖고, 화면은 고정 창(#chat)에 그린다. #main 밖이라 화면을 다시 그려도 쓰던 말이 남는다.
+   방: 데이터 관리(프로필 하나에 하나) + 단기 카드마다 하나. 같은 컴퓨터의 pkm-ai-server에 연결돼 있을 때만 열린다(로컬 전용) */
+const CH = { p:null, st:null, rooms:{}, room:'data', open:false, timer:null, loading:false, sig:'', pick:null, err:'', wasActive:new Set(), procOpen:new Set(), sending:false, seen:{}, opener:null, memoEdit:null, view:LS.get('pkm:v1:chat-view', 'log') === 'sum' ? 'sum' : 'log' };
+const chCoarse = () => matchMedia('(pointer:coarse)').matches;
+const chTail = d => { const a = String(d || '').replace(/^\/Users\/[^/]+/, '~').split('/'); return a.length > 3 ? `…/${a.slice(-2).join('/')}` : a.join('/'); };
+// 스크린리더에는 일이 생길 때만 한 줄 — 기록 전체는 라이브 영역이 아니다(다시 그릴 때마다 다시 읽지 않게)
+function chSay(t){ const el = $('#chat-say'); if (!el) return; el.textContent = ''; setTimeout(() => { el.textContent = t; }, 60); }
+function chNotice(rooms){
+  for (const r of rooms){
+    const was = CH.seen[r.id], name = (r.kind === 'card' || r.kind === 'project') && r.card ? `「${r.card.title}」 ` : '';
+    if (was && r.pending > was.pending) chSay(`${name}확인 요청이 왔어요`);
+    else if (was && CH_ACTIVE.includes(was.status) && r.status === 'done') chSay(`${name}답이 왔어요`);
+    else if (was && CH_ACTIVE.includes(was.status) && r.status === 'error') chSay(`${name}멈췄어요 — ${r.last}`);
+  }
+  CH.seen = Object.fromEntries(rooms.map(r => [r.id, { status:r.status, pending:r.pending }]));
+}
+// 채팅 창은 본문 위에 떠 있고 자리를 차지하지 않는다. 휴대폰(839px 이하)에서만 전체 화면이라 뒤를 막는다
+function chLayer(on){
+  const full = matchMedia('(max-width:839px)').matches;
+  for (const el of [$('.app'), $('.tabbar')]) if (el) el.inert = on && full;
+}
+const CH_ACTIVE = ['queued', 'running', 'waiting'];
+const capi = (sub, body, method) => papi(`/chats${sub}`, body, method);
+const chOn = () => !!(plOK() && CH.st && CH.st.plugin && CH.st.ok);
+const chScope = sc => !!(CH.st && CH.st.plugin && CH.st.plugin.scopes.some(x => x.scope === sc));
+const chCards = () => chOn() && chScope('card');
+const chSum = id => ((CH.st && CH.st.rooms) || []).find(r => r.id === id) || null;
+const chCardRoom = tid => chSum(`card-${tid}`);
+const chProjects = () => chOn() && (chScope('project') || chScope('card'));   // 프로젝트 채팅이 없는 옛 플러그인은 카드 채팅 설정을 빌린다
+const chRoomWord = r => r && r.kind === 'project' ? '프로젝트' : '카드';
+// 채팅방 목록에는 완료 카드의 방을 빼고 보인다 — 카드의 AI Chat 아이콘으로 들어온 지금 방은 남긴다
+const chListed = rooms => rooms.filter(r => (r.kind === 'project' || (r.kind === 'card' && (r.id === CH.room || !r.card || (find('tasks', r.card.id) || {}).status !== '완료'))));
+const chDraftKey = r => `pkm:v1:chat-draft:${S.profile}:${r}`;
+const CH_ICON = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
+const CH_WORD = { queued:'차례를 기다려요', running:'하는 중이에요', waiting:'기다리는 중이에요', done:'', error:'멈췄어요', canceled:'그만뒀어요' };
+// 방 상태(server/chats.js stateOf) — 카드 아이콘·채팅방 목록·버튼이 같은 말을 쓴다. none은 아직 세션을 열지 않은 카드
+const CH_LABEL = { none:'아직 열지 않음', idle:'대화 있음', run:'하는 중', ask:'확인 요청', new:'새 답', reply:'내 차례', bad:'멈춤' };
+const chState = r => !r ? 'none' : r.state || (r.pending ? 'ask' : CH_ACTIVE.includes(r.status) ? 'run' : r.status === 'error' ? 'bad' : r.status === 'done' ? 'reply' : 'idle');
+// 단기 카드의 AI Chat 아이콘 — 열지 않음은 흐린 테두리, 대화가 있으면 채운 아이콘, 일이 생기면 점과 짧은 말(색만으로 가르지 않게)
+function chCardBtn(t){
+  if (!chCards()) return '';
+  const st = chState(chCardRoom(t.id)), word = CH_LABEL[st];
+  const dot = ['run', 'ask', 'new', 'bad'].includes(st), lbl = !['none', 'idle'].includes(st);
+  return `<button class="ch-ico" type="button" data-ch="card" data-id="${t.id}" data-state="${st}" aria-label="${esc(t.title)} AI Chat · ${word}" title="AI Chat · ${word}"><span class="i">${CH_ICON}${dot ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>${lbl ? `<span class="lbl" aria-hidden="true">${word}</span>` : ''}</button>`;
+}
+// 카드 아래 버튼 줄 — AI Chat 아이콘은 왼쪽 끝(제목 줄을 좁히지 않게). 완료 카드는 아이콘만
+function chCardActs(t){
+  const ico = chCardBtn(t), acts = t.status === '완료' ? '' : taskActs(t, false);
+  if (!ico) return acts;
+  return acts ? acts.replace('<div class="t-acts">', `<div class="t-acts">${ico}`) : `<div class="t-acts">${ico}</div>`;
+}
+async function chLoad(){
+  clearTimeout(CH.timer); CH.timer = null;
+  if (!plOK() || S.mode !== 'data' || CH.loading) return;
+  if (CH.p !== S.profile){ Object.assign(CH, { p:S.profile, st:null, rooms:{}, room:'data', sig:'', pick:null, err:'', wasActive:new Set(), memoEdit:null }); chClose(true); }
+  CH.loading = true;
+  const before = JSON.stringify(CH.st && [CH.st.ok, CH.st.rooms]);
+  try {
+    CH.st = await capi('');
+    const ended = [...CH.wasActive].filter(id => { const r = chSum(id); return !r || !CH_ACTIVE.includes(r.status); });
+    CH.wasActive = new Set((CH.st.rooms || []).filter(r => CH_ACTIVE.includes(r.status)).map(r => r.id));
+    if (ended.length) setTimeout(poll, 300);   // 에이전트가 고친 파일을 바로 불러온다
+    chNotice(CH.st.rooms || []);
+    if (CH.open) await chRoomLoad();
+  } catch (e) { CH.st = CH.st || null; CH.err = e.message; }
+  finally { CH.loading = false; }
+  const active = ((CH.st && CH.st.rooms) || []).some(r => CH_ACTIVE.includes(r.status));
+  if (CH.st && CH.st.plugin) CH.timer = setTimeout(chLoad, CH.open && active ? 1200 : active ? 4000 : CH.open ? 5000 : 30000);
+  else CH.timer = setTimeout(chLoad, 60000);   // 설치하면 1분 안에 버튼이 생긴다(설치 화면은 바로 부른다)
+  chFab(); if (CH.open) chPaint();
+  // 카드 아이콘(세션 상태)은 보드·카드 화면에만 — 입력 중이면 그리지 않는다
+  if (before !== JSON.stringify(CH.st && [CH.st.ok, CH.st.rooms]) && /^#\/(action\/short|plugins\/[^/]+\/setup)/.test(location.hash) && !document.querySelector('dialog[open]')
+    && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#main input, #main textarea, #main select'))) render();
+}
+// 보고 있는 방의 끝난 답은 읽은 것으로 — 카드의 '새 답'이 '내 차례'로 바뀐다. 창이 열려 있고 탭이 보일 때만
+async function chMarkRead(sum){
+  if (!sum || !sum.unread || !CH.open || document.visibilityState !== 'visible' || CH.reading === sum.id) return;
+  CH.reading = sum.id;
+  try { await capi(`/${encodeURIComponent(sum.id)}/read`, {}); setTimeout(chLoad, 0); } catch {}
+  finally { CH.reading = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && CH.open) chMarkRead(chSum(CH.room)); });
+async function chRoomLoad(){
+  if (!chSum(CH.room)) return;
+  try { CH.rooms[CH.room] = await capi(`/${encodeURIComponent(CH.room)}`); } catch (e) { if (e.status === 404) delete CH.rooms[CH.room]; }
+}
+function chFab(){
+  const f = $('#chat-fab'); if (!f) return;
+  const show = chOn() && !CH.open;
+  f.hidden = !show; document.body.classList.toggle('has-chat-fab', show);
+  const rooms = (CH.st && CH.st.rooms) || [], ask = rooms.filter(r => r.pending).length, fresh = rooms.filter(r => chState(r) === 'new').length;
+  f.setAttribute('aria-label', ['AI 챗봇 열기', ask ? `확인 요청 ${ask}개` : '', fresh ? `새 답 ${fresh}개` : ''].filter(Boolean).join(' · '));
+  f.dataset.state = ask ? 'ask' : fresh ? 'new' : '';
+  const dot = f.querySelector('.dot'); if ((ask || fresh) && !dot) f.insertAdjacentHTML('beforeend', '<span class="dot" aria-hidden="true"></span>'); else if (!ask && !fresh && dot) dot.remove();
+}
+async function chOpen(room){
+  if (!chOn()) return toast(CH.st && CH.st.message ? `AI 챗봇을 열 수 없어요 — ${CH.st.message}` : 'AI 챗봇을 열 수 없어요');
+  const prev = CH.room;
+  if (room) CH.room = room;
+  if (!chSum(CH.room) && CH.room !== 'data') CH.room = 'data';
+  if (prev !== CH.room) chDraftSave(prev);
+  if (!CH.open) CH.opener = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+  CH.open = true; CH.sig = '';
+  chSizeApply();
+  $('#chat').hidden = false; $('#chat-fab').setAttribute('aria-expanded', 'true'); chFab(); chLayer(true);
+  chDraftLoad(); chPaint();
+  await chRoomLoad(); chPaint(true);
+  clearTimeout(CH.timer); CH.timer = setTimeout(chLoad, 1200);
+  // 터치 기기는 제목에 먼저(키보드가 올라와 답을 가리지 않게) — 다른 대화상자와 같은 관례
+  const box = chCoarse() ? $('#chat-h') : $('#chat-in'); if (box) box.focus();
+}
+function chClose(quiet){
+  if (!CH.open) return;
+  chDraftSave(CH.room);
+  CH.open = false; $('#chat').hidden = true; $('#chat-fab').setAttribute('aria-expanded', 'false'); chFab(); chLayer(false);
+  const back = CH.opener && CH.opener.isConnected && !CH.opener.closest('#chat') ? CH.opener : !$('#chat-fab').hidden ? $('#chat-fab') : null;
+  CH.opener = null;
+  if (!quiet && back) back.focus();
+}
+function chDraftSave(room){ const v = $('#chat-in').value; LS.set(chDraftKey(room), v); }
+function chDraftLoad(){ $('#chat-in').value = LS.get(chDraftKey(CH.room), ''); }
+// 카드 아이콘 — 세션이 있으면 그 방, 없으면 바로 만든다. 프로젝트가 아닌 카드도 많아 작업 폴더는 채팅 창에서 필요할 때 고른다
+// 프로젝트 묶음 카드의 아이콘 — 프로젝트마다 방 하나. 처음 작업 폴더는 서버가 그 프로젝트의 AI 작업 폴더로 잡는다
+async function chProject(pid){
+  CH.pick = null;
+  if (chSum(`project-${pid}`)) return chOpen(`project-${pid}`);
+  if (!chProjects()) return toast('프로젝트 세션은 이 컴퓨터의 pkm-ai-server에 연결돼 있을 때만 만들 수 있어요');
+  try { const r = await capi('', { project:pid }); CH.rooms[r.id] = r; await chLoad(); return chOpen(r.id); }
+  catch (e) { toast(`프로젝트 세션을 만들지 못했어요 — ${e.message}`); }
+}
+function chProjectBtn(pid, name){
+  if (!chProjects()) return '';
+  const st = chState(chSum(`project-${pid}`)), word = CH_LABEL[st], dot = ['run', 'ask', 'new', 'bad'].includes(st), lbl = !['none', 'idle'].includes(st);
+  return `<button class="ch-ico" type="button" data-ch="project" data-id="${esc(pid)}" data-state="${st}" aria-label="${esc(name)} 프로젝트 AI Chat · ${word}" title="AI Chat · ${word}"><span class="i">${CH_ICON}${dot ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>${lbl ? `<span class="lbl" aria-hidden="true">${word}</span>` : ''}</button>`;
+}
+async function chCard(tid){
+  const t = find('tasks', tid); if (!t) return;
+  CH.pick = null;
+  if (chCardRoom(tid)) return chOpen(`card-${tid}`);
+  if (!chCards()) return toast('카드 세션은 이 컴퓨터의 pkm-ai-server에 연결돼 있을 때만 만들 수 있어요');
+  try { const r = await capi('', { card:tid }); CH.rooms[r.id] = r; await chLoad(); return chOpen(r.id); }
+  catch (e) { toast(`카드 세션을 만들지 못했어요 — ${e.message}`); }
+}
+/* 작업 폴더 고르기 — 경로를 외우지 않아도 되게 폴더를 눌러 들어가며 고른다(휴대폰에서도). 먼저 볼 곳: 설정한 폴더·최근 고른 폴더·홈 */
+async function chPickGo(at){
+  CH.pick = { ...(CH.pick || {}), loading:true, err:'' }; chPaint(true);
+  try { CH.pick = { ...(await capi(`/_dirs${at ? `?path=${encodeURIComponent(at)}` : ''}`)), loading:false, err:'' }; }
+  catch (e) { CH.pick = { ...(CH.pick || {}), loading:false, err:e.message }; }
+  chPaint(true);
+  const h = $('#ch-pick-h'); if (h) h.focus();
+}
+async function chPickSet(dir){
+  const room = CH.room;
+  try { CH.rooms[room] = await capi(`/${encodeURIComponent(room)}/cwd`, { cwd:dir }); CH.pick = null; CH.err = ''; await chLoad(); chPaint(true); $('#chat-in').focus();
+    toast(dir ? `작업 폴더를 ${chTail(dir)}로 정했어요` : '작업 폴더 없이 해요'); }
+  catch (e) { CH.pick = { ...(CH.pick || {}), err:e.message }; chPaint(true); }
+}
+function chPickHtml(r){
+  const k = CH.pick, home = (CH.st && CH.st.home) || '', short = d => String(d || '').startsWith(home) ? '~' + String(d).slice(home.length) : String(d || '');
+  const quick = [...new Set([CH.st.card_cwd, r && r.cwd, ...(CH.st.recent || []), home].filter(Boolean))].slice(0, 6);
+  const crumbs = k.path ? (() => { const rel = short(k.path), parts = rel.split('/').filter(Boolean); let acc = rel.startsWith('~') ? home : '';
+    return parts.map((x, i) => { acc = i === 0 && x === '~' ? home : `${acc}/${x}`; return i === parts.length - 1 ? `<b>${esc(x)}</b>` : `<button class="btn btn-text btn-sm" type="button" data-ch="pick-go" data-path="${esc(acc)}">${esc(x)}</button>`; }).join('<span aria-hidden="true">/</span>'); })() : '';
+  return `<div class="ch-pick"><h3 id="ch-pick-h" tabindex="-1">작업 폴더 고르기</h3>
+    <p class="faint">「${esc(r && r.card ? r.card.title : '')}」 ${chRoomWord(r)}에서 AI가 일할 폴더예요.${r && r.session ? ' 바꾸면 AI가 새 세션으로 시작하고, 앞선 대화는 첫 말에 붙여 줘요.' : ''}</p>
+    <div class="ch-quick" role="group" aria-label="먼저 볼 폴더">${quick.map(d => `<button class="btn btn-ghost btn-sm" type="button" data-ch="pick-go" data-path="${esc(d)}" title="${esc(d)}">${esc(d === home ? '홈' : chTail(d))}</button>`).join('')}</div>
+    ${k.err ? `<p class="err" role="alert">${esc(k.err)}</p>` : ''}
+    ${k.path ? `<nav class="ch-crumb" aria-label="지금 보는 폴더">${crumbs}${k.git ? ' <span class="badge b-진행">프로젝트</span>' : ''}</nav>
+    <ul class="ch-dirs">${k.parent ? `<li><button type="button" data-ch="pick-go" data-path="${esc(k.parent)}"><span aria-hidden="true">‹</span> 위 폴더</button></li>` : ''}${k.dirs.map(d => `<li><button type="button" data-ch="pick-go" data-path="${esc(d.path)}">${esc(d.name)}${d.git ? ' <span class="badge b-진행">프로젝트</span>' : ''}</button></li>`).join('') || '<li class="faint" style="padding:8px 4px">하위 폴더가 없어요</li>'}</ul>` : k.loading ? '<p class="faint" role="status">폴더를 읽는 중이에요</p>' : ''}
+    <details class="ch-type"><summary>경로를 직접 적기</summary><form data-ch-form="pick-path" class="form-row" novalidate><label class="field" style="flex:1"><span class="sr-only">폴더 경로</span><input name="path" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="예: ~/cc/my-project"></label><button class="btn btn-ghost btn-sm" type="submit">열기</button></form></details>
+    <div class="ch-pick-acts">${r && r.cwd ? '<button class="btn btn-text btn-sm" type="button" data-ch="pick-none">폴더 없이 하기</button>' : ''}<button class="btn btn-ghost btn-sm" type="button" data-ch="pick-close">닫기</button>${k.path ? `<button class="btn btn-primary btn-sm" type="button" data-ch="pick-set" data-path="${esc(k.path)}">${esc(chTail(k.path))}로 정하기</button>` : ''}</div></div>`;
+}
+// 확인 요청 한 장 — 무엇을 하려는지 보이고 허락·거절. AskUserQuestion은 고르는 칸으로
+function chAsk(room, q){
+  const inp = q.input || {}, what = inp.command || inp.file_path || inp.path || inp.url || '';
+  if (q.tool === 'AskUserQuestion' && Array.isArray(inp.questions)){
+    return `<form class="ch-ask" data-ch-form="askq" data-room="${esc(room)}" data-req="${esc(q.id)}" novalidate><b>AI가 물어봐요</b>
+      ${inp.questions.map((x, i) => `<fieldset><legend>${esc(x.question || '')}</legend>${(x.options || []).map(o => `<label class="check"><input type="${x.multiSelect ? 'checkbox' : 'radio'}" name="q${i}" value="${esc(o.label)}"><span>${esc(o.label)}${o.description ? ` <span class="faint">${esc(o.description)}</span>` : ''}</span></label>`).join('')}</fieldset>`).join('')}
+      <p class="err" role="alert" hidden>질문마다 하나를 골라 주세요</p>
+      <div class="acts"><button class="btn btn-ghost btn-sm" type="button" data-ch="deny" data-room="${esc(room)}" data-req="${esc(q.id)}">답하지 않기</button><button class="btn btn-ghost btn-sm" type="submit">답하기</button></div></form>`;
+  }
+  const body = what ? String(what) : JSON.stringify(inp, null, 2);
+  return `<div class="ch-ask" role="group" aria-label="확인 요청 · ${esc(q.title || q.tool)}"><b>${esc(q.title || q.tool)} — 해도 될까요?</b>${q.description ? `<span>${esc(q.description)}</span>` : ''}
+    <pre tabindex="0">${esc(body.length > 3000 ? body.slice(0, 3000) + '…' : body)}</pre>
+    <div class="acts"><button class="btn btn-ghost btn-sm" type="button" data-ch="deny" data-room="${esc(room)}" data-req="${esc(q.id)}">거절하기</button><button class="btn btn-ghost btn-sm" type="button" data-ch="allow" data-room="${esc(room)}" data-req="${esc(q.id)}">허락하기</button></div></div>`;
+}
+function chTurn(room, t){
+  const st = t.status, n = (t.log || []).filter(x => x.kind !== 'text' || st !== 'done').length;
+  const line = (t.pending || []).length ? '<p class="ch-st wait"><span class="dot" aria-hidden="true" style="width:8px;height:8px;border-radius:50%;background:var(--s-review)"></span>내 답을 기다려요</p>'
+    : st === 'waiting' ? `<p class="ch-st wait">${t.until ? `사용 한도에 걸려 ${plTime(new Date(t.until).toISOString())}쯤 이어서 해요` : esc(t.error || '기다리는 중이에요')}</p>`
+    : st === 'error' ? `<p class="ch-st bad">멈췄어요 — ${esc(t.error || '이유를 받지 못했어요')} <button class="btn btn-text btn-sm" type="button" data-ch="again" data-text="${esc(t.text)}">다시 보내기</button></p>`
+    : CH_ACTIVE.includes(st) || st === 'canceled' ? `<p class="ch-st">${CH_WORD[st]}${st === 'running' && t.log.length ? ` · ${esc((t.log[t.log.length - 1].tool ? t.log[t.log.length - 1].tool + ' ' : '') + t.log[t.log.length - 1].text).slice(0, 80)}` : ''}</p>` : '';
+  const live = st !== 'done' ? (t.log || []).filter(x => x.kind === 'text').slice(-1)[0] : null;   // 하는 동안은 마지막 말을 보인다
+  const proc = n ? `<details class="ch-proc" data-turn="${esc(t.id)}" ${CH.procOpen.has(t.id) ? 'open' : ''}><summary>진행 과정 ${n}</summary><ol>${t.log.map(x => `<li>${x.kind === 'tool' ? `<span class="tool">${esc(x.tool)}</span> ${esc(x.text)}` : esc(x.text)}</li>`).join('')}</ol></details>` : '';
+  return `<div class="ch-me" data-turn="${esc(t.id)}" tabindex="-1">${esc(t.text)}</div>
+    <div class="ch-ai" data-turn="${esc(t.id)}">${(t.pending || []).map(q => chAsk(room, q)).join('')}${t.reply ? `<div class="md">${md(t.reply)}</div>` : live ? `<div class="md">${md(live.text)}</div>` : ''}${line}${proc}</div>`;
+}
+/* 요약 보기 — 말마다 무엇을(어떤 조건까지) 물었고 무엇이 왔는지 한두 줄씩, 날짜별 차례로. 다음 날 이어 할 때 훑는 용도.
+   AI가 답 끝에 붙인 요약(server/chats.js splitSummary)을 쓰고, 없는 말(옛 대화·멈춘 말)은 앞부분을 잘라 보여 준다 */
+const chLine = (s, n) => { const x = String(s || '').replace(/```[\s\S]*?```/g, ' ').split('\n').map(l => l.replace(/^[\s>#*\-\d.]+/, '').replace(/[*_`]/g, '').trim()).find(Boolean) || ''; return x.length > n ? x.slice(0, n) + '…' : x; };
+const chPend = r => !!(r && r.turns.some(t => (t.pending || []).length));   // 확인 요청이 있으면 요약 대신 대화 보기(허락·거절 상자가 가려지지 않게)
+function chSumsHtml(r){
+  const dayOf = d => { const n = Math.round((new Date(new Date().toDateString()) - new Date(d.toDateString())) / 864e5); return n === 0 ? '오늘' : n === 1 ? '어제' : `${d.getMonth() + 1}월 ${d.getDate()}일`; };
+  let day = '', html = '', guess = false;
+  for (const t of r.turns){
+    const d = new Date(t.created), k = dayOf(d), sm = t.summary, q = sm && sm.q, ok = sm && sm.a;
+    if (k !== day){ html += `${day ? '</ol>' : ''}<h3>${k}</h3><ol>`; day = k; }
+    const [a, cls] = (t.pending || []).length ? ['내 답을 기다려요', 'ask'] : ok ? [sm.a, ''] : t.status === 'done' ? [`앞부분 · ${chLine(t.reply, 60)}`, 'guess']
+      : t.status === 'error' ? [`멈췄어요 — ${t.error || ''}`, 'bad'] : [CH_WORD[t.status] || '', ''];
+    if (!q || (!ok && t.status === 'done')) guess = true;
+    html += `<li><button type="button" data-ch="sum-go" data-turn="${esc(t.id)}"><span class="when">${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</span>
+      <span class="k">질문</span><span class="q${q ? '' : ' guess'}">${esc(q || chLine(t.text, 50))}</span><span class="k">답</span><span class="a ${cls}">${esc(a)}</span></button></li>`;
+  }
+  return `<div class="ch-sums">${html}</ol>${guess ? '<p class="note">흐린 줄은 AI 요약이 없어 말의 앞부분을 보여 줘요.</p>' : ''}</div>`;
+}
+function chView(v, turn){
+  CH.view = v; LS.set('pkm:v1:chat-view', v); chPaint(true);
+  if (turn){ const me = $(`#chat-log .ch-me[data-turn="${CSS.escape(turn)}"]`); if (me){ me.focus({ preventScroll:true }); me.scrollIntoView({ block:'start' }); } return; }   // 고른 말로
+  const back = v === 'sum' && CH.sumAt && $(`#chat-log [data-ch="sum-go"][data-turn="${CSS.escape(CH.sumAt)}"]`);   // 요약으로 돌아오면 누르던 줄로
+  if (back){ back.focus({ preventScroll:true }); back.scrollIntoView({ block:'center' }); return; }
+  const b = $('[data-ch="view"]'); if (b) b.focus();
+}
+/* PC 창 크기·목록 너비 — 왼쪽 위 모서리와 목록 경계선을 끌어서(키보드는 화살표) 바꾸고, 이 브라우저에 기억한다 */
+const CH_SIZE_KEY = 'pkm:v1:chat-size', CH_SIZE0 = { w:720, h:640, side:180 };
+let chSize = { ...CH_SIZE0, ...(LS.get(CH_SIZE_KEY, {}) || {}) };
+function chSizeFit(z){
+  const w = Math.round(Math.max(560, Math.min(z.w, innerWidth - 48))), h = Math.round(Math.max(400, Math.min(z.h, innerHeight - 48)));
+  return { w, h, side:Math.round(Math.max(140, Math.min(z.side, 400, w - 320))) };
+}
+function chSizeApply(save){
+  const el = $('#chat'); if (!el) return;
+  const z = chSizeFit(chSize);
+  el.style.setProperty('--chat-w', z.w + 'px'); el.style.setProperty('--chat-h', z.h + 'px'); el.style.setProperty('--chat-side', z.side + 'px');
+  const sp = $('.chat-split'); sp.setAttribute('aria-valuenow', z.side); sp.setAttribute('aria-valuemin', 140); sp.setAttribute('aria-valuemax', Math.min(400, z.w - 320)); sp.setAttribute('aria-valuetext', `${z.side}픽셀`);
+  if (save){ chSize = z; LS.set(CH_SIZE_KEY, z); }
+}
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest && e.target.closest('[data-ch-drag]'); if (!g || e.button !== 0) return;
+  e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add('on');
+  const kind = g.dataset.chDrag, x0 = e.clientX, y0 = e.clientY, z0 = chSizeFit(chSize);
+  const move = ev => { chSize = kind === 'win' ? { ...z0, w:z0.w + x0 - ev.clientX, h:z0.h + y0 - ev.clientY } : { ...z0, side:z0.side + ev.clientX - x0 }; chSizeApply(); };
+  const up = () => { g.classList.remove('on'); g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); chSizeApply(true); };
+  g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+});
+document.addEventListener('dblclick', e => {
+  const g = e.target.closest && e.target.closest('[data-ch-drag]'); if (!g) return;
+  const z = chSizeFit(chSize); chSize = g.dataset.chDrag === 'win' ? { ...CH_SIZE0, side:z.side } : { ...z, side:CH_SIZE0.side }; chSizeApply(true);
+});
+document.addEventListener('keydown', e => {
+  const g = e.target.closest && e.target.closest('[data-ch-drag]'); if (!g) return;
+  const d = { ArrowLeft:[-1, 0], ArrowRight:[1, 0], ArrowUp:[0, -1], ArrowDown:[0, 1] }[e.key], step = e.shiftKey ? 64 : 16, z = chSizeFit(chSize);
+  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); chSize = g.dataset.chDrag === 'win' ? { ...CH_SIZE0, side:z.side } : { ...z, side:CH_SIZE0.side }; return chSizeApply(true); }
+  if (!d) return;
+  e.preventDefault();
+  chSize = g.dataset.chDrag === 'win' ? { ...z, w:z.w - d[0] * step, h:z.h - d[1] * step } : { ...z, side:z.side + d[0] * step };
+  chSizeApply(true);
+});
+addEventListener('resize', () => { if (CH.open) chSizeApply(); });
+// PC(840px 이상)에서는 셀렉트 대신 왼쪽 목록 — 지금 보는 방, 제목, 하는 중·확인 요청이 한눈에
+function chRoomsPaint(rooms){
+  const ul = $('#chat-rooms'); if (!ul) return;
+  const items = [['data', '데이터 관리', chSum('data')], ...chListed(rooms).map(r => [r.id, r.card ? r.card.title : r.id, r])];
+  const html = items.map(([id, title, r]) => {
+    const st = r ? chState(r) : '', dot = ['run', 'ask', 'new', 'bad'].includes(st);
+    const memo = r && r.memo ? `<span class="mm">메모 · ${esc(r.memo.text.split('\n')[0].slice(0, 120))}</span>` : '';   // 쉬는 방은 마지막으로 하려던 일을 보인다
+    const word = st === 'ask' ? CH_LABEL.ask : st === 'run' ? CH_WORD[r.status] : st === 'bad' ? CH_WORD.error : st === 'new' ? '새 답이 왔어요'
+      : st === 'reply' ? (memo ? `${CH_LABEL.reply} · ${memo}` : CH_LABEL.reply) : memo || (id === 'data' ? '프로필 데이터' : '쉬는 중');
+    return `<li><button type="button" data-ch="goto" data-room="${esc(id)}" ${id === CH.room ? 'aria-current="true"' : ''} title="${esc(title)}"><span class="t">${id === 'data' ? '' : `${chRoomWord(r)} · `}${esc(title)}</span><span class="s" data-state="${st}">${dot ? '<span class="dot" aria-hidden="true"></span>' : ''}${word}</span></button></li>`;
+  }).join('');
+  if (ul.dataset.sig === html) return;
+  const had = document.activeElement && document.activeElement.closest && document.activeElement.closest('#chat-rooms') ? document.activeElement.dataset.room : null;
+  ul.innerHTML = html; ul.dataset.sig = html;
+  if (had){ const b = ul.querySelector(`[data-room="${CSS.escape(had)}"]`); if (b) b.focus(); }
+}
+function chPaint(force){
+  if (!CH.open) return;
+  const rooms = (CH.st && CH.st.rooms) || [], sel = $('#chat-room');
+  const mark = r => !r ? '' : ['run', 'ask', 'new', 'bad'].includes(chState(r)) ? ` (${CH_LABEL[chState(r)]})` : r.memo ? ' (메모)' : '';
+  const opts = [['data', `데이터 관리${mark(chSum('data'))}`], ...chListed(rooms).map(r => [r.id, `${chRoomWord(r)} · ${r.card ? r.card.title : r.id}${mark(r)}`])];
+  const optHtml = opts.map(([v, l]) => `<option value="${esc(v)}" ${v === CH.room ? 'selected' : ''}>${esc(l)}</option>`).join('');
+  if (sel.dataset.sig !== optHtml){ sel.innerHTML = optHtml; sel.dataset.sig = optHtml; }
+  sel.value = CH.room;
+  chRoomsPaint(rooms);
+  const r = CH.rooms[CH.room], sum = chSum(CH.room), busy = !!(sum && CH_ACTIVE.includes(sum.status));
+  chMarkRead(sum);
+  const tools = $('#chat-tools'), card = sum && sum.card ? sum.card : null;
+  const other = rooms.filter(x => x.id !== CH.room && x.pending);
+  const otherHtml = other.length ? `<span class="ch-st wait" style="width:100%">다른 대화에서 답을 기다려요 ${other.length}개 <button class="btn btn-text btn-sm" type="button" data-ch="goto" data-room="${esc(other[0].id)}">보기</button></span>` : '';
+  const toolHtml = otherHtml + (CH.pick ? ''
+    : `<span class="faint" title="${esc(r && r.cwd ? r.cwd : '')}">${CH.room === 'data' ? `${esc(S.profile)} 프로필 데이터` : r && r.cwd ? `작업 폴더 ${esc(chTail(r.cwd))}` : '작업 폴더 없음'}</span>
+      ${card ? `<button class="btn btn-text btn-sm" type="button" data-ch="pick" ${busy ? 'disabled title="하는 중에는 바꿀 수 없어요"' : ''}>${r && r.cwd ? '폴더 바꾸기' : '작업 폴더 고르기'}</button>` : ''}
+      ${card ? (sum.kind === 'project' ? '<a class="btn btn-text btn-sm" href="#/action/short">단기 보드 보기</a>' : `<a class="btn btn-text btn-sm" href="#/action/short/${esc(card.id)}">카드 보기</a>`) : ''}
+      ${r && r.turns.length && !chPend(r) ? `<button class="btn btn-text btn-sm" type="button" data-ch="view">${CH.view === 'sum' ? '대화 보기' : '요약 보기'}</button>` : ''}
+      ${r && r.turns.length && !busy ? `<button class="btn btn-text btn-sm" type="button" data-ch="reset">새 대화</button>` : ''}
+      ${card ? `<button class="btn btn-text btn-sm pl-danger" type="button" data-ch="remove">세션 지우기</button>` : ''}`);
+  tools.hidden = !toolHtml.trim();
+  $('#chat-in').placeholder = CH.room === 'data' ? "예: 내일까지 '견적서 보내기' 단기를 만들어 줘" : '예: 할 일 첫 줄부터 해 줘';
+  $('#chat-hint').hidden = chCoarse();
+  if (tools.dataset.sig !== toolHtml){ tools.innerHTML = toolHtml; tools.dataset.sig = toolHtml; }
+  chMemoPaint(sum);
+  $('#chat-stop').hidden = !busy;
+  $('#chat-form').hidden = !!CH.pick;
+  const log = $('#chat-log');
+  let html;
+  if (!chOn()) html = `<p class="ch-empty">${esc((CH.st && CH.st.message) || 'AI 챗봇을 쓸 수 없어요')}</p>`;
+  else if (CH.pick) html = chPickHtml(r);
+  else if (!r || !r.turns.length) html = `<p class="ch-empty">${CH.room === 'data' ? '노트·단기·기록을 말로 더하고 고치고 지워요. 고친 것은 화면에 바로 보여요.' : '이 카드에서 할 일을 말해 주세요. 이 대화는 카드 세션에 이어져요.'}${CH.st.full ? '' : '<br><span class="faint">pkm-ai-server가 full 모드를 허용하지 않아 자동 권한 모드로 돌아요.</span>'}</p>`;
+  else if (CH.view === 'sum' && !chPend(r)) html = chSumsHtml(r);
+  else html = r.turns.map(t => chTurn(CH.room, t)).join('');
+  if (CH.err && !CH.pick) html += `<p class="ch-st bad" role="alert">${esc(CH.err)}</p>`;
+  if (!force && html === CH.sig) return;
+  if (!force && document.activeElement && document.activeElement.closest && document.activeElement.closest('#chat-log .ch-ask')) return;   // 고르는 중이면 고른 값이 날아가지 않게 그대로 둔다
+  const near = log.scrollHeight - log.scrollTop - log.clientHeight < 80, keep = log.scrollTop;
+  const focusReq = document.activeElement && document.activeElement.closest && document.activeElement.closest('#chat-log') ? document.activeElement.dataset.req : null;
+  log.innerHTML = html; CH.sig = html;
+  log.scrollTop = near || force ? log.scrollHeight : keep;
+  log.setAttribute('aria-label', CH.view === 'sum' && r && r.turns.length && !chPend(r) && !CH.pick ? '대화 요약' : '대화 기록');
+  if (focusReq){ const b = log.querySelector(`[data-req="${focusReq}"]`); if (b) b.focus(); }
+}
+/* 메모 — 방마다 마지막으로 하려던 일을 적어 둔다(돌아오면 첫 동작). AI에게는 보내지 않는다 */
+function chMemoPaint(sum){
+  const box = $('#chat-memo'), m = sum && sum.memo;
+  const show = chOn() && !CH.pick;
+  box.hidden = !show; if (!show) return;
+  if (CH.memoEdit === CH.room){
+    if (box.dataset.sig === 'edit:' + CH.room) return;   // 쓰는 중에는 다시 그리지 않는다
+    box.innerHTML = `<form data-ch-form="memo" novalidate><label class="m-head" for="chat-memo-in"><b>메모</b><span class="faint">돌아오면 처음 할 일을 적어 두세요</span></label>
+      <textarea id="chat-memo-in" name="text" rows="2" maxlength="2000" spellcheck="false" placeholder="예: 결과를 열어서 실패한 테스트부터 보기">${esc(LS.get(chMemoKey(CH.room), '') || (m ? m.text : ''))}</textarea>
+      <p class="err" role="alert" hidden></p>
+      <div class="m-acts">${m ? '<button class="btn btn-text btn-sm pl-danger" type="button" data-ch="memo-clear">지우기</button>' : ''}<button class="btn btn-ghost btn-sm" type="button" data-ch="memo-close">닫기</button><button class="btn btn-primary btn-sm" type="submit">저장하기</button></div></form>`;
+    box.dataset.sig = 'edit:' + CH.room;
+    return;
+  }
+  const html = m
+    ? `<div class="m-head"><b>메모</b><span class="faint">${esc(chAgo(m.at))}</span><button class="btn btn-text btn-sm" type="button" data-ch="memo-edit" aria-label="메모 고치기">고치기</button></div><p class="m-text" tabindex="0">${esc(m.text)}</p>`
+    : '<button class="btn btn-text btn-sm m-empty" type="button" data-ch="memo-edit">메모 남기기 · 돌아오면 할 일</button>';
+  if (box.dataset.sig !== html){ box.innerHTML = html; box.dataset.sig = html; }
+}
+function chAgo(at){
+  const d = new Date(at), min = Math.round((Date.now() - d) / 60000);
+  if (!(min >= 0)) return '';
+  if (min < 1) return '방금 적음';
+  if (min < 60) return `${min}분 전에 적음`;
+  if (min < 60 * 24) return `${Math.round(min / 60)}시간 전에 적음`;
+  return `${d.getMonth() + 1}월 ${d.getDate()}일에 적음`;
+}
+// 쓰던 메모는 방별 초안으로 둔다 — 다른 방에 다녀오거나 창을 닫아도 이어 쓴다. [닫기]·Esc·저장하면 비운다
+const chMemoKey = r => `pkm:v1:chat-memo-draft:${S.profile}:${r}`;
+function chMemoOpen(on){
+  if (!on) LS.set(chMemoKey(CH.room), '');
+  CH.memoEdit = on ? CH.room : null; $('#chat-memo').dataset.sig = ''; chMemoPaint(chSum(CH.room));
+  const el = on ? $('#chat-memo-in') : $('[data-ch="memo-edit"]');
+  if (el){ el.focus(); if (on) el.setSelectionRange(el.value.length, el.value.length); }
+}
+async function chMemoSave(text){
+  const room = CH.room, f = $('#chat-memo form');
+  try {
+    CH.rooms[room] = await capi(`/${encodeURIComponent(room)}/memo`, { text });
+    LS.set(chMemoKey(room), ''); if (room !== CH.room){ if (CH.memoEdit === room) CH.memoEdit = null; await chLoad(); return; }
+    await chLoad(); chMemoOpen(false);
+    toast(text.trim() ? '메모를 저장했어요' : '메모를 지웠어요');
+  } catch (e) {
+    const msg = `메모를 저장하지 못했어요 — ${e instanceof TypeError ? 'pkm 서버에 닿지 않아요. 연결을 확인하고 다시 눌러 주세요' : e.message}`;
+    const er = f && f.querySelector('.err'); if (er){ er.textContent = msg; er.hidden = false; } else toast(msg);
+  }
+}
+async function chSend(){
+  const box = $('#chat-in'), text = box.value.trim();
+  if (!text || CH.sending) return;
+  CH.sending = true; CH.err = '';
+  const id = 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), room = CH.room;
+  try {
+    if (room === 'data' && !chSum('data')) await capi('', {});
+    const t = await capi(`/${encodeURIComponent(room)}/send`, { id, text });
+    box.value = ''; LS.set(chDraftKey(room), '');
+    if (CH.view === 'sum'){ CH.view = 'log'; LS.set('pkm:v1:chat-view', 'log'); }   // 보낸 말의 진행이 보이게
+    const r = CH.rooms[room] || (CH.rooms[room] = { id:room, turns:[] }); if (!r.turns.some(x => x.id === t.id)) r.turns.push(t);
+    await chLoad();
+  } catch (e) { CH.err = e.message; chPaint(true); }
+  finally { CH.sending = false; }
+}
+async function chAnswer(room, req, allow, input){
+  try { await capi(`/${encodeURIComponent(room)}/answer`, { request_id:req, allow, input }); CH.err = ''; await chLoad(); $('#chat-in').focus(); }
+  catch (e) { CH.err = e.message; chPaint(true); }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-ch]'); if (!b) return;
+  const act = b.dataset.ch;
+  if (act === 'open') return chOpen();
+  if (act === 'close') return chClose();
+  if (act === 'card') return chCard(b.dataset.id);
+  if (act === 'project'){ if (b.closest('summary')) e.preventDefault(); return chProject(b.dataset.id); }   // 묶음 머리 안의 아이콘 — 펼치고 접기는 하지 않는다
+  if (act === 'pick'){ const r = CH.rooms[CH.room]; return chPickGo((r && r.cwd) || (CH.st && CH.st.card_cwd) || ''); }
+  if (act === 'pick-go') return chPickGo(b.dataset.path);
+  if (act === 'pick-set') return chPickSet(b.dataset.path);
+  if (act === 'pick-none') return chPickSet(null);
+  if (act === 'pick-close'){ CH.pick = null; chPaint(true); const t = $('[data-ch="pick"]'); if (t) t.focus(); return; }
+  if (act === 'goto'){ if (b.dataset.room === CH.room) return; chDraftSave(CH.room); CH.room = b.dataset.room; CH.pick = null; CH.err = ''; chDraftLoad(); await chRoomLoad(); chPaint(true); return; }
+  if (act === 'view') return chView(CH.view === 'sum' ? 'log' : 'sum');
+  if (act === 'sum-go'){ CH.sumAt = b.dataset.turn; return chView('log', b.dataset.turn); }
+  if (act === 'memo-edit') return chMemoOpen(true);
+  if (act === 'memo-close') return chMemoOpen(false);
+  if (act === 'memo-clear') return chMemoSave('');
+  if (act === 'again'){ $('#chat-in').value = b.dataset.text || ''; return chSend(); }
+  if (act === 'allow' || act === 'deny'){ b.disabled = true; return chAnswer(b.dataset.room, b.dataset.req, act === 'allow'); }
+  if (act === 'cancel'){ try { await capi(`/${encodeURIComponent(CH.room)}/cancel`, {}); await chLoad(); } catch (er) { toast(er.message); } return; }
+  if (act === 'reset') return plAsk({ title:'새 대화를 시작할까요?', body:'<p>이 채팅의 기록과 AI 세션을 비워요. 고친 파일은 그대로예요.</p>', ok:'새 대화 시작하기' }, async () => {
+    try { CH.rooms[CH.room] = await capi(`/${encodeURIComponent(CH.room)}/reset`, {}); await chLoad(); chPaint(true); $('#chat-in').focus(); } catch (er) { toast(er.message); } });
+  if (act === 'remove'){ const s = chSum(CH.room), title = s && s.card ? s.card.title : '', w = chRoomWord(s);
+    return plAsk({ title:`${w} 세션을 지울까요?`, body:`<p>「${esc(title)}」 ${w}의 AI Chat 기록과 세션을 지워요.${s && s.memo ? ' 적어 둔 메모도 함께 지워져요.' : ''} 하던 일은 멈추고, 작업 폴더의 파일은 그대로예요.</p>`, ok:'세션 지우기', danger:true }, async () => {
+      const room = CH.room;
+      try { await capi(`/${encodeURIComponent(room)}`, undefined, 'DELETE'); delete CH.rooms[room]; LS.set(chDraftKey(room), ''); LS.set(chMemoKey(room), ''); CH.room = 'data'; await chLoad(); chDraftLoad(); await chRoomLoad(); chPaint(true); toast(`${w} 세션을 지웠어요`); }
+      catch (er) { toast(er.message); } }); }
+});
+document.addEventListener('submit', e => {
+  const f = e.target;
+  if (f.id === 'chat-form'){ e.preventDefault(); return chSend(); }
+  const k = f.dataset && f.dataset.chForm; if (!k) return;
+  e.preventDefault();
+  if (k === 'memo') return chMemoSave(f.text.value);
+  if (k === 'pick-path'){ const v = f.path.value.trim(); if (v) chPickGo(v); return; }
+  if (k === 'askq'){
+    const q = (((CH.rooms[f.dataset.room] || {}).turns || []).flatMap(t => t.pending || []).find(x => x.id === f.dataset.req) || {}).input || {};
+    const miss = (q.questions || []).findIndex((x, i) => !f.querySelector(`[name="q${i}"]:checked`));
+    if (miss >= 0){ f.querySelector('.err').hidden = false; const first = f.querySelector(`[name="q${miss}"]`); if (first) first.focus(); return; }
+    const answers = Object.fromEntries((q.questions || []).map((x, i) => [x.question, [...f.querySelectorAll(`[name="q${i}"]:checked`)].map(c => c.value).join(', ')]));
+    return chAnswer(f.dataset.room, f.dataset.req, true, { ...q, answers });
+  }
+});
+document.addEventListener('input', e => { if (e.target.id === 'chat-memo-in') LS.set(chMemoKey(CH.room), e.target.value); });
+document.addEventListener('change', e => {
+  if (e.target.id === 'chat-room'){ chDraftSave(CH.room); CH.room = e.target.value; CH.pick = null; CH.err = ''; chDraftLoad(); chPaint(true); chRoomLoad().then(() => chPaint(true)); }
+});
+document.addEventListener('toggle', e => { const d = e.target; if (d.classList && d.classList.contains('ch-proc')){ if (d.open) CH.procOpen.add(d.dataset.turn); else CH.procOpen.delete(d.dataset.turn); } }, true);
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'chat-in' && e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229 && !chCoarse()){ e.preventDefault(); chSend(); }   // 터치 기기는 Enter가 줄바꿈, 보내기는 버튼으로
+  if (e.target.id === 'chat-memo-in' && e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.isComposing){ e.preventDefault(); return chMemoSave(e.target.value); }
+  if (e.target.id === 'chat-memo-in' && e.key === 'Escape'){ e.preventDefault(); return chMemoOpen(false); }
+  if (e.key === 'Escape' && CH.open && e.target.closest && e.target.closest('#chat') && !document.querySelector('dialog[open]')){ e.preventDefault(); chClose(); }
+});
+
 function render(){
+  if (plOK() && S.mode === 'data' && !CH.loading && (!CH.timer || CH.p !== S.profile)) setTimeout(chLoad, 0);
   buildNav(); const main = $('#main'); const p = parse();
   const sec = p[0] === 'refine' ? 'knowledge' : p[0];
   document.querySelectorAll('[data-nav]').forEach(a => a.dataset.nav === sec ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
@@ -4537,6 +5247,7 @@ document.addEventListener('click', e => {
     case 'ai-recall-check': { const p = find('perms', id), line = (String(p.body).match(new RegExp(`^- \\(${TODAY}\\) (.*)$`, 'm')) || [])[1] || '';
       aiAsk('recall-check:' + id, `내가 노트를 보지 않고 떠올려 쓴 한 줄을 원래 노트와 맞춰 봐 줘. 맞게 떠올린 것, 빠진 핵심, 틀린 것을 각각 한 줄로. 칭찬이나 점수는 빼고 짧게 한국어로.\n\n떠올린 한 줄: ${line}\n\n원래 노트 — ${p.title}\n${p.body.split(RECALL_H)[0].slice(0, 2000)}`); break; }
     case 'task-move': moveTask(id, b.dataset.to); break;
+    case 'copy-task-id': copyText(id, `ID ${id}를 복사했어요`); break;
     case 'task-archive': { const t = find('tasks', id); if (!t) break; const nx = b.closest('li') && (b.closest('li').nextElementSibling || b.closest('li').previousElementSibling); t.archived = TODAY; render(); focusEl(nx && $(`[data-id="${nx.dataset.id}"] a`) || $('#col-완료'));
       // 연달아 보관하면 토스트 하나로 모으고, 되돌리기는 모은 것을 한꺼번에
       if (Date.now() - ARCH.at > 7000) ARCH.ids = []; ARCH.ids.push(t.id); ARCH.at = Date.now(); const ids = ARCH.ids.slice();
@@ -4958,6 +5669,8 @@ document.addEventListener('submit', e => {
     toast(noAmt(L.unit) ? `${L.title}에 기록을 남겼어요` : `${L.title}에 ${fmtAmt(amt, L.unit)}을 기록했어요`, { label:'되돌리기', fn:() => { L.records = L.records.filter(x => x !== rec); render(); } });
   } else if (kind === 'retro'){
     D.dailies[f.dataset.date].retro = f.retro.value.trim(); render(); toast('회고를 저장했어요');
+  } else if (kind === 'wrap'){
+    dayOf(f.dataset.date).wrap = f.wrap.value.trim(); render(); toast(f.dataset.date === TODAY ? '마무리를 저장했어요. 내일 지금 화면 맨 위에 보여요' : '마무리를 저장했어요');
   } else if (kind === 'task-todo'){
     const v = f.t.value.trim(); if (!v){ f.t.focus(); return; }
     find('tasks', f.dataset.id).todos.push({ t:v, d:false }); render(); $('#ttodo-' + f.dataset.id).focus();
@@ -4968,6 +5681,9 @@ document.addEventListener('submit', e => {
 });
 $('#cap-text').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); $('#dlg-capture form').requestSubmit(); } });
 document.querySelectorAll('dialog input, dialog textarea').forEach(i => i.addEventListener('input', () => { if (i.getAttribute('aria-invalid')){ i.removeAttribute('aria-invalid'); i.closest('form').querySelectorAll('.err').forEach(x => x.hidden = true); } }));
+
+// 프로젝트 묶음을 펼치고 접은 것 — 이 기기에 기억한다(toggle은 거품이 일지 않아 capture로)
+document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-tg]')) LS.set(`pkm:v1:tg:${S.profile}:${d.dataset.tg}`, d.open); }, true);
 
 /* PC 드래그 — 마우스가 있는 넓은 화면에서만. 버튼과 같은 moveTask를 부른다 */
 const canDrag = () => matchMedia('(pointer:fine) and (min-width:600px)').matches;

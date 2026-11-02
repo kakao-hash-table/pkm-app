@@ -197,9 +197,9 @@
       const plan = x.plan || {};
       const planText = Object.keys(plan).sort().filter(k => plan[k].length).map(k => `## ${k}\n${plan[k].map(e => { const t = byId(D.tasks, e.id); return t ? `- [${e.done ? 'x' : ' '}] ${link(t.title)}${e.min ? ` · ${e.min}분` : ''}` : ''; }).filter(Boolean).join('\n')}`).join('\n\n');
       const skipped = (x.skipped || []).map(rLink).filter(Boolean);
-      if (!x.memo && !x.retro && !planText && !done.length && !x.start && !skipped.length) return;
+      if (!x.memo && !x.retro && !x.wrap && !planText && !done.length && !x.start && !skipped.length) return;
       index[d] = `${F.daily}/${d}.md`;
-      files[`${F.daily}/${d}.md`] = writeDoc({ type:'daily', date:d, start:x.start || undefined, routines:done, skipped:skipped.length ? skipped : undefined }, [['오늘 계획', planText], ['메모', x.memo], ['한 줄 회고', x.retro]]);
+      files[`${F.daily}/${d}.md`] = writeDoc({ type:'daily', date:d, start:x.start || undefined, routines:done, skipped:skipped.length ? skipped : undefined }, [['오늘 계획', planText], ['메모', x.memo], ['한 줄 회고', x.retro], ...(x.wrap ? [['하루 마무리', x.wrap]] : [])]);   // 마무리는 쓴 날만 — 옛 데일리 파일이 빈 제목 때문에 바뀌지 않게
     });
     // 기록(종류별 폴더)
     const kinds = D.kinds || [];
@@ -287,6 +287,12 @@
     }
     const kindByName = n => D.kinds.find(k => k.name === n);
     const paths = {};   // id → 읽어 온 파일 경로 (사용자가 Obsidian에서 이름을 바꿨으면 저장 때 옛 파일을 정리한다)
+    // 단기 id는 카드마다 하나여야 한다(AI 채팅 세션이 id로 붙는다). 없거나 겹치면 새로 주고 reid에 모아 다시 쓰게 한다.
+    // 겹치면 경로가 앞서는 파일이 원래 id를 갖는다 — 어느 기기에서 읽어도 같은 카드가 남게
+    const keeper = {}, reid = [];
+    for (const d of docs) if (d.fm.type === 'project' && d.fm.id != null){ const k = String(d.fm.id); if (!(k in keeper) || d.path < keeper[k]) keeper[k] = d.path; }
+    const taken = new Set(Object.keys(keeper));
+    const freshTaskId = () => { let v; do v = newId('t'); while (taken.has(v)); taken.add(v); return v; };
     const later = [];   // 제목 링크는 모두 읽은 뒤에 id로 바꾼다
     const tbDir = ((settings.folders || {}).textbook || DEFAULT_FOLDERS.textbook) + '/';
     const cardDir = ((settings.folders || {}).cards || DEFAULT_FOLDERS.cards) + '/';
@@ -315,7 +321,7 @@
       }
       else if (type === 'daily'){
         const date = String(f.date || base(d.path));
-        const x = { memo:S['메모'] || '', retro:S['한 줄 회고'] || '', did:[], plan:{} };
+        const x = { memo:S['메모'] || '', retro:S['한 줄 회고'] || '', wrap:S['하루 마무리'] || '', did:[], plan:{} };
         if (/^\d{1,2}:\d{2}$/.test(String(f.start || ''))) x.start = String(f.start).padStart(5, '0');   // 그날만 하루 시작을 옮긴 시각
         D.dailies[date] = x;
         const planText = S['오늘 계획'] || '';
@@ -348,7 +354,9 @@
         D.meetings.push(m);
       }
       else if (type === 'project'){
-        const t = { id:id || newId('t'), title:String(f.title || base(d.path)), status:toVal(STATUS, f.status || 'todo'), area:unlink(f.area), due:f.due ? String(f.due) : '', estimate:f.estimate ? Number(f.estimate) : null,
+        const own = id != null && keeper[id] === d.path, tid = own ? id : freshTaskId();
+        if (!own) reid.push(tid);
+        const t = { id:tid, title:String(f.title || base(d.path)), status:toVal(STATUS, f.status || 'todo'), area:unlink(f.area), due:f.due ? String(f.due) : '', estimate:f.estimate ? Number(f.estimate) : null,
           result:f.result ? String(f.result) : '', doneAt:f.done_at ? String(f.done_at) : '', archived:f.archived ? String(f.archived).slice(0, 10) : '', created:f.created ? String(f.created) : '', waitOn:f.waiting_on ? String(f.waiting_on) : '', waitSince:f.waiting_since ? String(f.waiting_since) : '',
           todos:String(S['할 일'] || '').split('\n').map(l => l.match(/^\s*-\s+\[( |x|X)\]\s+(.*)$/)).filter(Boolean).map(m => ({ t:m[2].trim(), d:m[1] !== ' ' })),
           done:listLines(S['완료 조건']), memo:S['메모'] || '' };
@@ -401,7 +409,7 @@
     const realArea = t => { if (!t) return ''; const L = D.longs.find(x => same(x.title, t)); return L ? L.title : t; };
     D.tasks.forEach(t => { t.area = realArea(t.area); }); D.routines.forEach(r => { r.area = realArea(r.area); });
     if (!D.kinds.length) D.kinds = [{ id:'meeting', name:'회의록', fields:[['agenda', '안건'], ['talk', '논의'], ['decisions', '결정']], people:true, todos:true }];
-    return { db:D, settings, paths };
+    return { db:D, settings, paths, reid };
   }
   const base = p => p.split('/').pop().replace(/\.md$/, '');
   const pathId = p => { let h = 2166136261; for (const c of p) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h.toString(36); };   // id 없는 교과서 파일 — 경로가 같으면 같은 id
