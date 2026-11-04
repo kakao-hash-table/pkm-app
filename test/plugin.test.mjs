@@ -210,3 +210,33 @@ test('누른 항목의 진행 — 누른 뒤에 만든 실행을 찾고, 상태�
   assert.equal(P.runFeedback(run({ status: 'canceled' }, [])).phase, 'canceled');
   assert.equal(P.runFeedback(null), null);
 });
+
+test('누른 항목 자리 — 실행이 사라지면 추적을 지우고, 글만 바뀌면 다시 그리지 않으며, 끝나면 빠지는 목록만 항목을 숨긴다', () => {
+  const app = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const fn = name => { const i = app.indexOf(`function ${name}(`); let d = 0, j = app.indexOf('){', i) + 1; for (; j < app.length; j++){ if (app[j] === '{') d++; else if (app[j] === '}' && --d === 0) break; } return app.slice(i, j + 1); };
+  const line = name => app.match(new RegExp(`const ${name} = [^\\n]+`))[0];
+  const live = { textContent: '' }, els = {}, PL = { track: {}, sent: {} };
+  const T = new Function('PKMPlugin', 'PL', '$', 'plRunner', 'esc', `${line('PL_POLL_MS')}\n${line('plTrackKey')}\n${line('plDoneLeaves')}\n${line('plTrackHidden')}\n${fn('plTrackOf')}\n${line('plTrackDue')}\n${fn('plTrackUpdate')}\nreturn { plTrackKey, plTrackUpdate, plTrackHidden };`)(
+    P, PL, q => q === '#pl-live' ? live : els[q] || null, () => '', s => String(s));
+  const now = Date.now(), iso = ms => new Date(now + ms).toISOString();
+  const leave = { name: '할 일', start: '했어요', starts: ['했어요'], count: 'yes' }, stay = { name: '프로젝트', start: '점검', starts: ['점검'], count: 'no' };
+  const setup = (f, runs, t) => { PL.st = { plugins: { p: { feeds: [f], state: { feeds: { [f.name]: { at: iso(-60000), items: [{ id: 'i1' }] } }, runs } } } };
+    PL.track = { [T.plTrackKey('p', f.name, 'i1')]: { id: 'p', feed: f.name, item: 'i1', workflow: f.starts[0], label: '예시', at: now, n: 1, skip: [], said: 'busy', ...t } }; };
+  const run = (f, o) => ({ id: 'r1', feed: f.name, item: { id: 'i1' }, workflow: f.starts[0], created: iso(500), updated: iso(800), finished: iso(900), ...o });
+  const done = { status: 'done', steps: [{ key: 'end', status: 'done', output: { verdict: { title: '했어요' } } }] };
+
+  setup(leave, [], { run: 'r1', said: 'done' });   // 찾았던 실행이 기록에서 사라졌다
+  assert.equal(T.plTrackUpdate(), true); assert.deepEqual(PL.track, {});
+
+  const el = { textContent: '' }; els['#plt-1 .pl-track-text'] = el;   // 같은 단계에서 'n분째'만 바뀌면 그 줄 글자만
+  setup(stay, [run(stay, { status: 'running', steps: [{ key: 'ai', kind: 'agent', status: 'running', started: iso(-200000) }] })], { run: 'r1', said: 'ai', text: 'AI가 하는 중 · 2분째' });
+  assert.equal(T.plTrackUpdate(), false); assert.equal(el.textContent, 'AI가 하는 중 · 3분째'); assert.equal(live.textContent, '');
+
+  setup(leave, [run(leave, done)], { run: 'r1' });   // 단계가 바뀌면 다시 그리고 한 번 알린다
+  assert.equal(T.plTrackUpdate(), true); assert.equal(live.textContent, '예시 — 했어요'); assert.equal(T.plTrackUpdate(), false);
+
+  setup(leave, [run(leave, done)], { run: 'r1', said: 'done', doneAt: now - 5000 });   // 끝나면 빠지는 목록 — 숨기고, 목록을 새로 가져올 때까지 둔다
+  assert.equal(T.plTrackUpdate(), true); assert.equal(T.plTrackHidden('p', leave, { id: 'i1' }), true);
+  setup(stay, [run(stay, done)], { run: 'r1', said: 'done', doneAt: now - 5000 });   // 늘 남는 목록 — 결과 줄만 지운다
+  assert.equal(T.plTrackUpdate(), true); assert.deepEqual(PL.track, {});
+});
