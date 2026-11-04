@@ -186,3 +186,27 @@ test('pairs 설정 — 줄을 두 칸으로 나눠 보이고, 저장할 때 탭�
   assert.deepEqual(plPairRows('a\thttps://x/$&\n\nb → https://y\nc'), [['a', 'https://x/$&'], ['b', 'https://y'], ['c', '']]);
   assert.deepEqual(plPairRows(''), []);
 });
+
+test('누른 항목의 진행 — 누른 뒤에 만든 실행을 찾고, 상태마다 그 자리에 보일 한 줄을 정한다', () => {
+  const at = Date.parse('2026-01-02T10:00:00Z'), iso = ms => new Date(at + ms).toISOString();
+  const run = (o, steps) => ({ id: o.id || 'r1', feed: '할 일', item: { id: 'i1' }, workflow: '했어요', created: iso(1000), status: 'running', steps, ...o });
+  const t = { feed: '할 일', item: 'i1', workflow: '했어요', at, skip: ['old'] };
+  const runs = [run({ id: 'old', created: iso(500) }, []), run({ id: 'other', item: { id: 'i2' } }, []), run({ id: 'wf', workflow: '다르게 할래요' }, []), run({ id: 'stale', created: iso(-120000) }, []), run({ id: 'mine' }, [])];
+  assert.equal(P.runOf(runs, t).id, 'mine');
+  assert.equal(P.runOf(runs.slice(0, 4), t), null);   // 누르기 전에 있던 것·다른 항목·다른 워크플로우·오래된 것은 아니다
+
+  const script = { key: 'end', kind: 'script', status: 'running' }, agent = { key: 'ai', kind: 'agent', status: 'running', started: iso(0) };
+  assert.deepEqual(P.runFeedback(run({ status: 'queued' }, [{ ...script, status: 'pending' }])), { phase: 'busy', text: '처리하는 중…' });
+  assert.equal(P.runFeedback(run({}, [agent]), at + 30000).text, 'AI가 하는 중 · 몇 분 걸려요');
+  assert.equal(P.runFeedback(run({}, [agent]), at + 185000).text, 'AI가 하는 중 · 3분째');
+  assert.match(P.runFeedback(run({ status: 'waiting' }, [{ ...agent, status: 'waiting', reason: 'limit' }])).text, /풀리면 이어서/);
+  assert.deepEqual(P.runFeedback(run({ status: 'input' }, [{ key: 'done1', status: 'done' }, { key: 'res', kind: 'script', status: 'input' }])), { phase: 'input', text: '내 확인이 필요해요', step: 'res' });
+  assert.deepEqual(P.runFeedback(run({ status: 'stopped' }, [{ key: 'end', kind: 'script', status: 'failed', error: '카드를 찾지 못했어요\n자세한 내용' }])), { phase: 'failed', text: '멈췄어요 · 카드를 찾지 못했어요', step: 'end' });
+  assert.equal(P.runFeedback(run({ status: 'stopped', note: '워크플로우가 사라졌어요' }, [{ key: 'a', status: 'pending' }])).text, '멈췄어요 · 워크플로우가 사라졌어요');
+  assert.deepEqual(P.runFeedback(run({ status: 'done' }, [{ key: 'end', status: 'done', output: { verdict: { tone: 'ok', title: '했어요', text: '예시 할 일' }, outcome: { title: '했어요' } } }])), { phase: 'done', tone: 'ok', text: '했어요 · 예시 할 일' });
+  assert.equal(P.runFeedback(run({ status: 'done' }, [{ key: 'end', status: 'done', output: { outcome: { title: '뺐어요', text: '' } } }])).text, '뺐어요');
+  assert.equal(P.runFeedback(run({ status: 'done' }, [{ key: 'end', status: 'done', output: { summary: 's' } }])).text, '끝났어요');
+  assert.equal(P.runFeedback(run({ status: 'done' }, [{ key: 'end', status: 'done', output: { verdict: { tone: 'bad', title: '준비한 게 없어요' } } }])).tone, 'bad');
+  assert.equal(P.runFeedback(run({ status: 'canceled' }, [])).phase, 'canceled');
+  assert.equal(P.runFeedback(null), null);
+});

@@ -266,7 +266,36 @@
     return { ok: !errors.length, manifest, workflows, feeds, searches, editors, checkins, chats, links, scripts: bundled, errors, warnings };
   }
 
-  const api = { SPEC, DIR, MODES, LIMITS, validate, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, parseLinks, parseLinkRules, parseChoices, parseLintRules, startsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
+  /* 누른 항목의 실행 — 같은 목록·항목·워크플로우에서 누른 뒤에 만든 것 중 가장 새것(누르기 전에 있던 skip은 빼고). 시계 차이는 1분까지 본다 */
+  function runOf(runs, t){
+    const since = t.at - 60000;
+    return (runs || []).filter(r => r.feed === t.feed && r.item && r.item.id === t.item && (!t.workflow || r.workflow === t.workflow) && !(t.skip || []).includes(r.id) && Date.parse(r.created) >= since)
+      .sort((a, b) => String(b.created).localeCompare(String(a.created)))[0] || null;
+  }
+  /* 누른 항목 자리에 보일 한 줄 — phase: busy(짧은 처리)·ai(AI가 하는 중)·input(내 확인)·failed(멈춤)·done·canceled */
+  function runFeedback(r, now = Date.now()){
+    if (!r) return null;
+    const steps = r.steps || [], cur = steps.find(s => !['done', 'skipped'].includes(s.status)) || steps[steps.length - 1] || {};
+    const line = v => String(v || '').trim().split('\n')[0].slice(0, 160);
+    if (['queued', 'running', 'waiting'].includes(r.status)){
+      if (r.status === 'waiting') return { phase: 'ai', text: cur.reason === 'limit' ? 'AI 한도라 기다리는 중 · 풀리면 이어서 해요' : cur.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중 · 이어서 해요' };
+      if (!['ai', 'agent'].includes(cur.kind)) return { phase: 'busy', text: '처리하는 중…' };
+      const min = cur.started ? Math.floor((now - Date.parse(cur.started)) / 60000) : 0;
+      return { phase: 'ai', text: `AI가 하는 중 · ${min >= 1 ? `${min}분째` : '몇 분 걸려요'}` };
+    }
+    if (r.status === 'input') return { phase: 'input', text: '내 확인이 필요해요', step: cur.key };
+    if (r.status === 'stopped'){ const why = line(cur.status === 'failed' ? cur.error : r.note || cur.error); return { phase: 'failed', text: `멈췄어요${why ? ` · ${why}` : ''}`, step: cur.key }; }
+    if (r.status === 'canceled') return { phase: 'canceled', text: '그만뒀어요' };
+    for (let i = steps.length - 1; i >= 0; i--){
+      const o = steps[i].output; if (!o || typeof o !== 'object') continue;
+      const v = o.verdict && typeof o.verdict === 'object' ? o.verdict : null, oc = o.outcome && typeof o.outcome === 'object' ? o.outcome : null;
+      if (v && line(v.title)) return { phase: 'done', tone: v.tone === 'bad' ? 'bad' : 'ok', text: [line(v.title), line(v.text)].filter(Boolean).join(' · ') };
+      if (oc && line(oc.title)) return { phase: 'done', tone: 'ok', text: [line(oc.title), line(oc.text)].filter(Boolean).join(' · ') };
+    }
+    return { phase: 'done', tone: 'ok', text: '끝났어요' };
+  }
+
+  const api = { SPEC, DIR, MODES, LIMITS, validate, runOf, runFeedback, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, parseLinks, parseLinkRules, parseChoices, parseLintRules, startsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMPlugin = api;
 })(typeof self !== 'undefined' ? self : this);
