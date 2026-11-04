@@ -246,7 +246,8 @@ export function workDir(pr, root){
   fs.mkdirSync(path.join(dir, '.pilot', 'out'), { recursive: true });
   return dir;
 }
-// 내가 할 일에 이어 둔 파일 — 작업 폴더 안의 글 파일만 읽는다. 링크로 밖을 가리켜도 실제 경로로 다시 확인한다
+// 내가 할 일에 이어 둔 파일 — 작업 폴더 안의 글 파일만 읽는다. 심볼릭 링크는 실제 경로로 다시 확인하고, 하드 링크(nlink > 1)는 밖의 파일일 수 있어 읽지 않는다
+// 읽은 앞부분은 피드 상태(.state)에 복사되어 데이터 저장소로 동기화된다
 const SEE_EXT = /\.(md|txt|csv|json)$/i, SEE_MAX = 1800;   // 피드 항목 detail 글은 2,000자까지 남는다(server/runner.js)
 export function readWorkFile(dir, rel){
   const root = path.resolve(dir), abs = path.resolve(root, String(rel || ''));
@@ -254,7 +255,9 @@ export function readWorkFile(dir, rel){
   let real, realRoot;
   try { real = fs.realpathSync(abs); realRoot = fs.realpathSync(root); } catch { return { status: 'missing' }; }
   if (!real.startsWith(realRoot + path.sep)) return { status: 'outside' };
-  if (!SEE_EXT.test(real) || !fs.statSync(real).isFile()) return { status: 'not-text' };
+  const st = fs.statSync(real);
+  if (!SEE_EXT.test(real) || !st.isFile()) return { status: 'not-text' };
+  if (st.nlink > 1) return { status: 'linked' };
   const buf = Buffer.alloc(SEE_MAX * 4), fd = fs.openSync(real, 'r');   // 큰 파일도 앞부분만
   let t; try { t = buf.subarray(0, fs.readSync(fd, buf, 0, buf.length, 0)).toString('utf8').replace(/\uFFFD$/, ''); } finally { fs.closeSync(fd); }
   return { status: 'ok', text: t.length > SEE_MAX ? `${t.slice(0, SEE_MAX)}\n…(뒷부분은 파일에서 봐 주세요)` : t };

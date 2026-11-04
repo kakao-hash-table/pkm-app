@@ -119,8 +119,9 @@ function checkinsList(){
 /* ---------- 내가 할 일 — AI가 부탁한 일, 내가 정할 것, 카드의 🙋 할 일 ---------- */
 // 할 일과 볼 파일은 항목 글의 sha(항목 id에 쓰는 값과 같다)로 잇는다 — pr.see[sha] = [작업 폴더 기준 경로]
 const meKey = text => sha(E.str(text, 200).replace(/^🙋\s*/u, '').replace(/\s*\(\d+분\)$/, ''));
-const SEE_MISS = { missing: '파일이 아직 없어요', outside: '작업 폴더 밖이라 읽지 않았어요', 'not-text': '글 파일이 아니라 여기서 보이지 않아요' };
-const seeDetail = (work, files) => files.map(f => { const r = S.readWorkFile(work, f); return r.status === 'ok' ? { kind: 'file', who: f, text: r.text } : { kind: r.status, who: f, text: SEE_MISS[r.status] }; });
+const SEE_MISS = { missing: '파일이 아직 없어요', outside: '작업 폴더 밖이라 읽지 않았어요', 'not-text': '글 파일이 아니라 여기서 보이지 않아요', linked: '다른 곳과 이어진 파일이라 여기서 보이지 않아요' };
+const seeName = f => f.length > 110 ? `…${f.slice(-109)}` : f;   // 피드는 who를 120자로 자른다 — 확장자가 남게 앞을 줄인다
+const seeDetail = (work, files) => files.map(f => { const r = S.readWorkFile(work, f); return r.status === 'ok' ? { kind: 'file', who: seeName(f), text: r.text } : { kind: r.status, who: seeName(f), text: SEE_MISS[r.status] }; });
 // 아직 열린 내 몫 — ask(AI 요청)·decision(정할 것)·todo(카드 🙋). files는 이어 둔 파일
 function openMe(pr){
   const out = [], see = pr.see || {};
@@ -182,9 +183,10 @@ function meDone(){
 function takeAsks(pr, out, from){
   for (const a of Array.isArray(out && out.me_asks) ? out.me_asks.slice(0, 8) : []){
     const text = E.str(a && (a.text || a), 200); if (text.length < 4) continue;
-    const id = sha(text); if ((pr.requests ||= []).some(r => r.id === id)) continue;
+    const id = sha(text), files = E.seeList(a.files);
+    if ((pr.requests ||= []).some(r => r.id === id)){ if (files.length && !(pr.see || {})[id]) linkSee(pr, id, files); continue; }   // 같은 부탁이 다시 와도 비어 있던 파일은 채운다
     pr.requests.push({ id, text, why: E.str(a.why, 160), after: /^\d{4}-\d{2}-\d{2}$/.test(String(a.after || '')) ? a.after : '', from, at: NOW.toISOString(), done: '' });
-    const files = E.seeList(a.files); if (files.length) linkSee(pr, id, files);
+    if (files.length) linkSee(pr, id, files);
   }
   // 거절한 부탁은 오래돼도 남긴다 — 같은 부탁을 다시 올리지 않게(중복 판정이 이 목록을 본다)
   const reqs = pr.requests || [], keep = reqs.filter(r => r.rejected), rest = reqs.filter(r => !r.rejected).slice(-60);

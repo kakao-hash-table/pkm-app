@@ -4041,13 +4041,13 @@ function plReport(text){
   return r;
 }
 // AI 보고는 마크다운으로 — 앞부분만 보이고 나머지는 접는다(표·코드 블록이 반쯤 잘리지 않게 줄 경계에서)
-function plMd(t, cut = 600, key = ''){
+function plMd(t, cut = 600, key = '', label = ''){
   const lines = String(t || '').trim().split('\n'); let n = 0, k = 0, fence = false;
   for (; k < lines.length; k++){ if (lines[k].startsWith('```')) fence = !fence; n += lines[k].length + 1; if (n > cut && !fence && !/^\s*\|/.test(lines[k + 1] || '')) { k++; break; } }
   const head = lines.slice(0, k).join('\n'), rest = lines.slice(k).join('\n');
-  return `<div class="md pl-md">${md(head)}${rest.trim() ? `<details class="more"${key ? ` data-key="${esc(key)}"` : ''}><summary>전체 펼치기</summary>${md(rest)}</details>` : ''}</div>`;
+  return `<div class="md pl-md">${md(head)}${rest.trim() ? `<details class="more"${key ? ` data-key="${esc(key)}"` : ''}><summary>전체 펼치기${label ? `<span class="sr-only"> — ${esc(label)}</span>` : ''}</summary>${md(rest)}</details>` : ''}</div>`;
 }
-const plText = (t, cut = 600, key = '') => { t = String(t || '').trim(); return t.length <= cut ? `<p class="pl-text">${esc(t)}</p>` : `<p class="pl-text">${esc(t.slice(0, cut))}…</p><details class="more"${key ? ` data-key="${esc(key)}"` : ''}><summary>전체 펼치기</summary><p class="pl-text">${esc(t)}</p></details>`; };
+const plText = (t, cut = 600, key = '', label = '') => { t = String(t || '').trim(); return t.length <= cut ? `<p class="pl-text">${esc(t)}</p>` : `<p class="pl-text">${esc(t.slice(0, cut))}…</p><details class="more"${key ? ` data-key="${esc(key)}"` : ''}><summary>전체 펼치기${label ? `<span class="sr-only"> — ${esc(label)}</span>` : ''}</summary><p class="pl-text">${esc(t)}</p></details>`; };
 function vPluginRun(id, rid){
   if (!plOK()) return vPlugins(id);
   plLoad();
@@ -4289,7 +4289,8 @@ function plMultiFeed(id, x, f){
     const btns = f.starts.map((w, i) => `<button class="btn ${i ? 'btn-text' : 'btn-tonal'} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-wf="${esc(w)}" data-title="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(w)}" ${live(it, w) || PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(w)}${live(it, w) ? ' 중' : ''}</button>`).join('');
     // 항목에 붙은 내용(예: 볼 파일)은 제목과 버튼 사이에 — 보고 나서 누르게
     const see = (it.detail || []).map((d, k) => { const key = `pl-see-${id}-${it.id}-${k}`;   // 목록을 다시 가져와도 펼친 칸은 그대로
-      return `<div class="pl-see">${d.who ? `<p class="pl-see-path">${esc(d.who)}</p>` : ''}${d.kind === 'file' && /\.md$/i.test(d.who) ? plMd(d.text, 300, key) : plText(d.text, 300, key)}</div>`; }).join('');
+      const mdText = d.kind === 'file' && /\.md$/i.test(d.who) && d.text.replace(/^#{1,6}\s+(.+)$/gm, '**$1**');   // 목록 항목 안이라 파일의 제목은 강조 글자로
+      return `<div class="pl-see">${d.who ? `<p class="pl-see-path">${esc(d.who)}</p>` : ''}${mdText ? plMd(mdText, 300, key, it.title) : plText(d.text, 300, key, it.title)}</div>`; }).join('');
     return `<li><div class="row pl-multi-row"><span class="body">${ttl}${(it.tags || []).map(t => plBadge(t, 'ok')).join('')}<span class="meta">${(it.meta || []).slice(0, 4).map(mm => `<span>${esc(mm)}</span>`).join('')}</span></span>${see}<span class="pl-btns">${btns}</span></div></li>`;
   };
   const mineR = runs.filter(plMine), going = runs.filter(r => ['queued', 'running', 'waiting'].includes(r.status) || (PL.sent[r.id] && ['input', 'stopped'].includes(r.status)));
@@ -4990,7 +4991,7 @@ function render(){
   if (S.mode === 'connect' && PKMStore.github.auth() && !GH.repos.length && !GH.loading){
     GH.loading = true; PKMStore.github.repos().then(r => { GH.repos = r; GH.loading = false; render(); }).catch(e => { GH.loading = false; toast(e.message); });
   }
-  openKeys.forEach(k => { const d = main.querySelector(`details[data-key="${k}"]`); if (d) d.open = true; });
+  openKeys.forEach(k => { const d = main.querySelector(`details[data-key="${CSS.escape(k)}"]`); if (d) d.open = true; });
   const cur = main.querySelector('.seg-scroll a[aria-current]'); if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - 48;   // 왼쪽 탭이 반쯤 보이게 — 옆에 탭이 더 있다는 단서
   const wd0 = main.querySelector('.week a.day[aria-current]'); if (wd0){ const ol = wd0.closest('ol'); if (ol.scrollWidth > ol.clientWidth) ol.scrollLeft = wd0.parentElement.offsetLeft - ol.clientWidth / 2; }   // 큰 글씨에서도 고른 날이 보이게   // 기록 종류가 많아도 지금 탭이 보이게
   const h1 = main.querySelector('h1');

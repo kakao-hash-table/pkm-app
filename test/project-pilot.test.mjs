@@ -190,7 +190,19 @@ test('내가 할 일 — 이어 둔 파일은 항목 안에 보이고, 작업 �
   assert.deepEqual(ask2.detail, [{ who: 'content/없음.md', kind: 'missing', text: '파일이 아직 없어요' }]);
   assert.ok(!JSON.stringify(items).includes('밖에 있는 비밀'));
   assert.doesNotMatch(run('loop-prep', { pid, loop: 'draft', period: '2026-11-22' }).task, /이어지지 않은 내 몫[\s\S]*- 하나 고르기/);
-  run('me-done', ask.vars); run('me-done', ask2.vars);
+
+  // 하드 링크는 작업 폴더 안에 있어도 읽지 않는다 · 같은 부탁이 다시 오면 비어 있던 파일만 채운다 · 긴 경로는 확장자가 남게 앞을 줄인다
+  fs.linkSync(path.join(tmp, 'outside.md'), path.join(pr.work, 'content/hard.md'));
+  const long = `content/${'긴'.repeat(120)}.md`;
+  write(path.join(pr.work, '.pilot/out/kickoff.json'), JSON.stringify({ summary: 's', items: [], me_asks: [{ text: '예시 표 채우기', files: ['content/후보.md'] }, { text: '예시 하드 링크 보기', files: ['content/hard.md', long] }] }));
+  save(p => { p.kickoff_done = false; delete p.see[ask2.vars.ref]; });
+  run('kickoff-done', { pid });
+  const again = run('me-list').items, hard = again.find(i => i.title === '예시 하드 링크 보기');
+  assert.equal(again.find(i => i.title === '예시 표 채우기').detail[0].who, 'content/후보.md');
+  assert.deepEqual(hard.detail.map(d => d.kind), ['linked', 'missing']);
+  assert.ok(!JSON.stringify(again).includes('밖에 있는 비밀'));
+  assert.match(hard.detail[1].who, /^….*\.md$/); assert.ok(hard.detail[1].who.length <= 110);
+  run('me-done', ask.vars); run('me-done', ask2.vars); run('me-done', hard.vars);
 });
 
 test('다르게 할래요 — 사유는 필수, AI 요청은 내리고 다시 올리지 않으며, 정할 것·할 일은 사유를 채운 고칠 요청으로 설계 고치기에 넘긴다', () => {
