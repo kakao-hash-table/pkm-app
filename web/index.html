@@ -879,6 +879,10 @@ body.has-chat-fab main{padding-bottom:120px}
 .pl-quiet{display:inline-flex;gap:4px;flex-wrap:wrap}
 .pl-answer{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}.pl-ask-q{font-size:1rem;margin:8px 0 0}
 .pl-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.pl-see{flex:1 0 100%;min-width:0;padding:10px 12px;background:var(--surface-2);border-radius:var(--r-md)}
+.pl-see+.pl-see{margin-top:-4px}
+.pl-see~.pl-btns{margin-left:auto}
+.pl-see-path{margin:0 0 4px;color:var(--text-2);font-size:.8125rem;overflow-wrap:anywhere}
 .pl-md{padding:0;background:none}
 .pl-warn{margin:12px 0;padding:12px 16px 12px 32px;border-radius:var(--r-md);background:var(--s-review-bg);color:var(--s-review);font-weight:600}
 .run-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
@@ -4037,13 +4041,13 @@ function plReport(text){
   return r;
 }
 // AI 보고는 마크다운으로 — 앞부분만 보이고 나머지는 접는다(표·코드 블록이 반쯤 잘리지 않게 줄 경계에서)
-function plMd(t, cut = 600){
+function plMd(t, cut = 600, key = ''){
   const lines = String(t || '').trim().split('\n'); let n = 0, k = 0, fence = false;
   for (; k < lines.length; k++){ if (lines[k].startsWith('```')) fence = !fence; n += lines[k].length + 1; if (n > cut && !fence && !/^\s*\|/.test(lines[k + 1] || '')) { k++; break; } }
   const head = lines.slice(0, k).join('\n'), rest = lines.slice(k).join('\n');
-  return `<div class="md pl-md">${md(head)}${rest.trim() ? `<details class="more"><summary>전체 펼치기</summary>${md(rest)}</details>` : ''}</div>`;
+  return `<div class="md pl-md">${md(head)}${rest.trim() ? `<details class="more"${key ? ` data-key="${esc(key)}"` : ''}><summary>전체 펼치기</summary>${md(rest)}</details>` : ''}</div>`;
 }
-const plText = (t, cut = 600) => { t = String(t || '').trim(); return t.length <= cut ? `<p class="pl-text">${esc(t)}</p>` : `<p class="pl-text">${esc(t.slice(0, cut))}…</p><details class="more"><summary>전체 펼치기</summary><p class="pl-text">${esc(t)}</p></details>`; };
+const plText = (t, cut = 600, key = '') => { t = String(t || '').trim(); return t.length <= cut ? `<p class="pl-text">${esc(t)}</p>` : `<p class="pl-text">${esc(t.slice(0, cut))}…</p><details class="more"${key ? ` data-key="${esc(key)}"` : ''}><summary>전체 펼치기</summary><p class="pl-text">${esc(t)}</p></details>`; };
 function vPluginRun(id, rid){
   if (!plOK()) return vPlugins(id);
   plLoad();
@@ -4283,7 +4287,10 @@ function plMultiFeed(id, x, f){
   const row = it => {
     const ttl = plUrl(it.url) ? `<a class="title" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<span class="title">${esc(it.title)}</span>`;
     const btns = f.starts.map((w, i) => `<button class="btn ${i ? 'btn-text' : 'btn-tonal'} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-wf="${esc(w)}" data-title="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(w)}" ${live(it, w) || PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(w)}${live(it, w) ? ' 중' : ''}</button>`).join('');
-    return `<li><div class="row pl-multi-row"><span class="body">${ttl}${(it.tags || []).map(t => plBadge(t, 'ok')).join('')}<span class="meta">${(it.meta || []).slice(0, 4).map(mm => `<span>${esc(mm)}</span>`).join('')}</span></span><span class="pl-btns">${btns}</span></div></li>`;
+    // 항목에 붙은 내용(예: 볼 파일)은 제목과 버튼 사이에 — 보고 나서 누르게
+    const see = (it.detail || []).map((d, k) => { const key = `pl-see-${id}-${it.id}-${k}`;   // 목록을 다시 가져와도 펼친 칸은 그대로
+      return `<div class="pl-see">${d.who ? `<p class="pl-see-path">${esc(d.who)}</p>` : ''}${d.kind === 'file' && /\.md$/i.test(d.who) ? plMd(d.text, 300, key) : plText(d.text, 300, key)}</div>`; }).join('');
+    return `<li><div class="row pl-multi-row"><span class="body">${ttl}${(it.tags || []).map(t => plBadge(t, 'ok')).join('')}<span class="meta">${(it.meta || []).slice(0, 4).map(mm => `<span>${esc(mm)}</span>`).join('')}</span></span>${see}<span class="pl-btns">${btns}</span></div></li>`;
   };
   const mineR = runs.filter(plMine), going = runs.filter(r => ['queued', 'running', 'waiting'].includes(r.status) || (PL.sent[r.id] && ['input', 'stopped'].includes(r.status)));
   const ended = runs.filter(r => ['done', 'canceled'].includes(r.status) && Date.now() - Date.parse(r.updated) < 14 * 86400000);

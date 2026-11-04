@@ -14,6 +14,8 @@ const text = (v, n = 4000) => String(v ?? '').trim().slice(0, n);
 const num = (v, d = 0) => { const t = String(v ?? '').replace(/[, ]/g, ''); if (!t) return d; const x = Number(t); return Number.isFinite(x) ? x : d; };   // 빈 값은 기본값
 const list = v => Array.isArray(v) ? v : [];
 export const slug = (s, n = 24) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, n) || 'x';
+// 사람이 보고 판단할 파일 — 작업 폴더 기준 상대 경로 3개까지(밖을 가리키는지는 읽을 때 다시 확인한다)
+export const seeList = v => list(v).map(x => str(x, 200).replace(/^\.\//, '')).filter(Boolean).slice(0, 3);
 const atOk = v => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v || '')) ? String(v) : null;
 
 /* ---------- 설계 다듬기: AI가 낸 plan을 믿지 않는 입력으로 보고 모양·개수를 맞춘다 ---------- */
@@ -26,7 +28,8 @@ export function normalizePlan(p, { minutes = 10 } = {}){
     title: str(s.title, 60) || `서브 프로젝트 ${i + 1}`, why: str(s.why, 300), outcome: str(s.outcome, 300),
     wave: [0, 1, 2, 3].includes(num(s.wave, -1)) ? num(s.wave) : 1,
     done: list(s.done).map(x => str(x, 200)).filter(Boolean).slice(0, 6),
-    todos: list(s.todos).slice(0, LIMIT.todos).map(t => ({ text: str(t.text ?? t, 200), who: t.who === 'me' ? 'me' : 'ai', minutes: Math.min(120, Math.max(0, Math.round(num(t.minutes)))) })).filter(t => t.text)
+    todos: list(s.todos).slice(0, LIMIT.todos).map(t => { const see = t.who === 'me' ? seeList(t.see) : [];
+      return { text: str(t.text ?? t, 200), who: t.who === 'me' ? 'me' : 'ai', minutes: Math.min(120, Math.max(0, Math.round(num(t.minutes)))), ...(see.length ? { see } : {}) }; }).filter(t => t.text)
   }));
   const subKeys = new Set(subs.map(s => s.key));
   const loops = list(p.loops).filter(l => !(l && l.every === 'weekly' && /점검/.test(String(l.title || '')))).slice(0, LIMIT.loops).map((l, i) => normalizeLoop(l, i, subKeys, keys)).filter(Boolean);   // 주간 점검은 시스템이 붙인다
@@ -138,7 +141,7 @@ export function planMarkdown(pr){
     if (s.why) out.push(`- 왜: ${s.why}`);
     if (s.outcome) out.push(`- 나올 것: ${s.outcome}`);
     if (s.done.length) out.push(`- 완료 조건: ${s.done.join(' / ')}`);
-    for (const t of s.todos) out.push(`  - ${whoMark(t)}`);
+    for (const t of s.todos) out.push(`  - ${whoMark(t)}${t.see ? ` — 볼 파일: ${t.see.join(', ')}` : ''}`);
   }
   const loops = pr.loops || p.loops;
   if (loops.length){

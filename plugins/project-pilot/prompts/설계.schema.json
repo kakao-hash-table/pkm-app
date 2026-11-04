@@ -163,6 +163,12 @@
           },
           "minutes": {
            "type": "number"
+          },
+          "see": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
           }
          },
          "required": [

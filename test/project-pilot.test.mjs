@@ -163,6 +163,36 @@ test('내가 할 일 — AI 요청·정할 것·카드의 🙋 할 일을 한 �
   assert.equal(run('me-done', todo.vars).verdict.title, '이미 체크돼 있어요');   // 다시 눌러도 괜찮다
 });
 
+test('내가 할 일 — 이어 둔 파일은 항목 안에 보이고, 작업 폴더 밖·없는 파일은 읽지 않으며, id·version은 그대로', () => {
+  const save = f => { const p = rec(pid); f(p); fs.writeFileSync(path.join(profile, '_플러그인/.data/project-pilot', `${pid}.json`), JSON.stringify(p)); };
+  const pr = rec(pid), before = run('me-list').items.find(i => i.title === '하나 고르기');
+  assert.equal(before.detail, undefined);   // 이은 파일이 없으면 예전 그대로
+  assert.match(run('loop-prep', { pid, loop: 'draft', period: '2026-11-21' }).task, /아직 볼 파일이 이어지지 않은 내 몫[\s\S]*- 하나 고르기/);
+
+  // 설계에 적은 볼 파일 — 아직 만들지 않았으면 그 사실만
+  save(p => { p.plan.subprojects.find(s => s.key === 'offer').todos.find(t => t.text === '하나 고르기').see = ['content/계획.md']; });
+  assert.deepEqual(run('me-list').items.find(i => i.title === '하나 고르기').detail, [{ who: 'content/계획.md', kind: 'missing', text: '파일이 아직 없어요' }]);
+
+  // 시동·루프 결과의 me_see·me_asks.files — 실제로 만든 파일이 설계보다 앞선다
+  write(path.join(pr.work, 'content/후보.md'), '# 후보\n이름: 예시 계정\n소개: 예시 소개 문구\n');
+  write(path.join(tmp, 'outside.md'), '밖에 있는 비밀');
+  fs.symlinkSync(path.join(tmp, 'outside.md'), path.join(pr.work, 'content/link.md'));
+  write(path.join(pr.work, '.pilot/out/kickoff.json'), JSON.stringify({ summary: 's', items: [],
+    me_see: [{ text: '🙋 하나 고르기 (2분)', files: ['./content/후보.md'] }],
+    me_asks: [{ text: '예시 자료 확인하기', why: '시험', files: ['../outside.md', '/etc/hosts', 'content/link.md', 'content/넷째.md'] }, { text: '예시 표 채우기', files: ['content/없음.md'] }] }));
+  save(p => { p.kickoff_done = false; });
+  run('kickoff-done', { pid });
+  const items = run('me-list').items, todo = items.find(i => i.title === '하나 고르기'), ask = items.find(i => i.title === '예시 자료 확인하기'), ask2 = items.find(i => i.title === '예시 표 채우기');
+  assert.deepEqual(todo.detail, [{ who: 'content/후보.md', kind: 'file', text: '# 후보\n이름: 예시 계정\n소개: 예시 소개 문구\n' }]);
+  assert.match(todo.meta.join(' '), /아래 내용을 보고 끝냈으면 \[했어요\], 바꾸려면 \[다르게 할래요\]/);
+  assert.equal(todo.id, before.id); assert.equal(todo.version, before.version);   // 이미 처리한 항목이 다시 올라오지 않게
+  assert.deepEqual(ask.detail.map(d => d.kind), ['outside', 'outside', 'outside']);   // 파일은 3개까지
+  assert.deepEqual(ask2.detail, [{ who: 'content/없음.md', kind: 'missing', text: '파일이 아직 없어요' }]);
+  assert.ok(!JSON.stringify(items).includes('밖에 있는 비밀'));
+  assert.doesNotMatch(run('loop-prep', { pid, loop: 'draft', period: '2026-11-22' }).task, /이어지지 않은 내 몫[\s\S]*- 하나 고르기/);
+  run('me-done', ask.vars); run('me-done', ask2.vars);
+});
+
 test('다르게 할래요 — 사유는 필수, AI 요청은 내리고 다시 올리지 않으며, 정할 것·할 일은 사유를 채운 고칠 요청으로 설계 고치기에 넘긴다', () => {
   const save = f => { const p = rec(pid); f(p); fs.writeFileSync(path.join(profile, '_플러그인/.data/project-pilot', `${pid}.json`), JSON.stringify(p)); };
   // AI 요청 — 사유를 남기고 내린다. 같은 부탁은 다시 올라오지 않고, 다음 루프·맥락에 이유가 들어간다
@@ -380,4 +410,10 @@ test('실행기 규격 — when으로 건너뛴 단계의 결과 자리는 빈 �
   assert.deepEqual(w.steps.map(s => [s.key, s.when]), [['검토', null], ['반영', '{검토.request}']]);
   const bad = P.validate([{ path: 'plugin.md', size: 1, text: '---\npkm_plugin: 1\nid: x-y\nname: x\nversion: 0.1.0\npermissions:\n  ai: [chat]\n---\n' }, { path: 'workflows/a.md', size: 1, text: '## a\n- [반영] 반영 · ai when {없음.x}: 해 줘' }]);
   assert.match(bad.errors.join('\n'), /when의 \{없음.x\}는 앞 단계 결과여야 해요/);
+});
+
+test('설계의 볼 파일(see) — 사람 몫 할 일에만 3개까지 남고, 설계 노트에 보인다', () => {
+  const p = E.normalizePlan({ ...PLAN, subprojects: [{ ...PLAN.subprojects[0], todos: [{ text: '예시 문구를 보고 정한다', who: 'me', minutes: 1, see: ['./content/a.md', 'b.md', 'c.md', 'd.md'] }, { text: '예시 문구 쓰기', who: 'ai', see: ['content/a.md'] }, { text: '그냥 하기', who: 'me' }] }] });
+  assert.deepEqual(p.subprojects[0].todos.map(t => t.see), [['content/a.md', 'b.md', 'c.md'], undefined, undefined]);
+  assert.match(E.planMarkdown({ goal: 'g', plan: p }), /🙋 예시 문구를 보고 정한다 \(1분\) — 볼 파일: content\/a\.md, b\.md, c\.md/);
 });

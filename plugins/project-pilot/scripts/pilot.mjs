@@ -117,26 +117,44 @@ function checkinsList(){
 }
 
 /* ---------- 내가 할 일 — AI가 부탁한 일, 내가 정할 것, 카드의 🙋 할 일 ---------- */
+// 할 일과 볼 파일은 항목 글의 sha(항목 id에 쓰는 값과 같다)로 잇는다 — pr.see[sha] = [작업 폴더 기준 경로]
+const meKey = text => sha(E.str(text, 200).replace(/^🙋\s*/u, '').replace(/\s*\(\d+분\)$/, ''));
+const SEE_MISS = { missing: '파일이 아직 없어요', outside: '작업 폴더 밖이라 읽지 않았어요', 'not-text': '글 파일이 아니라 여기서 보이지 않아요' };
+const seeDetail = (work, files) => files.map(f => { const r = S.readWorkFile(work, f); return r.status === 'ok' ? { kind: 'file', who: f, text: r.text } : { kind: r.status, who: f, text: SEE_MISS[r.status] }; });
+// 아직 열린 내 몫 — ask(AI 요청)·decision(정할 것)·todo(카드 🙋). files는 이어 둔 파일
+function openMe(pr){
+  const out = [], see = pr.see || {};
+  for (const r of (pr.requests || []).filter(r => !r.done && !r.rejected)) out.push({ kind: 'ask', ref: r.id, text: r.text, r, files: see[r.id] || [] });
+  for (const d of pr.plan.decisions || []){
+    const ref = sha(d); if ((pr.accepted || []).includes(ref) || (pr.rejected_decisions || []).includes(ref)) continue;
+    out.push({ kind: 'decision', ref, text: d, files: see[ref] || [] });
+  }
+  for (const s of pr.plan.subprojects){
+    const c = pr.cards[s.key]; if (!c) continue;
+    const card = S.readCard(profile, F, c); if (!card || card.status === 'done') continue;
+    for (const t of S.openMine(profile, F, c)){
+      const h = sha(t.text), planned = s.todos.find(x => x.who === 'me' && x.text === t.text);
+      out.push({ kind: 'todo', ref: `${s.key}|${h}`, text: t.text, t, s, files: see[h] || (planned && planned.see) || [] });
+    }
+  }
+  return out;
+}
+const SEE_HINT = '아래 내용을 보고 끝냈으면 [했어요], 바꾸려면 [다르게 할래요]';
 function meList(){
   const items = [];
   for (const pr of S.listProjects(profile)){
     if (!pr.plan || pr.status === 'done') continue;
-    const name = pr.plan.name;
-    for (const r of (pr.requests || []).filter(r => !r.done && !r.rejected)){
-      const later = r.after && r.after > today;
-      items.push({ id: `${pr.id}|ask|${r.id}`, title: r.text, tags: ['AI 요청'], at: r.at, version: r.id,
-        meta: [name, later ? `${r.after.slice(5).replace('-', '/')}부터 할 수 있어요` : '', r.why, r.from ? `${r.from}에서` : ''].filter(Boolean), vars: { pid: pr.id, kind: 'ask', ref: r.id }, _o: later ? 3 : 0 });
-    }
-    for (const d of pr.plan.decisions || []){
-      const ref = sha(d); if ((pr.accepted || []).includes(ref) || (pr.rejected_decisions || []).includes(ref)) continue;
-      items.push({ id: `${pr.id}|decision|${ref}`, title: d, tags: ['정할 것'], version: ref,
-        meta: [name, 'AI가 임시로 정했어요. 이대로 두려면 [했어요], 다르게 하려면 [다르게 할래요]'], vars: { pid: pr.id, kind: 'decision', ref }, _o: 1 });
-    }
-    for (const s of pr.plan.subprojects){
-      const c = pr.cards[s.key]; if (!c) continue;
-      const card = S.readCard(profile, F, c); if (!card || card.status === 'done') continue;
-      for (const t of S.openMine(profile, F, c)) items.push({ id: `${pr.id}|todo|${s.key}|${sha(t.text)}`, title: t.text, tags: t.minutes ? [`${t.minutes}분`] : [], version: sha(t.line),
-        meta: [name, `${E.waveName(s.wave)} · ${s.lens}`], vars: { pid: pr.id, kind: 'todo', ref: `${s.key}|${sha(t.text)}` }, _o: 2 + s.wave / 10 });
+    const name = pr.plan.name, work = S.workPath(pr, args['work-root']);
+    for (const m of openMe(pr)){
+      const detail = seeDetail(work, m.files), base = { id: `${pr.id}|${m.kind}|${m.ref}`, title: m.text, vars: { pid: pr.id, kind: m.kind, ref: m.ref }, ...(detail.length ? { detail } : {}) };
+      if (m.kind === 'ask'){
+        const later = m.r.after && m.r.after > today;
+        items.push({ ...base, tags: ['AI 요청'], at: m.r.at, version: m.ref, meta: [name, later ? `${m.r.after.slice(5).replace('-', '/')}부터 할 수 있어요` : '', m.r.why, detail.length ? SEE_HINT : ''].filter(Boolean), _o: later ? 3 : 0 });
+      } else if (m.kind === 'decision'){
+        items.push({ ...base, tags: ['정할 것'], version: m.ref, meta: [name, `AI가 임시로 정했어요. ${detail.length ? '아래 내용을 보고 ' : ''}이대로 두려면 [했어요], 다르게 하려면 [다르게 할래요]`], _o: 1 });
+      } else {
+        items.push({ ...base, tags: m.t.minutes ? [`${m.t.minutes}분`] : [], version: sha(m.t.line), meta: [name, detail.length ? SEE_HINT : ''].filter(Boolean), _o: 2 + m.s.wave / 10 });
+      }
     }
   }
   return { items: items.sort((a, b) => a._o - b._o).map(({ _o, ...it }) => it) };
@@ -166,10 +184,21 @@ function takeAsks(pr, out, from){
     const text = E.str(a && (a.text || a), 200); if (text.length < 4) continue;
     const id = sha(text); if ((pr.requests ||= []).some(r => r.id === id)) continue;
     pr.requests.push({ id, text, why: E.str(a.why, 160), after: /^\d{4}-\d{2}-\d{2}$/.test(String(a.after || '')) ? a.after : '', from, at: NOW.toISOString(), done: '' });
+    const files = E.seeList(a.files); if (files.length) linkSee(pr, id, files);
   }
   // 거절한 부탁은 오래돼도 남긴다 — 같은 부탁을 다시 올리지 않게(중복 판정이 이 목록을 본다)
   const reqs = pr.requests || [], keep = reqs.filter(r => r.rejected), rest = reqs.filter(r => !r.rejected).slice(-60);
   pr.requests = reqs.filter(r => keep.includes(r) || rest.includes(r));
+}
+// AI가 결과에 남긴 이음(me_see) — 🙋 할 일·정할 것·AI 요청 글과 볼 파일. 나중 결과가 앞의 것을 바꾼다
+function linkSee(pr, key, files){
+  const see = pr.see ||= {}; delete see[key]; see[key] = files;
+  for (const k of Object.keys(see).slice(0, -100)) delete see[k];
+}
+function takeSee(pr, out){
+  for (const x of Array.isArray(out && out.me_see) ? out.me_see.slice(0, 12) : []){
+    const files = E.seeList(x && x.files); if (x && E.str(x.text) && files.length) linkSee(pr, meKey(x.text), files);
+  }
 }
 // 다르게 할래요 — 사유는 필수. ask는 사유를 남기고 내린다(AI가 다음 루프·설계 고치기에서 대안을 찾는다).
 // decision·todo는 "'<내용>' 바꿔 줘. 이유: <사유>"를 채운 고칠 요청을 보여 주고, 사람이 고쳐 보내면 설계 고치기로 넘긴다
@@ -406,7 +435,7 @@ function kickoffDone(){
   const me = (out && Array.isArray(out.me_next) ? out.me_next : pr.plan.first_week).slice(0, 6).map(x => E.str(x, 200)).filter(Boolean);
   if (out && !pr.kickoff_done){   // 일지·체크는 한 번만
     pr.kickoff = { checked: checkDone(pr, out.done_todos), files: files.length };
-    takeAsks(pr, out, '첫 작업');
+    takeAsks(pr, out, '첫 작업'); takeSee(pr, out);
     journal(pr, '첫 작업 — AI가 먼저 한 일', out, items, files);
     S.logTo(pr, '시동', E.str(out.summary, 200)); pr.kickoff_done = true; S.saveProject(profile, pr);
   }
@@ -422,10 +451,11 @@ function kickoffDone(){
 
 /* ---------- 운영: 루프 ---------- */
 const OUT_RULE = `결과는 아래 JSON 하나로 {out} 파일에 써요(다른 말 없이, UTF-8). 쓴 뒤 node -e "JSON.parse(require('fs').readFileSync('{out}','utf8'))" 로 깨지지 않았는지 확인해요.
-{"summary":"한 줄 요약","items":[{"title":"무엇","copy":"사람이 그대로 복사해 쓸 글(없으면 빈 문자열)","where":"어디에 쓰나(예: 스레드)","url":"가격·사실을 확인한 페이지","note":"짧은 설명(예: 10:20 확인)"}],"files":["작업 폴더 기준 만든 파일 경로"],"done_todos":[{"sub":"서브 프로젝트 키","text":"체크할 🤖 할 일 원문 그대로(🤖 빼고)"}],"me_asks":[{"text":"사람에게 부탁할 일 한 줄(동사로 끝나게)","why":"왜 필요한지","after":"이 날짜 전엔 못 하면 YYYY-MM-DD, 아니면 빈 문자열"}]}
-me_asks에는 사람만 할 수 있어서 막힌 일(확인·결정·가입·자료 받기)을 적어요. 카드의 🙋 할 일에 이미 있는 것은 빼요. 없으면 빈 배열.`;
+{"summary":"한 줄 요약","items":[{"title":"무엇","copy":"사람이 그대로 복사해 쓸 글(없으면 빈 문자열)","where":"어디에 쓰나(예: 스레드)","url":"가격·사실을 확인한 페이지","note":"짧은 설명(예: 10:20 확인)"}],"files":["작업 폴더 기준 만든 파일 경로"],"done_todos":[{"sub":"서브 프로젝트 키","text":"체크할 🤖 할 일 원문 그대로(🤖 빼고)"}],"me_asks":[{"text":"사람에게 부탁할 일 한 줄(동사로 끝나게)","why":"왜 필요한지","after":"이 날짜 전엔 못 하면 YYYY-MM-DD, 아니면 빈 문자열","files":["사람이 보고 할 파일(작업 폴더 기준 경로, 없으면 빈 배열)"]}],"me_see":[{"text":"🙋 할 일·정할 것 원문 그대로(🙋·(N분) 빼고)","files":["사람이 보고 판단할 파일(작업 폴더 기준 경로)"]}]}
+me_asks에는 사람만 할 수 있어서 막힌 일(확인·결정·가입·자료 받기)을 적어요. 카드의 🙋 할 일에 이미 있는 것은 빼요. 없으면 빈 배열.
+사람이 무엇을 보고 판단하거나 옮겨 쓰는 일이면, 그 내용이 든 파일을 files·me_see에 이어요(사람이 파일을 찾지 않고 '내가 할 일'에서 바로 보게). 파일은 이 폴더 안에 있어야 하고, 사람이 볼 핵심(예: 이름·소개 문구)을 파일 맨 앞에 둬요. 이을 게 없으면 빈 배열.{unlinked}`;
 const REVIEW_RULE = `점검 결과에는 "changes" 배열을 더해요. 쓸 수 있는 것:
-{"type":"todo_add","sub":"키","text":"할 일","who":"ai|me","minutes":0} · {"type":"sub_add","sub":{"key":"","lens":"","title":"","why":"","outcome":"","wave":1,"done":[],"todos":[{"text":"","who":"ai","minutes":0}]}}
+{"type":"todo_add","sub":"키","text":"할 일","who":"ai|me","minutes":0,"see":["사람이 보고 할 파일(me일 때, 없으면 빈 배열)"]} · {"type":"sub_add","sub":{"key":"","lens":"","title":"","why":"","outcome":"","wave":1,"done":[],"todos":[{"text":"","who":"ai","minutes":0}]}}
 {"type":"loop_off","loop":"키","why":""} · {"type":"loop_on","loop":"키"} · {"type":"loop_edit","loop":"키","patch":{"task":"","at":"08:00","every":"daily","me":"","me_minutes":0}}
 {"type":"loop_add","loop":{"key":"","title":"","sub":"키","every":"daily|weekdays|weekly|monthly","dow":1,"day":1,"at":"08:00","task":"","me":"","me_minutes":0,"metric":""}}
 바꿀 게 없으면 "changes": []. 바꾸는 이유는 items의 note에. 사람 몫 합계가 하루 예산({minutes}분)을 넘으면 그 제안은 적용되지 않아요. 목표 숫자를 바꿔야 한다고 보면 changes가 아니라 items에 이유와 함께 적어요(사람이 [설계 고치기]로 정해요).`;
@@ -439,13 +469,14 @@ function loopPrep(){
   if (!(pr.done_periods || []).includes(`${l.key}|${period}`)) fs.rmSync(path.join(pr.work, out), { force: true });   // 끝난 회차를 다시 하면 결과는 그대로 둔다
   const sub = l.sub && pr.plan.subprojects.find(s => s.key === l.sub);
   const seen = ((pr.seen || {})[l.key] || []).slice(-20);   // 이미 낸 것 — 되풀이하지 않게
+  const unlinked = openMe(pr).filter(m => !m.files.length).slice(0, 10).map(m => m.text);
   const recent = (pr.log || []).filter(x => x.kind === l.title).slice(-5).map(x => `- ${x.at.slice(0, 10)} ${x.text}`).join('\n');
   const task = [`루프: ${l.title} (${E.whenText(l)}, 회차 ${period})`, sub ? `서브 프로젝트: ${sub.title} (키 ${sub.key})` : '', `할 일: ${l.task}`,
     l.me ? `사람 몫(${l.me_minutes}분): ${l.me} — 사람이 이 시간 안에 끝낼 수 있게 준비해요. 사람이 고를 것(초안·후보 합쳐)은 3개까지` : '사람 몫 없음 — 끝까지 AI가 해요',
     l.metric ? `겨누는 지표: ${l.metric}` : '', recent ? `지난 회차:\n${recent}` : '', seen.length ? `이미 낸 것(같은 상품·같은 첫 문장을 다시 쓰지 마요):\n${seen.map(x => `- ${x}`).join('\n')}` : '',
     (pr.rejections || []).length ? `사람이 거절하거나 바꾼 것(같은 부탁을 다시 하지 말고, 이유를 보고 다른 방법을 찾아요):\n${pr.rejections.slice(-10).map(x => `- ${x.text} — 이유: ${x.reason}`).join('\n')}` : '',
     affiliate(pr) ? '사람에게 갈 글은 첫 줄에 대가성 표기(예: "[광고] … 링크로 구매하면 수수료를 받아요")를 넣어요.' : '',
-    OUT_RULE.replaceAll('{out}', out), l.kind === 'review' ? REVIEW_RULE.replace('{minutes}', budgetOf(pr)) : ''].filter(Boolean).join('\n\n');
+    OUT_RULE.replaceAll('{out}', out).replace('{unlinked}', unlinked.length ? `\n아직 볼 파일이 이어지지 않은 내 몫이에요. 이 폴더에 그 판단에 쓸 파일이 이미 있으면 me_see에 이어요(글은 그대로 옮겨요):\n${unlinked.map(x => `- ${x}`).join('\n')}` : ''), l.kind === 'review' ? REVIEW_RULE.replace('{minutes}', budgetOf(pr)) : ''].filter(Boolean).join('\n\n');
   return { ...pubWork(pr), period, out, title: l.title, kind: l.kind, task, summary: `${l.title} · ${period}` };
 }
 function applyChanges(pr, changes){
@@ -453,7 +484,8 @@ function applyChanges(pr, changes){
   const subKeys = () => new Set(pr.plan.subprojects.map(s => s.key));
   for (const c of Array.isArray(changes) ? changes.slice(0, 15) : []){
     if (c.type === 'todo_add' && pr.cards[c.sub] && E.str(c.text)){
-      const t = { text: E.str(c.text, 200), who: c.who === 'me' ? 'me' : 'ai', minutes: Math.min(120, Math.max(0, Number(c.minutes) || 0)) };
+      const t = { text: E.str(c.text, 200), who: c.who === 'me' ? 'me' : 'ai', minutes: Math.min(120, Math.max(0, Number(c.minutes) || 0)) }, see = t.who === 'me' ? E.seeList(c.see) : [];
+      if (see.length) t.see = see;
       if (S.addTodos(profile, F, pr.cards[c.sub], [E.todoLine(t)])){ pr.plan.subprojects.find(s => s.key === c.sub)?.todos.push(t); done.push(`할 일 더함: ${t.text}`); }
     } else if (c.type === 'sub_add' && c.sub){
       const p = E.normalizePlan({ ...pr.plan, subprojects: [c.sub], loops: [] }).subprojects[0];
@@ -495,7 +527,7 @@ function loopDone(){
     pr.done_periods = [...(pr.done_periods || []), key].slice(-300);
     const n = checkDone(pr, out.done_todos);
     journal(pr, l.title, out, items, files);
-    takeAsks(pr, out, l.title);
+    takeAsks(pr, out, l.title); takeSee(pr, out);
     ((pr.seen ||= {})[l.key] ||= []).push(...items.map(f => `${f.title}${f.copy ? ` — ${E.str(f.copy.split('\n').find(x => x.trim() && !/광고|수수료/.test(x)) || '', 60)}` : ''}`));
     pr.seen[l.key] = pr.seen[l.key].slice(-40);
     if (l.me_minutes && l.kind !== 'review') (pr.unseen ||= {})[l.key] = ((pr.unseen || {})[l.key] || 0) + 1;

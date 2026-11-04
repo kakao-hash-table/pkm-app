@@ -235,13 +235,29 @@ export function saveProject(profile, pr){
 export function logTo(pr, kind, text){ (pr.log ||= []).push({ at: new Date().toISOString(), kind, text: String(text).slice(0, 400) }); pr.log = pr.log.slice(-200); }
 
 /* ---------- AI 작업 폴더 ---------- */
-export function workDir(pr, root){
+export function workPath(pr, root){
   const base = expand(root || '~/pkm-projects');
   // 동기화된 기록의 경로는 이 컴퓨터의 작업 폴더 안일 때만 쓴다(다른 기기에서 고친 경로로 에이전트를 움직이지 못하게)
   const inside = pr.work && path.resolve(pr.work).startsWith(path.resolve(base) + path.sep);
-  const dir = inside && fs.existsSync(pr.work) ? pr.work : path.join(base, path.basename(String(pr.work_name || pr.id)));
+  return inside && fs.existsSync(pr.work) ? pr.work : path.join(base, path.basename(String(pr.work_name || pr.id)));
+}
+export function workDir(pr, root){
+  const dir = workPath(pr, root);
   fs.mkdirSync(path.join(dir, '.pilot', 'out'), { recursive: true });
   return dir;
+}
+// 내가 할 일에 이어 둔 파일 — 작업 폴더 안의 글 파일만 읽는다. 링크로 밖을 가리켜도 실제 경로로 다시 확인한다
+const SEE_EXT = /\.(md|txt|csv|json)$/i, SEE_MAX = 1800;   // 피드 항목 detail 글은 2,000자까지 남는다(server/runner.js)
+export function readWorkFile(dir, rel){
+  const root = path.resolve(dir), abs = path.resolve(root, String(rel || ''));
+  if (!abs.startsWith(root + path.sep)) return { status: 'outside' };
+  let real, realRoot;
+  try { real = fs.realpathSync(abs); realRoot = fs.realpathSync(root); } catch { return { status: 'missing' }; }
+  if (!real.startsWith(realRoot + path.sep)) return { status: 'outside' };
+  if (!SEE_EXT.test(real) || !fs.statSync(real).isFile()) return { status: 'not-text' };
+  const buf = Buffer.alloc(SEE_MAX * 4), fd = fs.openSync(real, 'r');   // 큰 파일도 앞부분만
+  let t; try { t = buf.subarray(0, fs.readSync(fd, buf, 0, buf.length, 0)).toString('utf8').replace(/\uFFFD$/, ''); } finally { fs.closeSync(fd); }
+  return { status: 'ok', text: t.length > SEE_MAX ? `${t.slice(0, SEE_MAX)}\n…(뒷부분은 파일에서 봐 주세요)` : t };
 }
 // 에이전트 경계 — 작업 폴더의 Claude Code 설정. 노트 폴더 쓰기와 외부로 내보내는 명령을 막는다
 export function guardWork(dir, profile){
