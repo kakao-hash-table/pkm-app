@@ -4122,9 +4122,9 @@ function plTrackUpdate(){
   let repaint = false;
   for (const [key, t] of Object.entries(PL.track)){
     const x = PL.st && PL.st.plugins[t.id], f = x && x.feeds.find(z => z.name === t.feed), k = f && plTrackOf(t.id, x, f, { id:t.item });
-    // 찾았던 실행이 기록에서 사라졌으면(기록에서 지움·오래돼 잘림) 더 볼 것이 없다
-    if (!k || Date.now() - t.at > PL_TRACK_MAX_MS || (t.run && !k.run) || k.fb.phase === 'canceled'){ delete PL.track[key]; repaint = true; continue; }
-    if (k.run) t.run = k.run.id;
+    // 불러온 상태에서 본 적 있는 실행이 사라졌으면(기록에서 지움·오래돼 잘림) 더 볼 것이 없다. 응답으로만 안 실행은 늦게 온 옛 상태에 없을 수 있어 기다린다
+    if (!k || Date.now() - t.at > PL_TRACK_MAX_MS || (t.seen && !k.run) || k.fb.phase === 'canceled'){ delete PL.track[key]; repaint = true; continue; }
+    if (k.run){ t.run = k.run.id; t.seen = true; }
     if (k.fb.phase !== t.said){ t.said = k.fb.phase; $('#pl-live').textContent = `${t.label} — ${k.fb.text}`; repaint = true; }
     else if (k.fb.text !== t.text){ const el = $(`#plt-${t.n} .pl-track-text`); if (el) el.textContent = k.fb.text; }
     t.text = k.fb.text;
@@ -4159,8 +4159,13 @@ async function plStart(id, a, label){
     const r = await papi(`/plugins/${id}/act`, a);
     if (!r.applied){ PL.sent[`item:${a.item}`] = Date.now(); t.sent = true; }
     else { const mine = PKMPlugin.runOf(r.state && r.state.runs, t); if (mine) t.run = mine.id; }   // 이 컴퓨터가 돌렸으면 응답에 든 새 실행으로 바로 잡는다
-  } catch (e) { t.error = e.message; }
-  await plLoad(true); render();
+  } catch (e) { t.error = e.message; t.conflict = e.status === 409; }
+  await plLoad(true);
+  if (t.conflict){   // 이미 진행 중 — 그 항목의 진행 중인 실행을 찾으면 그 실행을 따라간다
+    const live = ((PL.st.plugins[id] || {}).state.runs || []).find(r => r.feed === a.feed && r.item && r.item.id === a.item && r.workflow === workflow && !['done', 'canceled'].includes(r.status));
+    if (live){ Object.assign(t, { error:'', conflict:false, run:live.id }); if (plTrackUpdate()) plRepaint(); plTrackSchedule(); }
+  }
+  render();
 }
 function plTrackLine(id, f, it, { t, run, fb }){
   const go = run ? `#/plugins/${id}/run/${esc(run.id)}` : '', name = esc(it.title);

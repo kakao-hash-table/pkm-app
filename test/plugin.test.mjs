@@ -225,7 +225,12 @@ test('누른 항목 자리 — 실행이 사라지면 추적을 지우고, 글�
   const run = (f, o) => ({ id: 'r1', feed: f.name, item: { id: 'i1' }, workflow: f.starts[0], created: iso(500), updated: iso(800), finished: iso(900), ...o });
   const done = { status: 'done', steps: [{ key: 'end', status: 'done', output: { verdict: { title: '했어요' } } }] };
 
-  setup(leave, [], { run: 'r1', said: 'done' });   // 찾았던 실행이 기록에서 사라졌다
+  setup(leave, [], { run: 'r1' });   // 응답으로만 안 실행 — 늦게 온 옛 상태에 없어도 기다린다
+  assert.equal(T.plTrackUpdate(), false); assert.equal(Object.keys(PL.track).length, 1);
+  const tr = Object.values(PL.track)[0];
+  PL.st.plugins.p.state.runs = [run(leave, { status: 'running', steps: [{ key: 'end', kind: 'script', status: 'running' }] })];
+  T.plTrackUpdate(); assert.equal(tr.seen, true);
+  PL.st.plugins.p.state.runs = [];   // 본 적 있는 실행이 기록에서 사라졌다
   assert.equal(T.plTrackUpdate(), true); assert.deepEqual(PL.track, {});
 
   const el = { textContent: '' }; els['#plt-1 .pl-track-text'] = el;   // 같은 단계에서 'n분째'만 바뀌면 그 줄 글자만
