@@ -200,6 +200,18 @@ a.row:hover{background:var(--fill)}
 .pl-multi-row{align-items:center;flex-wrap:wrap}
 .col-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px;margin-top:8px}
 .row a.body{color:inherit;text-decoration:none}
+/* 맥락노트 여러 개 고르기 — 고르는 동안 줄 전체가 체크 칸, 위 막대는 붙어 다닌다 */
+.sel-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px}
+.sel-bar.on{position:sticky;top:0;z-index:5;padding:8px 12px;border-radius:var(--r-sm);background:var(--surface);box-shadow:0 1px 0 var(--line)}
+@media (max-width:839px){.sel-bar.on{top:56px}}
+.sel-bar .check{min-height:40px}
+.sel-bar .btn:disabled{background:var(--fill);color:var(--text-3)}
+.sel-bar .sel-n{color:var(--text-2);font-size:.875rem;margin-right:auto}
+label.row.sel-row{cursor:pointer;align-items:center}
+label.row.sel-row:hover{background:var(--fill)}
+label.row.sel-row input{width:22px;height:22px;accent-color:var(--primary-fill);flex:none;margin:0}
+label.row.sel-row:has(input:checked){background:var(--fill)}
+.cm-list{max-height:min(46vh,360px);overflow:auto}
 .row a.body:hover .title{text-decoration:underline}
 .tb-prog{display:flex;align-items:center;gap:12px;margin:8px 0}
 progress.meter{display:block;width:100%;height:8px;appearance:none;-webkit-appearance:none;border:0;border-radius:4px;background:var(--line);overflow:hidden;color:var(--primary)}
@@ -271,6 +283,61 @@ progress.meter.thin{height:4px;margin:4px 0 12px}
 .ped-save{position:sticky;bottom:calc(env(safe-area-inset-bottom) + 72px);background:var(--bg);padding:8px 0;justify-content:flex-end;align-items:center}
 .ped-save #ped-dirty{margin-right:auto}
 @media (min-width:900px){.ped-save{bottom:0}}
+.ped-acts{flex-wrap:wrap;align-items:center}
+.ped-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end}
+.ped-row>.field{flex:1 1 160px;margin:0}
+.ped-w select{min-height:40px}
+.ped-period{border:0;padding:0;margin:0}
+.ped-period legend{font-weight:600;font-size:.9375rem;color:var(--text-2);margin-bottom:6px;padding:0}
+.ped-prow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.field .ped-prow input[type=month]{width:10.5rem;flex:0 0 auto}
+.ped-chk{display:inline-flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;font-weight:500;white-space:nowrap}
+.field .ped-chk input[type=checkbox]{width:22px;height:22px;min-height:0;padding:0;margin:0;flex:none;accent-color:var(--primary-fill)}
+.ped-row>.ped-period{flex:2 1 360px}
+.ped-note{display:block;width:100%;font-size:.8125rem;color:var(--text-3);margin-top:2px}
+.ped-comb{margin:-4px 0 0;font-size:.875rem;color:var(--text-2)}
+.ped-comb .over{color:var(--danger);font-weight:700}
+.ped-hub{margin:8px 0 0}
+.ped-lint:empty{display:none}
+.ped-lint{display:flex;flex-wrap:wrap;gap:6px;margin-top:-4px}
+.lint-chip{display:inline-flex;gap:4px;align-items:baseline;font-size:.8125rem;padding:3px 8px;border-radius:999px;background:var(--s-review-bg);color:var(--s-review)}
+.lint-chip b{font-weight:700}
+.pck-strip{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding:0;list-style:none}
+.pck-strip li{padding:6px 12px;border-radius:var(--r-md);background:var(--surface);font-size:.875rem;color:var(--text-2)}
+.pck-strip li b{color:var(--text);font-variant-numeric:tabular-nums}
+.pck-strip li.bad{background:var(--danger-bg);color:var(--danger)}
+.pck-strip li.bad b{color:var(--danger)}
+.pck-strip li.ok b{color:var(--s-done)}
+.pck-tabs{margin-top:16px}
+.pck-sbadge{display:inline-flex;gap:4px;flex-wrap:wrap;margin-right:auto;font-size:.8125rem;color:var(--text-2)}
+.pck-sbadge span{padding:2px 6px;border-radius:6px;background:var(--fill)}
+.pck-ai{flex-basis:100%}
+.pck-ai pre{white-space:pre-wrap;font:inherit;margin:0}
+.pck-check{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.pck-check li{display:flex;gap:8px;align-items:baseline}
+.pck-check .mk{flex:0 0 auto;font-weight:700;width:1.25em;text-align:center}
+.pck-check .ok .mk{color:var(--s-done)} .pck-check .bad .mk{color:var(--danger)} .pck-check .warn .mk{color:var(--s-review)}
+.pck-steps{margin:0;padding-left:1.25em;display:flex;flex-direction:column;gap:6px}
+.pck-form{background:var(--surface);border-radius:var(--r-lg);padding:16px;display:flex;flex-direction:column;gap:12px}
+.pck-fbox{border:1px solid var(--line);border-radius:var(--r-md);padding:12px;display:flex;flex-direction:column;gap:8px}
+.pck-fhead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pck-num{font-weight:700;min-width:2.5em;color:var(--text-2);font-variant-numeric:tabular-nums}
+.pck-lbl{font-size:.8125rem;color:var(--text-3);min-width:5.5em}
+.pck-inp{flex:1 1 200px;border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;white-space:pre-wrap;word-break:break-word;background:var(--surface-2);min-height:38px}
+.pck-inp.ta{min-height:80px}
+.pck-cnt{font-size:.8125rem;color:var(--text-3);font-variant-numeric:tabular-nums}
+.pck-cnt.over{color:var(--danger);font-weight:700}
+.pck-chip{display:inline-block;padding:3px 8px;border-radius:999px;background:var(--fill);font-size:.8125rem;margin:2px 4px 2px 0}
+.pck-diff{font-size:.75rem;padding:2px 6px;border-radius:6px}
+.pck-diff.same{background:var(--s-wait-bg);color:var(--s-wait)} .pck-diff.chg{background:var(--s-review-bg);color:var(--s-review)} .pck-diff.new{background:var(--s-doing-bg);color:var(--s-doing)}
+.pck-old{font-size:.875rem;color:var(--text-2);white-space:pre-wrap;margin:4px 0 0;padding:8px;border-left:3px solid var(--line-strong)}
+.pck-meter{display:inline-flex;gap:2px;vertical-align:middle}
+.pck-meter i{width:10px;height:10px;border-radius:2px;background:var(--fill-strong)}
+.pck-meter i.on{background:var(--primary)}
+.pck-st{text-align:center;font-variant-numeric:tabular-nums}
+.pck-st[data-s="0"]{color:var(--text-3)}
+.pck-st[data-s="4"],.pck-st[data-s="5"],.pck-st[data-s="6"],.pck-st[data-s="7"]{color:var(--primary);font-weight:700}
+.pck-in-new{display:flex;flex-direction:column;gap:12px}
 .psr-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px}
 .pl-multi-row .body{flex:1 1 220px}
 .pl-btns{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}
@@ -398,6 +465,7 @@ mark{background:var(--primary-weak);color:inherit;font-weight:700;border-radius:
 .blk-body>a:hover{text-decoration:underline}
 .blk-body .meta{align-items:center}
 .blk-task.done .blk-body>a{color:var(--text-3);text-decoration:line-through}
+.blk-body>.ql-line{font-weight:600}.ql-line>a:not(.ql){color:inherit;text-decoration:none}.ql-line>a:not(.ql):hover{text-decoration:underline}.blk-task.done .ql-line{color:var(--text-3);text-decoration:line-through}
 .blk-task[draggable="true"]{cursor:grab}
 .add-blk{align-self:flex-start;margin:4px 0 0 -10px}
 .blk-chip{align-self:flex-start;display:inline-flex;gap:4px;align-items:center;padding:1px 8px;border-radius:6px;font-size:.75rem;font-weight:700;color:var(--text-2);background:color-mix(in srgb,var(--kc) 14%,transparent);margin-bottom:2px}
@@ -595,7 +663,8 @@ details.more>summary{cursor:pointer;color:var(--primary);font-weight:600;min-hei
 .stab button{flex:1;min-height:44px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--text-2);font:inherit;font-weight:600;cursor:pointer}
 .stab button[aria-pressed="true"]{background:var(--surface);color:var(--text);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1)}
 @media (max-width:599px){.stab{display:flex}.board .col>h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
-.t-head{display:flex;gap:4px;align-items:flex-start}.t-head a{flex:1;min-width:0;padding-top:4px}.t-head .more-btn{margin:-4px -8px 0 0}
+.t-head{display:flex;gap:4px;align-items:flex-start}.t-head a{flex:1;min-width:0;padding-top:4px}.t-head a.ql{flex:none}.t-key{font-size:.8125rem;margin:-2px 0 2px}.t-key a.ql{display:inline}
+a.ql,.tcard a.ql{color:var(--primary);font-weight:600;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}.t-head .more-btn{margin:-4px -8px 0 0}
 .t-acts{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px}
 .t-acts .more-btn,.more-btn{min-width:44px;padding:0;font-size:1.125rem;letter-spacing:1px;color:var(--text-3)}
 .tcard[draggable="true"]{cursor:grab}
@@ -878,7 +947,7 @@ body.has-chat-fab main{padding-bottom:120px}
 .pl-card{margin:16px 0}.pl-card-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.pl-card-acts .btn{margin-top:0}
 .pl-quiet{display:inline-flex;gap:4px;flex-wrap:wrap}
 .pl-answer{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}.pl-ask-q{font-size:1rem;margin:8px 0 0}
-.pl-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.pl-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}.pl-rich{white-space:normal}.pl-rich>:first-child{margin-top:0}.pl-rich>:last-child{margin-bottom:0}
 .pl-see{flex:1 0 100%;min-width:0;padding:10px 12px;background:var(--surface-2);border-radius:var(--r-md)}
 .pl-see+.pl-see{margin-top:-4px}
 .pl-see~.pl-btns{margin-left:auto}
@@ -899,7 +968,13 @@ body.has-chat-fab main{padding-bottom:120px}
 .pl-kv{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.pl-kv:last-child{border-bottom:0}
 .pl-kv dt{font-weight:600;min-width:120px}.pl-kv dd{margin:0;flex:1;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;overflow-wrap:anywhere}
 .pl-secret{margin-top:16px}.pl-secret-in{display:flex;gap:8px}.pl-secret-in input{flex:1;min-width:0}
-.pl-settings{display:flex;flex-direction:column;gap:14px}.pl-settings textarea{font-family:var(--mono, ui-monospace, monospace);font-size:.875rem}
+.pl-settings{display:flex;flex-direction:column;gap:14px}
+.pl-pairs{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}.pl-pairs legend{font-weight:600;padding:0;margin-bottom:6px}
+.pl-pair-head,.pl-pair{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr) auto;gap:6px;align-items:center}.pl-pair-head{color:var(--text-2);font-size:.8125rem;padding-right:64px}
+.pl-pair-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pl-pair input{min-height:40px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font-family:var(--mono, ui-monospace, monospace);font-size:.875rem;padding:0 10px;min-width:0}
+.pl-pair input[aria-invalid="true"]{border-color:var(--danger)}
+@media (max-width:599px){.pl-pair{grid-template-columns:minmax(0,1fr) auto}.pl-pair .pl-pair-b{grid-column:1}.pl-pair button{grid-row:1 / span 2;grid-column:2}.pl-pair-head{display:none}.pl-pair-list{gap:12px}}.pl-settings textarea{font-family:var(--mono, ui-monospace, monospace);font-size:.875rem}
 .pl-script pre,.pl-review pre{max-height:320px;overflow:auto;background:var(--surface-2);padding:12px;border-radius:var(--r-md);font-size:.8125rem}
 .pl-review h3{margin:16px 0 6px;font-size:1rem}.pl-review ul{margin:0;padding-left:20px}
 .pl-danger,.pl-review .pl-danger{color:var(--danger)}
@@ -1042,6 +1117,7 @@ body.has-chat-fab main{padding-bottom:120px}
     </fieldset>
     <label class="field" data-extra="wait"><span>누구의 답을 기다리나요 <span class="hint">선택</span></span><input name="waitOn" id="st-wait" list="wait-names" autocomplete="off" placeholder="예: 민지"></label>
     <datalist id="wait-names"></datalist>
+    <div id="st-pck"></div>
     <div class="dlg-actions">
       <button class="btn btn-text btn-danger" type="button" data-act="st-del" style="margin-right:auto">삭제</button>
       <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
@@ -1301,6 +1377,30 @@ body.has-chat-fab main{padding-bottom:120px}
   </form>
 </dialog>
 
+<!-- 맥락노트 여러 개 옮기기·지우기 -->
+<dialog id="dlg-ctxmove" aria-labelledby="cm-title">
+  <form data-form="ctxmove" novalidate>
+    <div><h2 id="cm-title">어느 묶음으로 옮길까요</h2><p class="faint" id="cm-sub" style="margin:4px 0 0"></p></div>
+    <fieldset class="choice cm-list" id="cm-list"><legend class="sr-only">옮길 묶음</legend></fieldset>
+    <label class="field"><span>새 묶음 <span class="hint">위에 없으면 적어요 · 하위 묶음은 /로 나눠요</span></span><input name="newg" id="cm-new" autocomplete="off" aria-describedby="cm-err" placeholder="예: 2026 성과관리/1분기"></label>
+    <p class="err" id="cm-err" hidden>옮길 묶음을 고르거나 새 묶음 이름을 적어 주세요</p>
+    <div class="dlg-actions">
+      <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
+      <button class="btn btn-primary" type="submit">옮기기</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="dlg-ctxdel" aria-labelledby="cd-title">
+  <form data-form="ctxdel" novalidate>
+    <div><h2 id="cd-title"></h2><p class="faint" style="margin:4px 0 0">휴지통으로 옮겨요. 바로 되돌릴 수 있어요. 바뀐 기록도 함께 옮겨져요.</p></div>
+    <ul id="cd-list" class="faint" style="margin:0;padding-left:20px"></ul>
+    <div class="dlg-actions">
+      <button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>
+      <button class="btn btn-ghost btn-danger" type="submit" id="cd-submit">삭제하기</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- 참조노트 만들기 -->
 <dialog id="dlg-ref" aria-labelledby="ref-title">
   <form data-form="ref" novalidate>
@@ -1531,6 +1631,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 /* ---------------- 도우미 ---------------- */
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const eul = w => w + ((w.charCodeAt(w.length - 1) - 0xAC00) % 28 ? '을' : '를');
 const uid = p => p + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 6);   // 시각+무작위 — 기기 둘이 같은 때 만들어도 겹치지 않게
@@ -1774,13 +1875,13 @@ const chipBar = (items, cur, act, label, extra = '') => `<div class="chip-bar" r
 const AIR = {};   // 화면마다 AI 결과 { state:'run'|'ok'|'err', text, data, msg }
 const aiReady = () => !!(PKMAI.conn() && PKMAI.prefs().provider);
 function aiJSON(t){ const m = String(t || '').match(/[\[{][\s\S]*[\]}]/); if (!m) return null; try { return JSON.parse(m[0]); } catch (e) { return null; } }
-async function aiAsk(key, prompt, json = false){
+async function aiAsk(key, prompt, json = false, opt = {}){
   if (AIR[key] && AIR[key].state === 'run') return;
   AIR[key] = { state:'run' }; render();
   const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 180000);
   let text = '';
   try {
-    const job = await PKMAI.run({ prompt, tag:`pkm-${key.split(':')[0]}`, signal:ac.signal, onText:x => { text += x; } });
+    const job = await PKMAI.run({ prompt, system:opt.system, tag:`pkm-${key.split(':')[0]}`, signal:ac.signal, onText:x => { text += x; } });
     if (job.status !== 'done') throw new Error(job.error || '답을 받지 못했어요');
     const out = String((job.result && job.result.text) || text).trim(), data = json ? ((job.result && job.result.structured) || aiJSON(out)) : null;
     if (json && !data) throw new Error('AI 답을 읽지 못했어요. 다시 시도해 주세요');
@@ -2001,7 +2102,7 @@ function vNow(){
       todo += open.length; open.forEach(({ e, t }) => {
         const part = slotsOf(D, t.id).some(o => o.key !== x.key && !o.e.done);   // 다른 블록에도 있으면 이 블록 분량만 끝낸다
         const later = nb && !(plan[nb.key] || []).some(o => o.id === t.id) ? `${nb.key} 블록으로` : '오늘은 빼기';
-        cards.push(nowCard(cls, kick, `<a href="#/action/short/${t.id}">${esc(t.title)}</a>`, `<span>${fmtMin(slotMin(e, t))}</span>${dueText(t.due, t.status)}`,
+        cards.push(nowCard(cls, kick, qlCardLink(t.title, `#/action/short/${t.id}`), `<span>${fmtMin(slotMin(e, t))}</span>${dueText(t.due, t.status)}`,
           `<button class="btn btn-ghost btn-sm" type="button" id="now-later-${t.id}-${k}" data-act="now-later" data-id="${t.id}" data-block="${x.key}" aria-label="${esc(t.title)} ${later}">${later}</button><button class="btn btn-tonal btn-sm" type="button" id="now-done-${t.id}-${k}" data-act="now-done" data-id="${t.id}" data-block="${x.key}" aria-label="${esc(t.title)} ${part ? '이 블록 끝내기' : '완료하기'}">${part ? '이 블록 끝내기' : '완료하기'}</button>`));
       });
       if (open.length) return;
@@ -2110,7 +2211,7 @@ function blkTask(t, e, b, start){
   const cid = `bt-${t.id}-${b.key.replace(':', '')}`;
   return `<li class="blk-task ${done ? 'done' : ''}" data-id="${t.id}" data-block="${b.key}">
     <input type="checkbox" id="${cid}" data-change="blk-done" data-id="${t.id}" data-block="${b.key}" ${done ? 'checked' : ''} aria-label="${esc(t.title)} ${others.length ? '이 블록 분량 끝냄' : '완료'}">
-    <div class="blk-body"><a href="#/action/short/${t.id}">${esc(t.title)}</a>
+    <div class="blk-body">${qlCardLink(t.title, `#/action/short/${t.id}`)}
       <span class="meta">${doneT ? '<span>완료</span>' : done ? '<span>이 블록 분량 끝</span>' : `${start !== null ? `<span class="num">${toHM(start)}~</span>` : ''}<button class="est-btn" type="button" data-act="blk-more" data-id="${t.id}" data-block="${b.key}" aria-label="${esc(t.title)} 이 블록에서 ${e.min || t.estimate ? fmtMin(m) : '기본 ' + fmtMin(m)}, 바꾸기">${e.min || t.estimate ? fmtMin(m) : `기본 ${fmtMin(m)}`}</button>${dueText(t.due, t.status)}`}${others.length ? `<span>다른 블록에도: <span class="num">${others.join(', ')}</span></span>` : ''}${big ? `<a href="#/action/short/${t.id}">할 일 쪼개기</a>` : ''}</span></div>
     ${!done ? `<button class="btn btn-text btn-sm more-btn" type="button" data-act="blk-more" data-id="${t.id}" data-block="${b.key}" aria-label="${esc(t.title)} 옮기기·빼기">⋯</button>` : ''}</li>`;
 }
@@ -2483,6 +2584,40 @@ function searchResults(){
     ${r && r.state === 'ok' ? aiOut('찾은 노트로 AI가 요약한 것', `<div class="md">${md(r.text)}</div>`, `<button class="btn btn-text btn-sm" type="button" data-act="ai-clear" data-key="search:${esc(q)}">닫기</button>`) : aiBtn('search:' + q, `찾은 노트 ${Math.min(8, all.length)}개로 AI 요약 받기`, 'ai-search')}
     <ul class="list" style="margin-top:12px">${shown.map(x => `<li><a class="row" href="${x.href}"><span class="body"><span class="title">${markTerms(x.title, q)}</span><span class="meta"><span class="kind">${SR_NAME[x.k]}</span>${x.sub ? `<span>${esc(x.sub)}</span>` : ''}</span>${srTerms(q).every(w => x.title.toLowerCase().includes(w)) ? '' : `<span class="snip">${snip(x.text, q)}</span>`}</span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`;
 }
+/* ---------------- 플러그인 퀵링크: 카드 제목 맨 앞이 규칙의 정규식에 맞으면 그 부분을 링크로 ----------------
+   규격: docs/PLUGIN.md › 퀵링크. 규칙은 한 줄에 "정규식<탭>주소"(설정 칸이 저장하는 꼴) 또는 "정규식 → 주소"이고, 주소의 $&·$1~$9는 맞은 글자로 바뀐다. 틀린 줄은 건너뛴다 */
+function qlParse(text){
+  return String(text || '').split(/\r?\n|\\n/).map(l => l.trim()).filter(Boolean).flatMap(l => {
+    const m = l.match(/^(.+?)\t+\s*(https?:\/\/\S+)$/) || l.match(/^(.+?)\s+(?:→|->)\s+(https?:\/\/\S+)$/); if (!m) return [];
+    try { return [{ re:new RegExp(`^(?:${m[1]})`), url:m[2] }]; } catch { return []; }
+  });
+}
+function qlMatch(title, rules){
+  for (const r of rules){
+    const m = r.re.exec(String(title)); if (!m || !m[0]) continue;
+    const url = r.url.replace(/\$(&|\d)/g, (z, g) => encodeURIComponent(g === '&' ? m[0] : m[+g] ?? ''));
+    return { key:m[0], url, rest:String(title).slice(m[0].length).trim() };
+  }
+  return null;
+}
+let QL = { st:null, p:null, rules:[], sig:'' };
+function qlRules(){
+  if (plOK()) plLoad();   // 단기 보드·카드 화면에서도 규칙을 가져온다(10초에 한 번까지)
+  if (!PL.st || PL.p !== S.profile) return [];
+  if (QL.st === PL.st && QL.p === PL.p) return QL.rules;
+  const rules = Object.values(PL.st.plugins || {}).flatMap(x => (x.links || []).flatMap(l => {
+    const set = (x.local && x.local.settings) || {};
+    return qlParse(l.rules.replace(/\{([a-z_][a-z0-9_]*)\}/g, (m, k) => set[k] != null ? String(set[k]) : ''));
+  }));
+  QL = { st:PL.st, p:PL.p, rules, sig:JSON.stringify(rules.map(r => [r.re.source, r.url])) };
+  return rules;
+}
+const qlOf = title => { const r = qlRules(); return r.length ? qlMatch(title, r) : null; };
+// 제목이 링크 글자뿐이면(나머지가 없으면) 카드 링크 뒤에 ↗만 둔다
+const qlA = q => `<a class="ql${q.rest ? '' : ' ql-only'}" href="${esc(q.url)}" target="_blank" rel="noopener noreferrer" title="${esc(q.url)}" aria-label="${esc(q.key)} 새 창에서 열기">${q.rest ? esc(q.key) : '↗'}</a>`;
+/* 카드로 가는 링크 앞에 퀵링크를 붙인다. 맞는 규칙이 없으면 카드 링크 하나 */
+const qlCardLink = (title, href) => { const q = qlOf(title);
+  return !q ? `<a href="${href}">${esc(title)}</a>` : `<span class="ql-line">${q.rest ? `${qlA(q)} <a href="${href}" aria-label="${esc(title)}">${esc(q.rest)}</a>` : `<a href="${href}">${esc(title)}</a> ${qlA(q)}`}</span>`; };
 /* ---------------- 플러그인 편집기: 노트를 제목 줄 단위 칸으로 나눠 글자 수를 세며 고친다 ----------------
    규격: docs/PLUGIN.md › 편집기. 고친 칸만 원래 글에 끼워 넣고 나머지 글은 그대로 둔다 */
 function pedList(){
@@ -2494,7 +2629,8 @@ function pedList(){
 }
 const pedNote = title => { const D = db(); return D.ctxs.find(c => c.title === title) || D.perms.find(p => p.title === title) || null; };
 const pedHref = e => `#/plugins/${encodeURIComponent(e.id)}/edit/${encodeURIComponent(e.name)}`;
-const pedLinks = title => { if (plOK()) plLoad(); return pedList().filter(e => e.noteTitle === title).map(e => `<a class="btn btn-tonal btn-sm" href="${pedHref(e)}">${esc(e.name)} 글자 수 맞춰 고치기</a>`).join(''); };
+const pedLinks = title => { if (plOK()) plLoad(); const eds = pedList().filter(e => e.noteTitle === title), cks = [...new Set(eds.map(e => pckFor(e.id, e.name)).filter(Boolean))];
+  return cks.map(c => `<a class="btn btn-tonal btn-sm" href="${pckHref(c, pckEdTab(c, eds))}">${esc(c.name)} 화면에서 고치기</a>`).join('') + eds.filter(e => !pckFor(e.id, e.name)).map(e => `<a class="btn btn-tonal btn-sm" href="${pedHref(e)}">${esc(e.name)} 글자 수 맞춰 고치기</a>`).join(''); };
 const hLevel = l => { const m = /^(#{1,6})\s/.exec(l); return m ? m[1].length : 0; };
 function pedParse(body, e){
   const L = String(body).split('\n'), lv = e.block.length, out = [];
@@ -2505,11 +2641,12 @@ function pedParse(body, e){
     from = i + 1; const wl = hLevel(L[i]);
     if (wl){ const j = L.findIndex((l, k) => k > i && hLevel(l) && hLevel(l) <= wl); if (j > 0) to = j; }
   }
-  const gl = e.group ? e.group.length : 0; let group = '';
+  const gl = e.group ? e.group.length : 0; let group = '', groupHead = -1;
   for (let i = from; i < to; i++){
     const h = hLevel(L[i]);
-    if (gl && h === gl){ group = L[i].replace(/^#+\s*/, ''); continue; }
+    if (gl && h === gl){ group = L[i].replace(/^#+\s*/, ''); groupHead = i; continue; }
     if (h !== lv) continue;
+    if (e.only && !new RegExp(e.only).test(L[i].replace(/^#+\s*/, ''))) continue;   // 제목이 맞는 칸만(번호 없는 '참고' 같은 칸은 뺀다)
     let end = i + 1; while (end < to && !(hLevel(L[end]) && hLevel(L[end]) <= lv)) end++;
     let bodyFrom = i + 1;
     if (e.body_start){ const re = new RegExp(e.body_start), k = L.findIndex((l, n) => n > i && n < end && re.test(l)); if (k < 0) continue; bodyFrom = k + 1; }
@@ -2524,9 +2661,11 @@ function pedParse(body, e){
     let a = bodyFrom, b = bodyTo; while (a < b && !L[a].trim()) a++; while (b > a && !L[b - 1].trim()) b--;
     let countLine = null;
     if (e.count){ const re = new RegExp(e.count), k = L.findIndex((l, n) => n >= bodyTo && n < end && re.test(l)); if (k >= 0) countLine = k; }
-    out.push({ group, head:i, hashes:L[i].match(/^#+/)[0], title:L[i].replace(/^#+\s*/, ''), fields, a, b, body:L.slice(a, b).join('\n'), countLine });
+    // 본문 뒤 '- 이름: 값' 줄(협업 동료 같은)도 따로 고칠 칸으로
+    if ((e.after || []).length) for (let n = bodyTo; n < end; n++){ const m = fieldRe.exec(L[n]); if (m && e.after.includes(m[1].trim())) fields.push({ line:n, name:m[1].trim(), value:m[2], after:true }); }
+    out.push({ group, groupHead, head:i, end, hashes:L[i].match(/^#+/)[0], title:L[i].replace(/^#+\s*/, ''), fields, a, b, bodyStart:e.body_start ? bodyFrom - 1 : -1, body:L.slice(a, b).join('\n'), countLine });
   }
-  return { lines:L, blocks:out };
+  return { lines:L, blocks:out, from, to };
 }
 function pedApply(P, e, vals){
   const L = P.lines.slice(), ops = [];
@@ -2553,65 +2692,130 @@ function pedSummary(blocks, e, val){
   const over = blocks.filter((bk, i) => (e.title && pedLen(val(`t${i}`, bk.title)) > e.title) || (e.body && pedLen(val(`b${i}`, bk.body)) > e.body)).length;
   return over ? `${blocks.length}칸 중 ${over}칸이 글자 수를 넘었어요` : `${blocks.length}칸 모두 글자 수 안이에요`;
 }
+/* 칸 값 위젯 — 고를 값(choices)·켜고 끄기(check)·기간(period). 값 뒤에 붙은 메모('진행 완료 (0928 배포)'의 괄호)는 그대로 둔다 */
+const pedNorm = v => String(v).replace(/\s+/g, '');
+function pedSplit(opts, v){
+  const s = String(v || ''), hit = opts.slice().sort((a, b) => b.length - a.length).find(o => pedNorm(s).startsWith(pedNorm(o)));
+  if (!hit) return { opt:null, rest:s };
+  let k = 0, n = 0; const want = pedNorm(hit).length;
+  while (k < s.length && n < want){ if (!/\s/.test(s[k])) n++; k++; }
+  return { opt:hit, rest:s.slice(k) };
+}
+const PED_PERIOD = /^\s*(\d{4})[-.](\d{1,2})\s*(?:~|-|–)\s*(?:(\d{4})[-.](\d{1,2}))?(.*)$/;
+function pedPeriod(v){ const m = PED_PERIOD.exec(String(v || '')); return m ? { from:`${m[1]}-${m[2].padStart(2, '0')}`, to:m[3] ? `${m[3]}-${m[4].padStart(2, '0')}` : '', rest:m[5] || '' } : null; }
+const pedPeriodText = (from, to, rest) => `${from} ~ ${to}${rest || ''}`.replace(/ ~ $/, ' ~ ');
+function pedFieldHTML(e, f, key, v){
+  const ch = (e.choices || {})[f.name], ck = (e.check || {})[f.name], pd = (e.period || []).includes(f.name) && pedPeriod(v);
+  const note = rest => rest.trim() ? `<span class="ped-note" title="노트에 적힌 메모는 그대로 둬요">${esc(rest.trim())}</span>` : '';
+  if (ck){ const sp = pedSplit(ck, v);
+    return `<div class="field ped-w"><span>${esc(f.name)}</span><label class="ped-chk"><input type="checkbox" class="ped-f" name="${key}" data-on="${esc(ck[0] + (sp.opt ? sp.rest : ''))}" data-off="${esc(ck[1] + (sp.opt ? sp.rest : ''))}" ${sp.opt === ck[0] ? 'checked' : ''}><span>${esc(ck[0])}</span></label>${note(sp.opt ? sp.rest : v)}</div>`; }
+  if (ch){ const sp = pedSplit(ch, v), opts = sp.opt ? ch : [v, ...ch];
+    return `<label class="field ped-w"><span>${esc(f.name)}</span><select class="ped-f" name="${key}">${opts.map(o => { const full = o === v && !sp.opt ? v : o + sp.rest; return `<option value="${esc(full)}" ${(sp.opt ? o === sp.opt : o === v) ? 'selected' : ''}>${esc(o)}</option>`; }).join('')}</select>${note(sp.opt ? sp.rest : '')}</label>`; }
+  if (pd) return `<fieldset class="field ped-w ped-period"><legend>${esc(f.name)}</legend><input type="hidden" class="ped-f" name="${key}" value="${esc(v)}" data-rest="${esc(pd.rest)}">
+      <div class="ped-prow"><input type="month" class="ped-p" data-for="${key}" data-k="from" value="${pd.from}" aria-label="${esc(f.name)} 시작 월"><span aria-hidden="true">~</span><input type="month" class="ped-p" data-for="${key}" data-k="to" value="${pd.to}" aria-label="${esc(f.name)} 끝 월"><label class="ped-chk"><input type="checkbox" class="ped-p" data-for="${key}" data-k="open" ${pd.to ? '' : 'checked'}><span>끝 미정</span></label></div>${note(pd.rest)}</fieldset>`;
+  return `<label class="field"><span>${esc(f.name)}</span><textarea class="ped-f" name="${key}" rows="1">${esc(v)}</textarea></label>`;
+}
+/* 제출 칸 하나에 제목과 본문이 빈 줄로 이어 들어가는 편집기(combine) — 그 합 */
+const pedSubmitTitle = t => String(t).trim().replace(/^\d+(?:-\d+)*\.\s*/, '');   // 노트의 '1. ', '2-1. ' 번호는 제출 칸에 넣지 않는다
+const pedCombined = (t, b) => `${pedSubmitTitle(t)}\n\n${String(b).trim()}`;
+/* 칸 하나(카드). extra: { lint(text) → html, side(i) → html } — 체크인 화면이 점검·점수를 붙인다 */
+function pedCard(e, bk, i, val, extra = {}){
+  const t = val(`t${i}`, bk.title), b = val(`b${i}`, bk.body);
+  const cnt = (k, v, max) => `<span class="ped-count ${max && pedLen(v) > max ? 'over' : ''}" id="pc-${k}">${pedCountText(v, max)}</span>`;
+  const fld = after => bk.fields.map((f, j) => f.after === after || (!after && !f.after) ? pedFieldHTML(e, f, `f${i}_${j}`, val(`f${i}_${j}`, f.value)) : '').join('');
+  const before = fld(false), wide = (e.check && Object.keys(e.check).length) || (e.period || []).length;
+  return `<fieldset class="card ped-card" id="ped-${i}"><legend class="sr-only">${esc(bk.title)}</legend>
+      <div class="field"><div class="ped-lab"><label for="pf-t${i}">제목</label>${cnt(`t${i}`, t, e.title)}</div><textarea class="ped-f" id="pf-t${i}" name="t${i}" rows="1" data-max="${e.title || ''}" aria-describedby="pc-t${i}">${esc(t)}</textarea></div>
+      ${before ? (wide ? `<div class="ped-row">${before}</div>` : before) : ''}
+      <div class="field"><div class="ped-lab"><label for="pf-b${i}">본문</label>${cnt(`b${i}`, b, e.body)}</div><textarea class="ped-f" id="pf-b${i}" name="b${i}" rows="4" data-max="${e.body || ''}" aria-describedby="pc-b${i}${extra.lint ? ` pl-${i}` : ''}">${esc(b)}</textarea></div>
+      ${e.combine ? `<p class="ped-comb" id="pcc-${i}">${pedCombText(t, b, e.combine)}</p>` : ''}
+      ${extra.lint ? `<div class="ped-lint" id="pl-${i}" aria-live="polite">${extra.lint(`${t}\n${b}`)}</div>` : ''}
+      ${fld(true)}
+      <div class="ped-acts"><button class="btn btn-text btn-sm" type="button" data-act="ped-copy" data-what="t" data-i="${i}">제목 복사</button><button class="btn btn-text btn-sm" type="button" data-act="ped-copy" data-what="b" data-i="${i}">본문 복사</button>${e.combine ? `<button class="btn btn-text btn-sm" type="button" data-act="ped-copy" data-what="c" data-i="${i}">제출 칸 복사</button>` : ''}${extra.side ? extra.side(i) : ''}</div></fieldset>`;
+}
+const pedCombText = (t, b, max) => { const n = pedLen(pedCombined(t, b)); return `<span class="${n > max ? 'over' : ''}">제출 칸(제목, 빈 줄, 본문)에 붙이면 ${n} / ${max}자${n > max ? ` · ${n - max}자 넘음` : ''}</span>`; };
 function vPluginEditor(id, name){
   if (plOK()) plLoad();
   const e = pedList().find(x => x.id === id && x.name === name);
   if (!e) return PL.st ? vNotFound() : `<div class="page"><p class="faint" role="status">불러오는 중…</p></div>`;
   const n = pedNote(e.noteTitle);
   const head = `<a class="back" href="#/plugins/${encodeURIComponent(id)}"><span aria-hidden="true">‹</span> ${esc(plName(id))}</a><p class="eyebrow">글자 수 맞춰 고치기</p><h1 tabindex="-1">${esc(e.name)}</h1>`;
-  if (/\{[a-z_]+\}/.test(e.noteTitle)) return `<div class="page">${head}${empty('고칠 노트를 아직 정하지 않았어요', '플러그인 설정에서 노트 제목을 적어 주세요.', `<a class="btn btn-tonal" href="#/plugins/${encodeURIComponent(id)}/setup">설정 열기</a>`)}</div>`;
-  if (!n) return `<div class="page">${head}${empty(`'${esc(e.noteTitle)}' 노트가 없어요`, '플러그인 설정의 노트 제목이 맥락노트·영구노트 제목과 같은지 확인해 주세요.', `<a class="btn btn-tonal" href="#/plugins/${encodeURIComponent(id)}/setup">설정 열기</a>`)}</div>`;
-  const P = pedParse(n.body, e), kind = n.history ? 'ctx' : 'perm', draft = PED_DRAFT[pedKey(id, name)] || {};
-  if (!P.blocks.length) return `<div class="page">${head}${empty('나눌 칸을 찾지 못했어요', `노트에 ${esc(e.block)} 제목 줄이 있는지, 편집기 규칙이 노트 모양과 맞는지 확인해 주세요.`, `<a class="btn btn-tonal" href="#/knowledge/${kind}/${n.id}">노트 보기</a>`)}</div>`;
-  const val = (k, orig) => k in draft ? draft[k] : orig;
+  const gate = pedGate(e, n, id); if (gate) return `<div class="page">${head}${gate}</div>`;
+  const P = pedParse(n.body, e), kind = n.history ? 'ctx' : 'perm';
+  const ck = typeof pckFor === 'function' ? pckFor(id, name) : null;
+  return `<div class="page">${head}
+    ${ck ? `<p class="ped-hub"><a class="btn btn-tonal btn-sm" href="${pckHref(ck)}">${esc(ck.name)} 화면에서 함께 보기</a></p>` : ''}
+    <p class="faint">${e.description ? `${esc(e.description)} ` : ''}<a href="#/knowledge/${kind}/${n.id}">${esc(n.title)}</a> 노트의 ${P.blocks.length}칸이에요. 글자 수는 공백·줄바꿈을 포함해요. 고친 칸만 노트에 다시 넣어요.</p>
+    ${pedForm(id, name, e, n, P)}</div>`;
+}
+/* 고칠 노트가 없거나 칸이 없을 때 보일 안내. 문제가 없으면 '' */
+function pedGate(e, n, id){
+  if (/\{[a-z_]+\}/.test(e.noteTitle)) return empty('고칠 노트를 아직 정하지 않았어요', '플러그인 설정에서 노트 제목을 적어 주세요.', `<a class="btn btn-tonal" href="#/plugins/${encodeURIComponent(id)}/setup">설정 열기</a>`);
+  if (!n) return empty(`'${esc(e.noteTitle)}' 노트가 없어요`, '플러그인 설정의 노트 제목이 맥락노트·영구노트 제목과 같은지 확인해 주세요.', `<a class="btn btn-tonal" href="#/plugins/${encodeURIComponent(id)}/setup">설정 열기</a>`);
+  if (!pedParse(n.body, e).blocks.length) return empty('나눌 칸을 찾지 못했어요', `노트에 ${esc(e.block)} 제목 줄이 있는지, 편집기 규칙이 노트 모양과 맞는지 확인해 주세요.`, `<a class="btn btn-tonal" href="#/knowledge/${n.history ? 'ctx' : 'perm'}/${n.id}">노트 보기</a>`);
+  return '';
+}
+/* 편집 폼 — 편집기 화면과 체크인 화면이 같이 쓴다. opt: { lint, side, only(칸 번호 배열) } */
+function pedForm(id, name, e, n, P, opt = {}){
+  const draft = PED_DRAFT[pedKey(id, name)] || {}, val = (k, orig) => k in draft ? draft[k] : orig, kind = n.history ? 'ctx' : 'perm';
   let lastGroup = null;
   const card = (bk, i) => {
+    if (opt.only && !opt.only.includes(i)) return '';
     const g = bk.group && bk.group !== lastGroup ? `<h2 class="ped-group">${esc(bk.group)}</h2>` : ''; lastGroup = bk.group;
-    const t = val(`t${i}`, bk.title), b = val(`b${i}`, bk.body);
-    const cnt = (k, v, max) => `<span class="ped-count ${max && pedLen(v) > max ? 'over' : ''}" id="pc-${k}">${pedCountText(v, max)}</span>`;
-    return `${g}<fieldset class="card ped-card" id="ped-${i}"><legend class="sr-only">${esc(bk.title)}</legend>
-      <div class="field"><div class="ped-lab"><label for="pf-t${i}">제목</label>${cnt(`t${i}`, t, e.title)}</div><textarea class="ped-f" id="pf-t${i}" name="t${i}" rows="1" data-max="${e.title || ''}" aria-describedby="pc-t${i}">${esc(t)}</textarea></div>
-      ${bk.fields.map((f, j) => `<label class="field"><span>${esc(f.name)}</span><textarea class="ped-f" name="f${i}_${j}" rows="1">${esc(val(`f${i}_${j}`, f.value))}</textarea></label>`).join('')}
-      <div class="field"><div class="ped-lab"><label for="pf-b${i}">본문</label>${cnt(`b${i}`, b, e.body)}</div><textarea class="ped-f" id="pf-b${i}" name="b${i}" rows="4" data-max="${e.body || ''}" aria-describedby="pc-b${i}">${esc(b)}</textarea></div>
-      <div class="ped-acts"><button class="btn btn-text btn-sm" type="button" data-act="ped-copy" data-what="t" data-i="${i}">제목 복사</button><button class="btn btn-text btn-sm" type="button" data-act="ped-copy" data-what="b" data-i="${i}">본문 복사</button></div></fieldset>`;
+    return g + pedCard(e, bk, i, val, opt);
   };
   const dirty = pedDirty(id, name);
   setTimeout(() => document.querySelectorAll('.ped-f').forEach(pedFit), 0);
-  return `<div class="page">${head}
-    <p class="faint">${e.description ? `${esc(e.description)} ` : ''}<a href="#/knowledge/${kind}/${n.id}">${esc(n.title)}</a> 노트의 ${P.blocks.length}칸이에요. 글자 수는 공백·줄바꿈을 포함해요. 고친 칸만 노트에 다시 넣어요.</p>
-    <p class="ped-sum" id="ped-sum">${pedSummary(P.blocks, e, val)}</p>
+  return `<p class="ped-sum" id="ped-sum">${pedSummary(P.blocks, e, val)}</p>
     <form data-form="pl-editor" data-id="${esc(id)}" data-name="${esc(name)}" novalidate class="stack" style="gap:16px;margin-top:16px">
       ${P.blocks.map(card).join('')}
       <div class="dlg-actions ped-save"><span class="faint" id="ped-dirty" aria-live="polite">${dirty ? `저장 안 한 칸 ${dirty}개` : ''}</span><a class="btn btn-text" href="#/knowledge/${kind}/${n.id}">노트 보기</a><button class="btn btn-primary" type="submit">저장하기</button></div>
-    </form><p class="sr-only" role="status" id="ped-live"></p></div>`;
+    </form><p class="sr-only" role="status" id="ped-live"></p>`;
 }
 // 칸 높이를 글에 맞춘다(field-sizing을 못 쓰는 브라우저용)
-const pedFit = t => { if (CSS.supports && CSS.supports('field-sizing', 'content')) return; t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px`; };
+const pedFit = t => { if (t.tagName !== 'TEXTAREA' || (CSS.supports && CSS.supports('field-sizing', 'content'))) return; t.style.height = 'auto'; t.style.height = `${t.scrollHeight + 2}px`; };
+const pedValueOf = t => t.type === 'checkbox' ? (t.checked ? t.dataset.on : t.dataset.off) : t.value;
+// 기간 위젯(월 두 칸·끝 미정)을 숨은 칸 하나의 글로 합친다
 document.addEventListener('input', ev => {
-  const t = ev.target, f = t.closest && t.closest('form[data-form="pl-editor"]'); if (!f || !t.classList.contains('ped-f')) return;
+  const p = ev.target; if (!p.classList || !p.classList.contains('ped-p')) return;
+  const box = p.closest('.ped-period'), h = box.querySelector('.ped-f'), [from, to, open] = ['from', 'to', 'open'].map(k => box.querySelector(`[data-k="${k}"]`));
+  if (p === open && open.checked) to.value = ''; else if (p === to && to.value) open.checked = false;
+  h.value = pedPeriodText(from.value, open.checked ? '' : to.value, h.dataset.rest); pedInput(h);
+});
+document.addEventListener('input', ev => { const t = ev.target; if (t.classList && t.classList.contains('ped-f') && t.type !== 'hidden') pedInput(t); });
+document.addEventListener('change', ev => { const t = ev.target; if (t.type === 'checkbox' && t.classList && (t.classList.contains('ped-f') || t.classList.contains('ped-p'))) t.dispatchEvent(new Event('input', { bubbles:true })); });
+function pedInput(t){
+  const f = t.closest && t.closest('form[data-form="pl-editor"]'); if (!f) return;
   const key = pedKey(f.dataset.id, f.dataset.name), e = pedList().find(x => x.id === f.dataset.id && x.name === f.dataset.name), n = e && pedNote(e.noteTitle); if (!n) return;
   const P = pedParse(n.body, e), d = PED_DRAFT[key] || (PED_DRAFT[key] = {}), m = /^([tbf])(\d+)(?:_(\d+))?$/.exec(t.name), bk = P.blocks[+m[2]];
-  const orig = m[1] === 't' ? bk.title : m[1] === 'b' ? bk.body : bk.fields[+m[3]].value;
-  if (t.value === orig) delete d[t.name]; else d[t.name] = t.value;
+  const orig = m[1] === 't' ? bk.title : m[1] === 'b' ? bk.body : bk.fields[+m[3]].value, v = pedValueOf(t);
+  if (v === orig) delete d[t.name]; else d[t.name] = v;
   pedFit(t);
   const max = +t.dataset.max || 0, c = $(`#pc-${t.name}`);
   if (c){
-    const wasOver = c.classList.contains('over'), isOver = !!max && pedLen(t.value) > max;
-    c.textContent = pedCountText(t.value, max); c.classList.toggle('over', isOver);
-    if (wasOver !== isOver) $('#ped-live').textContent = isOver ? `${m[1] === 't' ? '제목' : '본문'}이 ${pedLen(t.value) - max}자 넘었어요` : `${m[1] === 't' ? '제목' : '본문'}이 글자 수 안으로 들어왔어요`;
+    const wasOver = c.classList.contains('over'), isOver = !!max && pedLen(v) > max;
+    c.textContent = pedCountText(v, max); c.classList.toggle('over', isOver);
+    if (wasOver !== isOver) $('#ped-live').textContent = isOver ? `${m[1] === 't' ? '제목' : '본문'}이 ${pedLen(v) - max}자 넘었어요` : `${m[1] === 't' ? '제목' : '본문'}이 글자 수 안으로 들어왔어요`;
   }
-  $('#ped-sum').textContent = pedSummary(P.blocks, e, (k, o) => k in d ? d[k] : o);
+  const i = +m[2], val = (k, o) => k in d ? d[k] : o, cc = $(`#pcc-${i}`);
+  if (cc && e.combine) cc.innerHTML = pedCombText(val(`t${i}`, bk.title), val(`b${i}`, bk.body), e.combine);
+  const pl = $(`#pl-${i}`); if (pl && typeof pckLintHTML === 'function') pl.innerHTML = pckLintHTML(f.dataset.id, `${val(`t${i}`, bk.title)}\n${val(`b${i}`, bk.body)}`);
+  $('#ped-sum').textContent = pedSummary(P.blocks, e, val);
   const nd = pedDirty(f.dataset.id, f.dataset.name); $('#ped-dirty').textContent = nd ? `저장 안 한 칸 ${nd}개` : '';
-});
-function pedSave(f){
-  const e = pedList().find(x => x.id === f.dataset.id && x.name === f.dataset.name), n = e && pedNote(e.noteTitle); if (!n) return;
-  const P = pedParse(n.body, e), el = f.elements;
-  const vals = P.blocks.map((bk, i) => ({ title:el['t' + i].value.replace(/\n+/g, ' ').trim(), body:el['b' + i].value.replace(/\s+$/, ''), fields:bk.fields.map((x, j) => el[`f${i}_${j}`].value.replace(/\n+/g, ' ').trim()) }));
+  if (typeof pckLive === 'function') pckLive(f.dataset.id, f.dataset.name);
+}
+function pedSave(f){ pedCommit(f.dataset.id, f.dataset.name); }
+/* 고친 칸(초안)을 노트에 넣는다. 화면에 그려지지 않은 칸의 초안도 함께 */
+function pedCommit(id, name, quiet){
+  const e = pedList().find(x => x.id === id && x.name === name), n = e && pedNote(e.noteTitle); if (!n) return false;
+  const P = pedParse(n.body, e), d = PED_DRAFT[pedKey(id, name)] || {}, val = (k, o) => k in d ? d[k] : o;
+  const vals = P.blocks.map((bk, i) => ({ title:val(`t${i}`, bk.title).replace(/\n+/g, ' ').trim(), body:val(`b${i}`, bk.body).replace(/\s+$/, ''), fields:bk.fields.map((x, j) => val(`f${i}_${j}`, x.value).replace(/\n+/g, ' ').trim()) }));
   const next = pedApply(P, e, vals);
-  delete PED_DRAFT[pedKey(f.dataset.id, f.dataset.name)];
-  if (next === n.body){ render(); toast('바뀐 칸이 없어요'); return; }
+  delete PED_DRAFT[pedKey(id, name)];
+  if (next === n.body){ if (!quiet){ render(); toast('바뀐 칸이 없어요'); } return false; }
   const undo = snapshot(); n.body = next; if (n.history) n.updated = TODAY;
-  render(); toast('노트에 저장했어요', { label:'되돌리기', fn:undo });
+  if (!quiet){ render(); toast('노트에 저장했어요', { label:'되돌리기', fn:undo }); }
+  return undo;
 }
 /* 플러그인 검색(사내 위키 같은) — 글자를 칠 때마다가 아니라 누를 때만, 이 컴퓨터의 pkm-ai-server로 */
 const PSR = {};
@@ -2755,6 +2959,7 @@ function kTabStart(){
 function vKnowledge(tab){
   const D = db();
   LS.set(`pkm:v1:k-tab:${S.profile}`, tab);
+  if (tab !== 'ctx') S.ctxSel = null;
   const head = `<header class="page-head"><h1 tabindex="-1">지식</h1>
     ${tab === 'ref' ? `<button class="btn btn-primary" type="button" data-act="new-ref">참조노트 만들기</button>` : ''}</header>
     ${seg([['ref','#/knowledge/ref',`참조노트 <span class="num">${D.refs.length}</span>`,'남의 글'],['fleeting','#/knowledge/fleeting',`임시노트 <span class="num">${D.fleeting.length}</span>`,'빠른 메모'],['perm','#/knowledge/perm',`영구노트 <span class="num">${D.perms.length}</span>`,'언제든 통하는 생각'],['ctx','#/knowledge/ctx',`맥락노트 <span class="num">${D.ctxs.length}</span>`,'회사·시스템에 묶인 정리'],['tb','#/knowledge/tb',`교과서 <span class="num">${tbBooks().length}</span>`,'읽기만 하는 책'],['recall','#/knowledge/recall','복습','오늘 떠올릴 3개']], tab, 'seg-compact seg-scroll', '지식 보기')}
@@ -2785,8 +2990,11 @@ function vKnowledge(tab){
   } else if (tab === 'recall'){
     body = vRecall();
   } else if (tab === 'ctx'){
-    const [bar, ctxs, gcur] = groupChips('ctx', D.ctxs);
-    body = D.ctxs.length ? bar + `<ul class="list">${ctxs.slice().sort((a, b) => b.updated.localeCompare(a.updated)).map(c => `<li><a class="row" href="#/knowledge/ctx/${c.id}"><span class="body"><span class="title">${esc(c.title)}</span><span class="meta">${grpPath(c.group, gcur) ? `<span>${esc(grpPath(c.group, gcur))}</span>` : ''}<span>${staleText(c.updated)}</span><span>바뀐 기록 <span class="num">${c.history.length}</span></span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`
+    const [bar, ctxs, gcur] = groupChips('ctx', D.ctxs), sel = S.ctxSel;
+    const info = c => `<span class="body"><span class="title">${esc(c.title)}</span><span class="meta">${grpPath(c.group, gcur) ? `<span>${esc(grpPath(c.group, gcur))}</span>` : ''}<span>${staleText(c.updated)}</span><span>바뀐 기록 <span class="num">${c.history.length}</span></span></span></span>`;
+    body = D.ctxs.length ? bar + ctxSelBar(ctxs) + `<ul class="list" id="ctx-list">${ctxs.slice().sort((a, b) => b.updated.localeCompare(a.updated)).map(c => sel
+      ? `<li><label class="row sel-row"><input type="checkbox" data-change="ctx-sel" data-id="${c.id}" ${sel.has(c.id) ? 'checked' : ''}>${info(c)}</label></li>`
+      : `<li><a class="row" href="#/knowledge/ctx/${c.id}">${info(c)}<span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`
       : empty('아직 맥락노트가 없어요', '배포 프로세스·팀 업무 흐름처럼 특정 회사·시스템·시점에 묶인 정리를 두는 곳이에요. 임시노트를 다듬을 때 맥락노트를 고르면 여기에 쌓여요.', `<a class="btn btn-tonal" href="#/knowledge/fleeting">임시노트 보러 가기</a>`);
   } else {
     if (!D.perms.length) body = empty('아직 영구노트가 없어요', '임시노트나 참조노트의 내 생각을 다듬으면 여기에 쌓여요.', `<a class="btn btn-tonal" href="#/knowledge/fleeting">임시노트 보러 가기</a>`);
@@ -2810,6 +3018,43 @@ function groupChips(tab, arr){
   return [pick + (cur !== '*' ? `<p class="grp-note" role="status">${esc(label)} ${shown.length}개만 보는 중 <button class="btn btn-text btn-sm" type="button" data-act="k-group" data-tab="${tab}" data-v="*">전체 보기</button></p>` : ''), shown, cur];
 }
 const grpPath = (g, cur) => { const p = String(g || '').split('/'); if (cur && cur !== '*' && p[0] === cur) p.shift(); return p.join(' › '); };
+/* 맥락노트 여러 개 고르기 — 고른 것은 지금 보이는 묶음 안에서만 센다(다른 묶음에 남은 선택이 함께 지워지지 않게) */
+function ctxPicked(){ if (!S.ctxSel) return []; const shown = $$('#ctx-list input[data-change="ctx-sel"]').map(x => x.dataset.id); return shown.filter(id => S.ctxSel.has(id)); }
+function ctxSelBar(shown){
+  if (!S.ctxSel) return `<div class="sel-bar"><button class="btn btn-ghost btn-sm" type="button" data-act="ctx-sel-on">여러 개 고르기</button></div>`;
+  const n = shown.filter(c => S.ctxSel.has(c.id)).length, dis = n ? '' : 'disabled';
+  return `<div class="sel-bar on" role="group" aria-label="고른 맥락노트">
+    <label class="check"><input type="checkbox" id="ctx-sel-all" data-change="ctx-sel-all" ${n && n === shown.length ? 'checked' : ''}><span>전체 선택</span></label>
+    <span class="sel-n" id="ctx-sel-n" role="status">${n ? `${n}개 고름` : '고른 노트 없음'}</span>
+    <button class="btn btn-ghost btn-sm" type="button" data-act="ctx-move" ${dis}>옮기기</button>
+    <button class="btn btn-ghost btn-sm btn-danger" type="button" data-act="ctx-del" ${dis}>삭제하기</button>
+    <button class="btn btn-text btn-sm" type="button" data-act="ctx-sel-off">그만두기</button></div>`;
+}
+/* 체크할 때마다 다시 그리면 포커스가 사라져 — 막대만 고친다 */
+function ctxSelPaint(){
+  const boxes = $$('#ctx-list input[data-change="ctx-sel"]'), n = ctxPicked().length, all = $('#ctx-sel-all');
+  if (all){ all.checked = !!n && n === boxes.length; all.indeterminate = !!n && n < boxes.length; }
+  const t = $('#ctx-sel-n'); if (t) t.textContent = n ? `${n}개 고름` : '고른 노트 없음';
+  $$('.sel-bar [data-act="ctx-move"], .sel-bar [data-act="ctx-del"]').forEach(b => { b.disabled = !n; });
+}
+function openCtxMove(){
+  const D = db(), ids = ctxPicked(); if (!ids.length) return;
+  const here = new Set(ids.map(id => (find('ctxs', id) || {}).group || '')), groups = [...new Set(D.ctxs.map(c => c.group || '').filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+  const f = $('#dlg-ctxmove form'); f.reset();
+  $('#cm-sub').textContent = `맥락노트 ${ids.length}개`;
+  $('#cm-list').innerHTML = '<legend class="sr-only">옮길 묶음</legend>' + [['', '묶음 없음', '맥락노트 폴더 바로 아래'], ...groups.map(g => [g, g.replace(/\//g, ' › '), `${D.ctxs.filter(c => (c.group || '') === g).length}개`])]
+    .map(([v, l, sub]) => `<label><input type="radio" name="to" value="${esc(v)}"><span><b>${esc(l)}</b><small>${esc(sub)}${here.size === 1 && here.has(v) ? ' · 지금 여기 있어요' : ''}</small></span></label>`).join('');
+  openDlg('dlg-ctxmove');
+}
+function openCtxDel(){
+  const ids = ctxPicked(); if (!ids.length) return;
+  const f = $('#dlg-ctxdel form'), T = ids.map(id => (find('ctxs', id) || {}).title || '');
+  $('#cd-title').textContent = `맥락노트 ${ids.length}개를 지울까요`;
+  $('#cd-list').innerHTML = T.slice(0, 5).map(t => `<li>${esc(t)}</li>`).join('') + (T.length > 5 ? `<li>그 밖에 ${T.length - 5}개</li>` : '');
+  $('#cd-submit').textContent = `${ids.length}개 삭제하기`;
+  f.dataset.ids = ids.join(',');
+  openDlg('dlg-ctxdel');
+}
 /* 복습 — 오늘 떠올릴 영구노트 3개. 노트를 보기 전에 내 말로 한 줄 적고, 그다음 원래 노트와 맞춰 본다(인출 연습). 7일 안에 떠올린 노트는 쉰다 */
 const RECALL_H = '### 다시 쓴 한 줄';
 const recallLast = p => [...String(p.body || '').matchAll(/^- \((\d{4}-\d{2}-\d{2})\) /gm)].map(m => m[1]).sort().pop() || '';
@@ -3409,8 +3654,8 @@ function vAction(board){
       let arr = D.tasks.filter(t => t.status === s && !t.archived);   // 보관한 완료는 보드에서 빠지고 보관함에서 본다
       if (s !== '완료') arr = arr.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
       const shown = s === '완료' ? arr.slice(0, 3) : arr, rest = s === '완료' ? arr.slice(3) : [];
-      const card = (t, inGroup) => { const w = whoOf(t), name = inGroup ? shortTitle(t) : t.title;
-        return `<li class="tcard${w.aiOnly ? ' t-ai' : ''}" data-id="${t.id}"><div class="t-head"><a href="#/action/short/${t.id}" ${name !== t.title ? `aria-label="${esc(t.title)}"` : ''}>${esc(name)}</a>${t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}" aria-label="${esc(t.title)} 보관하기">보관</button>` : ''}${moreBtn(t)}</div>
+      const card = (t, inGroup) => { const w = whoOf(t), full = inGroup ? shortTitle(t) : t.title, q = qlOf(full), name = q && q.rest ? q.rest : full;
+        return `<li class="tcard${w.aiOnly ? ' t-ai' : ''}" data-id="${t.id}">${q && q.rest ? `<div class="t-key">${qlA(q)}</div>` : ''}<div class="t-head"><a href="#/action/short/${t.id}" ${name !== t.title ? `aria-label="${esc(t.title)}"` : ''}>${esc(name)}</a>${q && !q.rest ? qlA(q) : ''}${t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}" aria-label="${esc(t.title)} 보관하기">보관</button>` : ''}${moreBtn(t)}</div>
           <div class="meta">${w.aiOnly ? '<span class="kind k-ai">AI가 진행</span>' : w.me ? `<span class="kind">내 할 일 ${w.me}</span>` : ''}${waitText(t)}${dueText(t.due, t.status)}${t.area && !inGroup ? `<span>${esc(t.area)}</span>` : ''}</div>
           ${chCardActs(t)}</li>`; };
       const cards = list => groupCards(list, s).map(g => g.pid ? tgroup(g, s, card) : card(g.t)).join('');
@@ -3495,10 +3740,10 @@ function vTask(id){
   return `<div class="page">
     <a class="back" href="#/action/short"><span aria-hidden="true">‹</span> 단기보드</a>
     ${conflictBanner()}
-    <p class="eyebrow">단기</p><h1 tabindex="-1">${esc(t.title)}</h1>
+    <p class="eyebrow">단기</p><h1 tabindex="-1">${(q => !q ? esc(t.title) : q.rest ? `${qlA(q)} ${esc(q.rest)}` : `${esc(t.title)} ${qlA(q)}`)(qlOf(t.title))}</h1>
     <dl class="meta-dl"><dt>마감</dt><dd>${t.due ? `${fmtDate(t.due)} · ${dueText(t.due, t.status)}` : '없음'}</dd><dt>쌓이는 곳</dt><dd>${t.area ? areaLink(t.area) : '없음'}</dd><dt>만든 날</dt><dd>${md2(t.created)}</dd><dt>ID</dt><dd><code class="num">${esc(t.id)}</code> <button class="btn btn-text btn-sm" type="button" data-act="copy-task-id" data-id="${t.id}" style="padding:0 4px;min-height:28px" aria-label="ID ${esc(t.id)} 복사">복사</button></dd>${t.status === '완료' ? `<dt>결과</dt><dd>${t.result ? esc(t.result) : `<button class="btn btn-text btn-sm" type="button" data-act="result" data-id="${t.id}" style="padding:0;min-height:28px">결과 한 줄 남기기</button>`}</dd>` : ''}${t.status === '기다림' ? `<dt>기다리는 사람</dt><dd>${t.waitOn ? esc(t.waitOn) : '적지 않음'} · ${md2(t.waitSince)}부터</dd>` : ''}${m ? `<dt>나온 곳</dt><dd><a href="${recHref(m)}">${esc(recKind(m).name)} · ${esc(m.title)}</a></dd>` : ''}</dl>
     <div class="doc-actions state-bar" role="group" aria-label="상태">${statusBadge(t.status)}${t.archived ? `<span class="meta">${md2(t.archived)} 보관함으로 옮김</span><button class="btn btn-text btn-sm" type="button" data-act="task-unarchive" data-id="${t.id}">보관함에서 꺼내기</button>` : t.status === '완료' ? `<button class="btn btn-text btn-sm" type="button" data-act="task-archive" data-id="${t.id}">보관하기</button>` : ''}${taskActs(t)}</div>
-    <div class="doc-actions" style="margin-top:8px">${editBtn()}${obsBtn()}${chCards() ? (() => { const r = chCardRoom(t.id); return `<button class="btn btn-ghost btn-sm" type="button" data-ch="card" data-id="${t.id}">${CH_ICON}AI Chat${r ? ` · ${CH_LABEL[chState(r)]}` : ''}</button>`; })() : ''}</div>
+    <div class="doc-actions" style="margin-top:8px">${editBtn()}${obsBtn()}${chCards() ? (() => { const r = chCardRoom(t.id); return `<button class="btn btn-ghost btn-sm" type="button" data-ch="card" data-id="${t.id}">${CH_ICON}AI Chat${r ? ` · ${CH_LABEL[chState(r)]}` : ''}</button>`; })() : ''}${pckCardBtn(t)}</div>
     ${section(`할 일${t.todos.length ? ` <span class="count num">${t.todos.filter(x => x.d).length}/${t.todos.length}</span>` : ''}`, (t.todos.length ? meter(t.todos.filter(x => x.d).length, t.todos.length, 'thin') : '') + todos + `<form data-form="task-todo" data-id="${t.id}" class="form-row" style="margin-top:12px"><label class="field" style="flex:1 1 240px"><span class="sr-only">할 일</span><input name="t" id="ttodo-${t.id}" placeholder="할 일 하나"></label><button class="btn btn-ghost" type="submit">할 일 추가하기</button></form>`)}
     ${section('완료 조건', t.done.filter(Boolean).length ? `<div class="md">${md(t.done.map(x => '- ' + x).join('\n'))}</div>` : noneText)}
     ${section('메모', t.memo ? `<div class="md">${md(t.memo)}</div>` : noneText)}
@@ -3801,6 +4046,40 @@ function plCount(id){
   const live = (f, it) => (x.state.runs || []).some(r => r.feed === f.name && r.item.id === it.id && !['done', 'canceled'].includes(r.status));
   return runs + x.feeds.filter(f => (!f.start && f.count !== 'no') || (f.start && f.count === 'yes')).reduce((n, f) => n + (f.start ? ((x.state.feeds[f.name] || {}).items || []).filter(it => !live(f, it)).length : plVisible(x, f).length), 0);
 }
+/* pairs 설정 — 한 줄에 두 칸(예: 정규식과 주소). 값은 줄마다 두 칸을 탭으로 나눈 글. 줄 더하기·지우기는 화면에서만 하고 저장할 때 모은다 */
+const plPairRows = v => String(v || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^(.+?)\t+\s*(.*)$/) || l.match(/^(.+?)\s+(?:→|->)\s+(.*)$/); return m ? [m[1], m[2]] : [l, '']; });
+function plPairRow(s, i, a = '', b = ''){
+  const [c1, c2] = s.columns;
+  return `<li class="pl-pair"><input class="pl-pair-a" value="${esc(a)}" placeholder="${esc(c1.placeholder)}" aria-label="${esc(c1.label)} ${i + 1}" data-check="${c1.check || ''}" autocomplete="off" spellcheck="false" autocapitalize="off">
+    <input class="pl-pair-b" value="${esc(b)}" placeholder="${esc(c2.placeholder)}" aria-label="${esc(c2.label)} ${i + 1}" data-check="${c2.check || ''}" autocomplete="off" spellcheck="false" autocapitalize="off">
+    <button class="btn btn-text btn-sm" type="button" data-pl="pair-del" aria-label="${i + 1}번째 줄 지우기">지우기</button></li>`;
+}
+function plPairs(s, v){
+  const rows = plPairRows(v), [c1, c2] = s.columns;
+  return `<fieldset class="pl-pairs" data-key="${s.key}"><legend>${esc(s.label)}${s.hint ? ` <span class="hint">${esc(s.hint)}</span>` : ''}</legend>
+    <div class="pl-pair-head" aria-hidden="true"><span>${esc(c1.label)}</span><span>${esc(c2.label)}</span></div>
+    <ol class="pl-pair-list">${(rows.length ? rows : [['', '']]).map(([a, b], i) => plPairRow(s, i, a, b)).join('')}</ol>
+    <p class="err" hidden></p>
+    <div><button class="btn btn-ghost btn-sm" type="button" data-pl="pair-add">+ 줄 더하기</button></div></fieldset>`;
+}
+// 저장할 때: 빈 줄은 빼고, 칸의 check(regex·url)가 틀리면 그 칸을 짚고 멈춘다
+function plPairCollect(fs){
+  const out = [], err = fs.querySelector('.err'); let bad = null;
+  fs.querySelectorAll('.pl-pair').forEach(li => {
+    const ins = [...li.querySelectorAll('input')], [a, b] = ins.map(x => x.value.replace(/[\t\n]/g, ' ').trim());
+    ins.forEach(x => x.removeAttribute('aria-invalid'));
+    if (!a && !b) return;
+    for (const [x, val] of [[ins[0], a], [ins[1], b]]){
+      const why = !val ? '비어 있어요' : x.dataset.check === 'regex' && (() => { try { new RegExp(val); return false; } catch { return true; } })() ? '정규식이 맞지 않아요'
+        : x.dataset.check === 'url' && !/^https?:\/\/\S+$/.test(val) ? 'http:// 또는 https://로 시작하는 주소여야 해요' : '';
+      if (why && !bad){ bad = { x, why:`${x.getAttribute('aria-label')}: ${why}` }; x.setAttribute('aria-invalid', 'true'); }
+    }
+    out.push(`${a}\t${b}`);
+  });
+  err.hidden = !bad; err.textContent = bad ? bad.why : '';
+  if (bad){ bad.x.focus(); return null; }
+  return out.join('\n');
+}
 async function plLoad(force){
   if (!plOK() || PL.loading) return;
   if (PL.p !== S.profile) Object.assign(PL, { p:S.profile, st:null, list:null, machine:{}, scripts:{}, at:0, inspect:null, sent:{}, keep:{}, picked:{} });
@@ -3819,7 +4098,8 @@ async function plLoad(force){
 function plRepaint(){
   buildNav();
   const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#main input, #main textarea, #main select');
-  if (!typing && !document.querySelector('dialog[open]') && /^#\/(plugins|now)/.test(location.hash || homeHash())) render();
+  const qlSig = QL.sig, qlNew = /^#\/action\/short/.test(location.hash || homeHash()) && (qlRules(), QL.sig !== qlSig);   // 퀵링크 규칙이 바뀌었을 때만 보드·카드를 다시 그린다
+  if (!typing && !document.querySelector('dialog[open]') && (qlNew || /^#\/(plugins|now)/.test(location.hash || homeHash()))) render();
   if (/^#\/search/.test(location.hash) && $('#q-res')) $('#q-res').innerHTML = searchResults();   // 플러그인 검색 칸이 늦게 와도 입력 중인 칸은 두고 결과만
 }
 async function plMachine(id, force){
@@ -3897,7 +4177,7 @@ function plFinds(list){
     <div class="pl-find-head">${plUrl(f.url) ? `<a class="pl-where" href="${esc(plUrl(f.url))}" target="_blank" rel="noopener"><code>${esc(f.where || '')}</code> <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<code class="pl-where">${esc(f.where || '')}</code>`}${f.tag ? plBadge(f.tag, 'bad') : ''}${f.note ? plBadge(f.note, 'wait') : ''}</div>
     ${f.title ? `<b class="pl-find-title">${esc(f.title)}</b>` : ''}
     ${f.text ? `<p class="pl-find-text">${esc(f.text)}</p>` : ''}
-    ${f.copy ? `<div class="pl-say"><p class="pl-text">${esc(f.copy)}</p><button class="btn btn-text btn-sm" type="button" data-pl="copy" data-text="${esc(f.copy)}" data-msg="${f.title ? `‘${esc(f.title)}’ 문구를 복사했어요` : `${k + 1}번째 문구를 복사했어요`}" aria-label="${f.title ? `‘${esc(f.title)}’ 문구 복사` : `${k + 1}번째 문구 복사`}">문구 복사</button></div>` : ''}
+    ${f.copy ? `<div class="pl-say">${f.rich ? `<div class="pl-text pl-rich md">${plRich(f.copy)}</div>` : `<p class="pl-text">${esc(f.copy)}</p>`}<button class="btn btn-text btn-sm" type="button" data-pl="copy" data-text="${esc(f.copy)}"${f.rich ? ' data-rich="1"' : ''} data-msg="${f.title ? `‘${esc(f.title)}’ 문구를 복사했어요` : `${k + 1}번째 문구를 복사했어요`}" aria-label="${f.title ? `‘${esc(f.title)}’ 문구 복사` : `${k + 1}번째 문구 복사`}">문구 복사</button></div>` : ''}
   </li>`).join('')}</ol>`;
 }
 // 묻는 단계의 선택지를 버튼으로(ask.inline). 누른 뒤에는 같은 자리에 '하는 중'을 둔다
@@ -3917,27 +4197,31 @@ function plInlineFeed(id, x, f){
     const r = runs.find(z => z.item.id === it.id && z.status !== 'canceled');   // 최근 것(runs는 새것이 앞)
     const stale = r && it.version != null && r.item.version != null && r.item.version !== it.version && !['queued', 'running', 'waiting'].includes(r.status);
     const startBtn = (text, cls = 'btn-tonal') => plIsRunner() || plRunner() ? `<button class="btn ${cls} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-label="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(text)}" ${PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(text)}</button>` : '';
+    // 워크플로우가 여럿이면(start: 최신화, 받기, 띄우기 …) 워크플로우마다 버튼 — 첫 번째만 강조. 도는 중인 워크플로우 버튼은 잠근다
+    const live = w => runs.some(z => z.item.id === it.id && z.workflow === w && ['queued', 'running', 'waiting', 'input'].includes(z.status));
+    const multi = f.starts && f.starts.length > 1 && !gone && (plIsRunner() || plRunner())
+      ? f.starts.map((w, i) => `<button class="btn ${i ? 'btn-text' : 'btn-tonal'} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-wf="${esc(w)}" data-title="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(w)}" ${live(w) || PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(i ? w : f.start_label || w)}${live(w) ? ' 중' : ''}</button>`).join('') : '';
     let tone = '', head = '', body = '', acts = '';
     const s = r && plStepNow(r), vd = r && plVerdictOf(r);
     if (r && ['done', 'stopped', 'canceled'].includes(r.status)) delete PL.picked[r.id];
     if (!r || stale){
       if (stale){ tone = 'wait'; head = '검토한 뒤 새 커밋이 올라왔어요'; }
-      acts = gone ? '' : startBtn(stale ? `다시 ${label}` : label);
+      acts = gone ? '' : multi || startBtn(stale ? `다시 ${label}` : label);
     } else if (PL.sent[r.id]) { tone = 'wait'; head = '보냈어요'; body = `<span>${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요</span>`; }
     else if (['queued', 'running', 'waiting'].includes(r.status)){ tone = 'wait'; head = esc(PL.picked[r.id] ? `${PL.picked[r.id]} 하는 중…` : r.status === 'queued' ? '차례를 기다려요' : r.status === 'waiting' ? plRunLine(x, r) : `${s.name} 하는 중`);
       body = PL.picked[r.id] || r.status === 'waiting' ? '' : `<span>${r.status === 'queued' ? esc(plRunLine(x, r)) : `${r.steps.indexOf(s) + 1}/${r.steps.length} · ${plMin(s.started || r.updated)}분째`}</span>`; }
     else if (['input', 'done'].includes(r.status) && vd){
       tone = vd.v.tone === 'bad' ? 'bad' : 'ok'; head = esc(vd.v.title || ''); body = `${vd.v.text ? `<span>${esc(vd.v.text)}</span>` : ''}${plFinds(vd.findings)}`;
       const oc = vd.step.output.outcome;
-      acts = r.status === 'done' ? `<span class="pl-outcome">✓ ${esc((oc && oc.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>`
+      acts = r.status === 'done' ? `<span class="pl-outcome">✓ ${esc((oc && oc.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>${multi}`
         : s.ask && s.ask.inline ? plChoices(id, r, s) : `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`;
     }
     else if (r.status === 'input' && s.ask && s.ask.type === 'gate'){ tone = 'wait'; head = `${esc(s.name)} 하기 전에 확인해 주세요`; body = '<span>자동 시작에서 이 단계는 내 확인을 받게 해 뒀어요</span>';
       acts = `<button class="btn btn-primary btn-sm" type="button" data-pl="confirm" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" data-msg="이어서 해요">이 단계 하기</button>`; }
     else if (r.status === 'input'){ tone = 'wait'; head = esc((s.ask && s.ask.question) || '답이 필요해요'); acts = `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`; }
     else if (r.status === 'stopped'){ tone = 'bad'; head = `${esc(s.name)}에서 멈췄어요`; body = `<span>${esc(String(s.error || '').split('\n')[0])}</span>`;
-      acts = plIsRunner() || plRunner() ? `<button class="btn btn-primary btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>${plUnfilled(s) ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="lenient" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}">빈 값은 두고 이어 하기</button>` : ''}` : ''; }
-    else if (r.status === 'done'){ tone = 'done'; head = `끝 · ${plTime(r.finished || r.updated)}`; }
+      acts = plIsRunner() || plRunner() ? `<button class="btn btn-primary btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>${plUnfilled(s) ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="lenient" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}">빈 값은 두고 이어 하기</button>` : ''}` : ''; acts += multi; }
+    else if (r.status === 'done'){ tone = 'done'; head = `끝 · ${plTime(r.finished || r.updated)}`; acts = multi; }
     const more = r && !stale ? `<a class="btn btn-text btn-sm" href="#/plugins/${id}/run/${r.id}">자세히</a>` : '';
     const state = head || body ? `<div class="pl-state ${tone ? `pl-${tone}` : ''}" ${tone === 'wait' ? 'role="status"' : ''}>${head ? `<b>${head}</b>` : ''}${body}</div>` : '';
     return `<li class="pl-irow${gone ? ' pl-gone' : ''}">
@@ -3956,7 +4240,9 @@ function vPlugins(id){
   if (!plOK()) return `<div class="page"><h1 tabindex="-1">플러그인</h1><p class="muted" style="margin-top:8px">플러그인 목록은 컴퓨터에서 pkm 서버로 열었을 때 볼 수 있어요.</p></div>`;
   plLoad();
   if (!PL.st) return `<div class="page"><h1 tabindex="-1">플러그인</h1>${PL.error ? `<div class="ai-state bad" style="margin-top:16px"><b>플러그인 상태를 읽지 못했어요</b><span>${esc(PL.error)}</span></div>` : '<p class="muted" style="margin-top:8px" role="status">불러오는 중이에요</p>'}</div>`;
-  const ids = plIds();
+  const ids = plIds(), cks = pckList().filter(c => !ids.includes(c.id));
+  // 목록이 없는 체크인 플러그인(성과 평가 글)은 탭으로 바로 그 화면에 간다
+  if (cks.length && (!ids.length || cks.some(c => c.id === id))){ const c = cks.find(x => x.id === id) || cks[0]; return vCheckin(c.id, c.name, 'main'); }
   if (!ids.length) return vPluginManage();
   if (!ids.includes(id)){ const last = LS.get(`pkm:v1:pl-tab:${S.profile}`, ''); id = ids.includes(last) ? last : ids[0]; }
   LS.set(`pkm:v1:pl-tab:${S.profile}`, id);
@@ -3972,11 +4258,13 @@ function vPlugins(id){
   if (!feeds.length) gate = '';
   else if (!plRunner()) gate = `<div class="ai-state wait"><b>아직 목록을 가져오는 컴퓨터가 없어요</b><span>회사처럼 GitHub·Jira에 닿는 컴퓨터에서 켜 두면, 브라우저를 닫아도 그 컴퓨터가 가져와요.</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">이 컴퓨터에서 돌리기</a></div></div>`;
   else if (plIsRunner() && m && m.at){ const left = plMissing(id); if (left.length) gate = `<div class="ai-state wait"><b>준비가 ${left.length}개 남았어요</b><span>${esc(left.join(' · '))}</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">준비 마치기</a></div></div>`; }
-  const tabs = ids.length > 1 ? seg(ids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), id, 'seg-compact', ids.length > 3 ? '플러그인 보기' : '') : '';
+  const tabs = ids.length + cks.length > 1 ? seg([...ids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), ...cks.map(c => [`ck:${c.id}`, `#/plugins/${c.id}`, esc(c.name)])], id, 'seg-compact', ids.length + cks.length > 3 ? '플러그인 보기' : '') : '';
   const autoFeed = feeds.find(f => f.start && f.start_mode === 'auto');
   const autoLine = autoFeed ? `<p class="pl-auto">새로 들어오면 자동 시작 · <b>${plAuto(x) ? '켜짐' : '꺼짐'}</b> ${plIsRunner() ? `<button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${plAuto(x) ? '' : '1'}" aria-label="새로 들어오면 자동 시작 ${plAuto(x) ? '끄기' : '켜기'}">${plAuto(x) ? '끄기' : '켜기'}</button>` : ''}</p>` : '';
   const extra = [
+    (x.checkins || []).length ? section('체크인 노트', `<ul class="list">${pckList().filter(c => c.id === id).map(c => `<li><a class="row" href="${pckHref(c)}"><span class="body"><span class="title">${esc(c.name)}</span><span class="meta"><span>${esc(c.description || '주요 업무와 과제를 한 화면에서')}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : '',
     (x.editors || []).length ? section('편집기', `<ul class="list">${pedList().filter(e => e.id === id).map(e => `<li><a class="row" href="${pedHref(e)}"><span class="body"><span class="title">${esc(e.name)}</span><span class="meta"><span>${/\{[a-z_]+\}/.test(e.noteTitle) ? '노트를 설정에서 정해 주세요' : esc(e.noteTitle)}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>`) : '',
+    (x.links || []).length ? section('퀵링크', `<p class="faint" style="margin:0">단기 카드 제목 맨 앞이 규칙에 맞으면 그 부분이 링크가 돼요. 지금 규칙 <span class="num">${qlRules().length}</span>개 · <a href="#/plugins/${id}/setup">규칙 고치기</a></p>`) : '',
     (x.searches || []).length ? section('검색', `<p class="faint" style="margin:0">찾기 화면 아래 '다른 곳에서 찾기'에 ${x.searches.map(s => `<b>${esc(s.name)}</b>`).join(', ')}이 생겨요. ${PL.machine[id] && PL.machine[id].approved ? '' : '이 컴퓨터에서 플러그인을 승인하고 비밀값을 넣어야 찾을 수 있어요. '}<a href="#/search">찾기 열기</a></p>`) : ''
   ].join('');
   const body = extra + feeds.map(f => {
@@ -4181,6 +4469,7 @@ function vPluginSetup(id){
     const v = x ? x.local.settings[s.key] : s.default, idf = `pl-set-${s.key}`, hint = s.hint ? ` <span class="hint">${esc(s.hint)}</span>` : '';
     if (s.type === 'toggle') return `<label class="check"><input type="checkbox" name="${s.key}" ${v ? 'checked' : ''}><span>${esc(s.label)}</span></label>`;
     if (s.type === 'lines') return `<label class="field"><span>${esc(s.label)}${hint}</span><textarea name="${s.key}" id="${idf}" rows="4" placeholder="${esc(s.placeholder)}" spellcheck="false">${esc(v)}</textarea></label>`;
+    if (s.type === 'pairs') return plPairs(s, v);
     return `<label class="field"><span>${esc(s.label)}${hint}</span><input name="${s.key}" id="${idf}" value="${esc(v)}" placeholder="${esc(s.placeholder)}" autocomplete="off" spellcheck="false" ${s.type === 'path' ? 'autocapitalize="off"' : ''}></label>`;
   }).join('');
   const autoFeed = x && x.feeds.find(f => f.start && f.start_mode === 'auto');
@@ -4215,6 +4504,7 @@ function vPluginSetup(id){
   return `<div class="page">
     <a class="back" href="#/plugins/${x && x.feeds.length ? id : '_manage'}"><span aria-hidden="true">‹</span> ${x && x.feeds.length ? esc(mf.name) : '플러그인 관리'}</a>
     <h1 tabindex="-1">${esc(mf.name)} 준비와 설정</h1>
+    ${pckList().filter(c => c.id === id).map(c => `<p style="margin:8px 0 0"><a class="btn btn-tonal btn-sm" href="${pckHref(c)}">${esc(c.name)} 열기</a></p>`).join('')}
     ${card}
     <section class="section"><h2>이 컴퓨터 · ${esc(here.host || '')}</h2><p class="faint" style="margin:-4px 0 12px">여기 값은 이 컴퓨터에만 있어요. 다른 컴퓨터에서 돌리려면 거기서 다시 넣어요.</p>
       <dl class="pl-kvs">${elsewhere ? runRow : plLocalOnly(id) && plNoScripts(id) && !plChat(id) ? kv('준비', '따로 준비할 것이 없어요') : aiRow + (plLocalOnly(id) ? '' : runRow) + apRow + chatRows + secretRows}</dl>${elsewhere ? '' : scriptList + secretForms}</section>
@@ -4231,13 +4521,27 @@ function vPluginManage(){
   if (!plOK()) return `<div class="page"><h1 tabindex="-1">플러그인 관리</h1><p class="muted" style="margin-top:8px">플러그인은 컴퓨터에서 pkm을 열었을 때 설치할 수 있어요.</p></div>`;
   plLoad();
   const list = PL.list || [];
-  const rows = list.map(z => { const n = z.manifest ? z.manifest.name : z.id, st = !z.ok ? '규격에 맞지 않아 멈춤' : z.changed && z.changed.length ? '바뀐 파일이 있어 멈춤' : '';
-    return `<li><a class="row" href="#/plugins/${z.id}/setup"><span class="body"><span class="title">${esc(n)}</span><span class="meta"><span>${esc(z.manifest ? z.manifest.version : '')}</span>${plUpd(z.id) ? plBadge(`새 버전 ${plUpd(z.id).to || ''}`.trim(), 'review') : ''}${st ? plBadge(st, 'bad') : ''}${plRunner() ? `<span>${esc(plWho())}에서 돌림</span>` : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`; });
+  list.forEach(z => plMachine(z.id));   // 쓰는지 가르려면 토큰·승인 상태가 있어야 한다
+  const row = (z, why) => { const n = z.manifest ? z.manifest.name : z.id, st = !z.ok ? '규격에 맞지 않아 멈춤' : z.changed && z.changed.length ? '바뀐 파일이 있어 멈춤' : '';
+    return `<li><a class="row" href="#/plugins/${z.id}/setup"><span class="body"><span class="title">${esc(n)}</span><span class="meta"><span>${esc(z.manifest ? z.manifest.version : '')}</span>${plUpd(z.id) ? plBadge(`새 버전 ${plUpd(z.id).to || ''}`.trim(), 'review') : ''}${st ? plBadge(st, 'bad') : ''}${why ? plBadge(why, 'wait') : plRunner() && !plLocalOnly(z.id) ? `<span>${esc(plWho())}에서 돌림</span>` : ''}</span></span><span class="chev" aria-hidden="true">›</span></a></li>`; };
+  const idle = list.map(z => [z, plIdle(z)]), wait = idle.some(([, w]) => w === null);
+  const used = idle.filter(([, w]) => !w).map(([z]) => row(z)), unused = idle.filter(([, w]) => w).map(([z, w]) => row(z, w));
+  const part = (title, rows, hint) => section(`${title} <span class="count">${rows.length}</span>`, `${hint ? `<p class="faint" style="margin:-4px 0 12px">${hint}</p>` : ''}<ul class="list">${rows.join('')}</ul>`);
   return `<div class="page">
     ${plIds().length ? `<a class="back" href="#/plugins"><span aria-hidden="true">‹</span> 플러그인</a>` : ''}
-    <header class="page-head"><div><h1 tabindex="-1">플러그인 관리</h1><p class="sub">${esc(S.profile)} 프로필에 설치한 플러그인이에요</p></div>${rows.length ? '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>' : ''}</header>
-    ${!PL.list ? '<p class="muted" role="status">불러오는 중이에요</p>' : rows.length ? `<ul class="list">${rows.join('')}</ul>` : empty('아직 설치한 플러그인이 없어요', '플러그인은 리뷰 모아 보기처럼 한 가지 일에 맞춘 목록과 작업을 pkm에 더해요.', '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>')}
+    <header class="page-head"><div><h1 tabindex="-1">플러그인 관리</h1><p class="sub">${esc(S.profile)} 프로필에 설치한 플러그인이에요</p></div>${list.length ? '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>' : ''}</header>
+    ${!PL.list || (list.length && wait) ? '<p class="muted" role="status">불러오는 중이에요</p>' : list.length ? `${used.length ? part('쓰는 중', used) : ''}${unused.length ? part('안 쓰는 중', unused, '토큰이나 준비가 빠져서 아직 돌지 않아요. 눌러서 마저 준비하거나, 필요 없으면 지워요.') : ''}` : empty('아직 설치한 플러그인이 없어요', '플러그인은 리뷰 모아 보기처럼 한 가지 일에 맞춘 목록과 작업을 pkm에 더해요.', '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>')}
   </div>`;
+}
+// 안 쓰는 이유 — 쓰는 중이면 '', 이 컴퓨터 상태를 아직 못 읽었으면 null. 멈춘 플러그인은 손봐야 하니 쓰는 중에 둔다
+function plIdle(z){
+  const m = PL.machine[z.id], x = PL.st && PL.st.plugins[z.id];
+  if (!z.ok || (z.changed && z.changed.length)) return '';
+  if (!m || !m.at || !x) return m && m.error ? '' : null;
+  if ((m.secrets || []).length && !m.secrets.some(s => s.set_at)) return '토큰 없음';
+  const left = plMissing(z.id); if (left.length) return `준비 ${left.length}개 남음`;
+  if (x.feeds.length && !Object.values(x.state.feeds || {}).some(f => f.at)) return '아직 가져온 적 없음';
+  return '';
 }
 function vPluginAdd(){
   if (!plOK()) return vPluginManage();
@@ -4248,7 +4552,7 @@ function vPluginAdd(){
   const review = !ins ? '' : !ins.ok ? `<div class="ai-state bad" role="alert"><b>설치할 수 없어요 — 규격에 맞지 않는 곳이 ${ins.errors.length}개 있어요</b><ul>${ins.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul><div><button class="btn btn-ghost btn-sm" type="button" data-pl="inspect-reset">다른 주소로 다시 하기</button></div></div>` : `
     <section class="section pl-review" aria-labelledby="pl-rv-h"><h2 id="pl-rv-h" tabindex="-1">${esc(mf.name)} <span class="faint num">${esc(mf.version)}</span></h2>${mf.description ? `<p class="pl-text">${esc(mf.description)}</p>` : ''}
       ${changes}
-      <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}${(ins.chats || []).map(c => `<li>${c.scope === 'card' ? `단기 카드마다 「${esc(c.label || c.name)}」 세션 — 이 컴퓨터의 작업 폴더에서, 카드끼리 동시에` : `오른쪽 아래 AI 챗봇 버튼 — 「${esc(c.name)}」, 이 프로필 데이터를 말로 고쳐요`}</li>`).join('')}</ul>
+      <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${(ins.checkins || []).map(c => `<li>체크인 「${esc(c.name)}」 — 주요 업무·과제를 한 화면에서 고치고, 제출 미리보기·점검${c.prompts && c.prompts.score ? '·점수' : ''}${c.card ? `, 단기 카드에 [${esc(c.card)}]` : ''}</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}${(ins.chats || []).map(c => `<li>${c.scope === 'card' ? `단기 카드마다 「${esc(c.label || c.name)}」 세션 — 이 컴퓨터의 작업 폴더에서, 카드끼리 동시에` : `오른쪽 아래 AI 챗봇 버튼 — 「${esc(c.name)}」, 이 프로필 데이터를 말로 고쳐요`}</li>`).join('')}</ul>
       <h3>쓰는 권한</h3><ul>
         ${mf.permissions.ai.includes('agent') ? `<li class="pl-danger"><b>AI가 파일을 고치고 명령을 실행해요</b> (에이전트 · 상한 ${esc(mf.permissions.agent_mode)})</li>` : mf.permissions.ai.includes('chat') ? '<li>AI와 대화만 해요</li>' : ''}
         ${(mf.secrets || []).map(sv => `<li>비밀값 ${esc(sv.label)}(<code>${esc(sv.name)}</code>)을 써요</li>`).join('')}
@@ -4314,7 +4618,27 @@ async function plRunnerSet(on, ai){
   try { await papi('/runner', { on, ...(ai ? { ai } : {}) }); await plLoad(true); for (const k of Object.keys(PL.machine)) plMachine(k, true); render(); return true; }
   catch (e) { toast(e.message); return false; }
 }
-function plCopy(text, msg){
+/* rich 문구: copy를 마크다운으로 보고 서식대로 보이고, 서식 있는 글(HTML)로 복사한다 — 아지트처럼 마크다운을 그대로 붙여 넣으면 서식이 안 사는 곳에 붙여 넣을 때.
+   화면 읽기용 글(새 창 등)은 빼고, 순수 글자판에는 마크다운 원문을 같이 넣는다 */
+function plRich(src){
+  const box = document.createElement('div'); box.innerHTML = md(src);
+  box.querySelectorAll('.sr-only').forEach(x => x.remove());
+  box.querySelectorAll('a').forEach(a => { a.removeAttribute('rel'); a.removeAttribute('target'); });
+  box.querySelectorAll('[class]').forEach(x => x.removeAttribute('class'));
+  return box.innerHTML;
+}
+function plCopy(text, msg, rich){
+  if (rich){
+    const html = plRich(text);
+    const fbRich = () => {   // 클립보드 API가 막힌 곳: 그린 글을 골라 복사하면 서식이 같이 간다
+      const d = document.createElement('div'); d.innerHTML = html; d.contentEditable = 'true'; d.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+      document.body.appendChild(d); const r = document.createRange(); r.selectNodeContents(d); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      const ok = document.execCommand('copy'); sel.removeAllRanges(); d.remove(); toast(ok ? msg : '복사하지 못했어요');
+    };
+    if (navigator.clipboard && window.isSecureContext && window.ClipboardItem)
+      return navigator.clipboard.write([new ClipboardItem({ 'text/html':new Blob([html], { type:'text/html' }), 'text/plain':new Blob([text], { type:'text/plain' }) })]).then(() => toast(msg), fbRich);
+    return fbRich();
+  }
   const fb = () => { const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); toast(ok ? msg : '복사하지 못했어요'); };
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(() => toast(msg), fb); else fb();
 }
@@ -4381,7 +4705,7 @@ document.addEventListener('click', async e => {
           <p class="faint">지금 목록에 있는 ${n}개는 자동으로 시작하지 않아요. AI는 'AI 연결'에서 정한 한도 안에서만 써요.</p>` }, () => set(true).then(() => toast('자동 시작을 켰어요')));
       break;
     }
-    case 'copy': plCopy(b.dataset.text, b.dataset.msg || '복사했어요'); break;
+    case 'copy': plCopy(b.dataset.text, b.dataset.msg || '복사했어요', !!b.dataset.rich); break;
     case 'use-ai': { const c = PKMAI.conn(); if (!c){ toast('이 브라우저에 AI 연결이 없어요'); break; } if (await plRunnerSet(null, { url:c.url, token:c.token })) toast('이 컴퓨터의 AI 연결을 넣었어요'); break; }
     case 'runner-on': if (await plRunnerSet(true)) toast(`이 컴퓨터에서 돌려요`); break;
     case 'runner-off': plAsk({ title:'이 컴퓨터에서 그만 돌릴까요?', body:'<p>목록 가져오기와 자동 시작을 멈춰요. 하던 작업은 멈춘 자리에 남아요. 다시 켜면 이어서 해요.</p>', ok:'멈추기' }, () => plRunnerSet(false).then(ok => ok && toast('이 컴퓨터에서 돌리기를 멈췄어요'))); break;
@@ -4390,6 +4714,18 @@ document.addEventListener('click', async e => {
     case 'secret-edit': PL.busy = `secret-edit:${b.dataset.name}`; render(); focusEl($(`#pl-sec-${b.dataset.name}`)); break;
     case 'secret-del': plAsk({ title:`${b.dataset.label}을 지울까요?`, body:'<p>이 값을 쓰는 목록과 작업이 다시 넣을 때까지 멈춰요. 지운 값은 되살릴 수 없어서, 다시 넣으려면 토큰을 새로 붙여 넣어야 해요.</p>', ok:'토큰 지우기', danger:true },
       async () => { try { await papi(`/plugins/${id}/secret`, { name:b.dataset.name, value:null }); await plMachine(id, true); toast(`${b.dataset.label}을 지웠어요`); } catch (er) { toast(er.message); } }); break;
+    case 'pair-add': case 'pair-del': {   // pairs 설정 줄 — 쓰던 칸이 날아가지 않게 다시 그리지 않고 줄만 더하고 뺀다
+      const fs = b.closest('.pl-pairs'), ol = fs.querySelector('.pl-pair-list'), li = (PL.list || []).find(z => z.id === b.closest('form').dataset.id);
+      const s = li && li.manifest.settings.find(z => z.key === fs.dataset.key); if (!s) break;
+      if (b.dataset.pl === 'pair-add'){ ol.insertAdjacentHTML('beforeend', plPairRow(s, ol.children.length)); ol.lastElementChild.querySelector('input').focus(); }
+      else {
+        const row = b.closest('.pl-pair'), next = row.nextElementSibling || row.previousElementSibling;
+        if (ol.children.length > 1) row.remove(); else row.querySelectorAll('input').forEach(x => { x.value = ''; x.removeAttribute('aria-invalid'); });
+        [...ol.children].forEach((r, i) => { const [x, y] = r.querySelectorAll('input'); x.setAttribute('aria-label', `${s.columns[0].label} ${i + 1}`); y.setAttribute('aria-label', `${s.columns[1].label} ${i + 1}`); r.querySelector('button').setAttribute('aria-label', `${i + 1}번째 줄 지우기`); });
+        ((next && next.isConnected ? next : ol.firstElementChild).querySelector('input')).focus();
+      }
+      break;
+    }
     case 'peek': { const i = b.parentElement.querySelector('input'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; b.textContent = show ? '가리기' : '보기'; b.setAttribute('aria-pressed', String(show)); break; }
     case 'remove': plAsk({ title:`${plName(id)} 플러그인을 지울까요?`, body:'<p>플러그인 파일을 휴지통으로 옮겨요. 가져오기와 자동 시작이 멈춰요. 만든 작업 폴더와 브랜치, 이 컴퓨터에 넣어 둔 토큰은 그대로 남아요.</p>', ok:'플러그인 지우기', danger:true },
       async () => { try { await STORE.json(`/api/profile/${encodeURIComponent(S.profile)}/plugins/${id}`, { method:'DELETE' }); await plLoad(true); chLoad(); go('#/plugins/_manage'); toast('플러그인을 지웠어요'); } catch (er) { toast(er.message); } }); break;
@@ -4458,7 +4794,10 @@ document.addEventListener('submit', async e => {
     try { await papi(`/plugins/${id}/local`, { gates }); await plLoad(true); render(); const n = Object.values(gates).filter(Boolean).length; toast(n ? `${n}단계는 하기 전에 내 확인을 받아요` : '모든 단계를 자동으로 해요'); } catch (er) { toast(er.message); }
   } else if (kind === 'settings'){
     const li = PL.list.find(z => z.id === id), settings = {};
-    for (const s of li.manifest.settings) settings[s.key] = s.type === 'toggle' ? f.elements[s.key].checked : f.elements[s.key].value;
+    for (const s of li.manifest.settings){
+      if (s.type === 'pairs'){ const v = plPairCollect(f.querySelector(`.pl-pairs[data-key="${s.key}"]`)); if (v == null) return; settings[s.key] = v; }
+      else settings[s.key] = s.type === 'toggle' ? f.elements[s.key].checked : f.elements[s.key].value;
+    }
     try { await papi(`/plugins/${id}/local`, { settings }); await plLoad(true); render(); toast('설정을 저장했어요'); } catch (er) { toast(er.message); }
   } else if (kind === 'inspect'){
     const src = f.src.value.trim().replace(/\.git$/, ''), ref = f.ref.value.trim();
@@ -4485,7 +4824,7 @@ const NAV = [['now','지금','#/now'],['inbox','인박스','#/inbox'],['knowledg
 /* 메뉴 순서·숨김은 프로필 설정(_설정.md의 menu_order·menu_hidden). 적힌 순서에 없는 메뉴는 뒤에 붙는다 */
 function menuItems(){
   const P = PSET[S.profile] || {}, order = (P.menu_order || []).filter(k => NAV.some(n => n[0] === k));
-  const all = [...order, ...NAV.map(n => n[0]).filter(k => !order.includes(k))].filter(k => k !== 'plugins' || plIds().length), hidden = new Set(P.menu_hidden || []);   // 플러그인 메뉴는 목록을 가져오는 플러그인이 있을 때만
+  const all = [...order, ...NAV.map(n => n[0]).filter(k => !order.includes(k))].filter(k => k !== 'plugins' || plIds().length || pckList().length), hidden = new Set(P.menu_hidden || []);   // 플러그인 메뉴는 목록을 가져오는 플러그인이 있을 때만
   return all.map(k => ({ k, n:NAV.find(n => n[0] === k), shown:!hidden.has(k) }));
 }
 const homeHash = () => (menuItems().find(m => m.shown) || { n:NAV[0] }).n[2];
@@ -4528,7 +4867,7 @@ function route(p){
       return vAction(b);
     }
     case 'plugins': if (p[1] === '_manage') return vPluginManage(); if (p[1] === '_add') return vPluginAdd();
-      if (p[2] === 'setup') return vPluginSetup(p[1]); if (p[2] === 'run') return vPluginRun(p[1], p[3]); if (p[2] === 'edit') return vPluginEditor(p[1], p[3]); return vPlugins(p[1]);
+      if (p[2] === 'setup') return vPluginSetup(p[1]); if (p[2] === 'run') return vPluginRun(p[1], p[3]); if (p[2] === 'edit') return vPluginEditor(p[1], p[3]); if (p[2] === 'checkin') return vCheckin(p[1], p[3], p[4], p[5]); return vPlugins(p[1]);
     default: return vNotFound();
   }
 }
@@ -5142,6 +5481,7 @@ function openStatus(id, to){
   f.querySelector(`input[name=to][value="${to || t.status}"]`).checked = true;
   f.waitOn.value = t.waitOn || '';
   $('#wait-names').innerHTML = [...new Set(db().tasks.map(x => x.waitOn).filter(Boolean))].map(n => `<option value="${esc(n)}">`).join('');
+  $('#st-pck').innerHTML = pckCardBtn(t, 'menu');
   syncStatusDlg(); openDlg('dlg-status');
   (to === '기다림' ? f.waitOn : f.querySelector('input[name=to]:checked')).focus();
 }
@@ -5225,6 +5565,10 @@ document.addEventListener('click', e => {
     case 'jobs-runner': plRunnerSet(true, PKMAI.conn() ? { url:PKMAI.conn().url, token:PKMAI.conn().token } : undefined).then(ok => { if (ok){ toast('이 컴퓨터에서 돌려요'); jobsLoad(true); } }); break;
     case 'job-run': papi(`/jobs/${encodeURIComponent(id)}/run`, {}).then(() => { toast('AI에게 맡겼어요 · 끝나면 인박스에 남아요'); jobsLoad(true); }).catch(e => toast(e.message)); break;
     case 'job-del': { const set = pset(), prev = (set.ai_jobs || []).slice(); set.ai_jobs = prev.filter(j => j.id !== id); go('#/jobs'); toast('예약 작업을 지웠어요', { label:'되돌리기', fn:() => { pset().ai_jobs = prev; render(); } }); break; }
+    case 'ctx-sel-on': S.ctxSel = new Set(); render(); focusEl($('#ctx-sel-all')); break;
+    case 'ctx-sel-off': S.ctxSel = null; render(); focusEl($('[data-act="ctx-sel-on"]')); break;
+    case 'ctx-move': openCtxMove(); break;
+    case 'ctx-del': openCtxDel(); break;
     case 'k-group': LS.set(`pkm:v1:kg:${S.profile}:${b.dataset.tab}`, b.dataset.v); render(); break;
     case 'q-kind': S.qk = b.dataset.v; $('#q-res').innerHTML = searchResults(); $(`#q-res [data-act="q-kind"][data-v="${CSS.escape(b.dataset.v)}"]`)?.focus(); break;
     case 'recall-skip': (S.recallSkip = S.recallSkip || []).push(id); render(); break;
@@ -5335,7 +5679,7 @@ document.addEventListener('click', e => {
     case 'st-del': { const tid = $('#dlg-status form').dataset.id; $('#dlg-status').close(); deleteItem('tasks', tid, true); break; }
     case 'pl-search': plSearchRun(id, b.dataset.name); break;
     case 'pl-search-all': plSearchAll(); break;
-    case 'ped-copy': { const t = $(`#pf-${b.dataset.what}${b.dataset.i}`); copyText(t.value.trim(), b.dataset.what === 't' ? '제목을 복사했어요' : '본문을 복사했어요'); break; }
+    case 'ped-copy': { const w = b.dataset.what, i = b.dataset.i, v = k => $(`#pf-${k}${i}`).value; copyText(w === 'c' ? pedCombined(v('t'), v('b')) : w === 't' ? pedSubmitTitle(v('t')) : v(w).trim(), w === 't' ? '제목을 복사했어요' : w === 'c' ? '제출 칸에 넣을 글을 복사했어요' : '본문을 복사했어요'); break; }
     case 'swipe-del': swOpen = null; deleteItem(b.dataset.kind, id, true); break;
     case 'inline-edit': S.inline = id; render(); { const t = document.getElementById('ie-' + id); t && t.focus(); } break;
     case 'inline-cancel': S.inline = null; render(); break;
@@ -5378,7 +5722,10 @@ document.addEventListener('click', e => {
       const tb = pp[1] === 'tb' && (db().textbooks || []).find(x => x.id === key);
       if (tb && tb.source){ location.href = `obsidian://open?file=${encodeURIComponent(tb.source.replace(/\.md$/, ''))}`; break; }   // 교과서는 Obsidian 원본이 정본 — 원본 볼트에서 연다
       if (!file){ toast('아직 파일로 저장되지 않았어요. 잠시 뒤 다시 눌러 주세요'); break; }
-      location.href = `obsidian://open?vault=${encodeURIComponent(S.profile)}&file=${encodeURIComponent(file.replace(/\.md$/, ''))}`;
+      STORE.json(`/api/profile/${encodeURIComponent(S.profile)}/obsidian?file=${encodeURIComponent(file)}`).then(r => {
+        if (r.url){ location.href = r.url; return; }
+        toast(`Obsidian에 이 노트 폴더가 보관함으로 열려 있지 않아요. Obsidian에서 '폴더를 보관함으로 열기'로 ${r.dir} 를 한 번 열어 주세요`, { label:'폴더 경로 복사', fn:() => copyText(r.dir, '폴더 경로를 복사했어요') });
+      }).catch(er => toast(er.message));
       break;
     }
     case 'del-fleeting': {
@@ -5453,7 +5800,11 @@ document.addEventListener('change', e => {
   }
   const act = el.dataset.change; if (!act) return;
   const D = db(), id = el.dataset.id;
-  if (act === 'routine-check'){
+  if (act === 'ctx-sel'){
+    if (!S.ctxSel) return; el.checked ? S.ctxSel.add(id) : S.ctxSel.delete(id); ctxSelPaint();
+  } else if (act === 'ctx-sel-all'){
+    if (!S.ctxSel) return; $$('#ctx-list input[data-change="ctx-sel"]').forEach(x => { x.checked = el.checked; el.checked ? S.ctxSel.add(x.dataset.id) : S.ctxSel.delete(x.dataset.id); }); ctxSelPaint();
+  } else if (act === 'routine-check'){
     checkRoutine(id, el.checked, el.dataset.k || id);
   } else if (act === 'job-on'){
     const j = (pset().ai_jobs || []).find(x => x.id === id); if (!j) return; j.on = el.checked; render();
@@ -5557,6 +5908,20 @@ document.addEventListener('submit', e => {
     });
     f.closest('dialog').close(); render();
     toast(`할 일 ${ids.length}개를 넣었어요`, { label:'되돌리기', fn:undo });
+  } else if (kind === 'ctxmove'){
+    const nw = f.newg.value.split('/').map(x => x.trim()).filter(Boolean).join('/'), r = f.querySelector('input[name=to]:checked');
+    if (!nw && !r) return invalid(f.newg, 'cm-err');
+    const to = nw || r.value, ids = ctxPicked(); f.closest('dialog').close(); if (!ids.length) return;
+    const undo = snapshot();
+    ids.forEach(id => { const c = find('ctxs', id); if (c) c.group = to; });
+    S.ctxSel = null; render();
+    toast(to ? `맥락노트 ${ids.length}개를 '${to.replace(/\//g, ' › ')}' 묶음으로 옮겼어요` : `맥락노트 ${ids.length}개를 묶음 밖으로 옮겼어요`, { label:'되돌리기', fn:undo });
+  } else if (kind === 'ctxdel'){
+    const ids = new Set((f.dataset.ids || '').split(',').filter(Boolean)); f.closest('dialog').close(); if (!ids.size) return;
+    const undo = snapshot();
+    D.ctxs = D.ctxs.filter(c => !ids.has(c.id));
+    S.ctxSel = null; render();
+    toast(`맥락노트 ${ids.size}개를 휴지통으로 옮겼어요`, { label:'되돌리기', fn:undo });
   } else if (kind === 'blkmove'){
     const to = f.to && f.to.value, est = f.querySelector('input[name=est]:checked'), t = find('tasks', f.dataset.id), e = (planOf(D)[f.dataset.block] || []).find(x => x.id === t.id); f.closest('dialog').close();
     const moved = to && to !== f.dataset.block, estCh = est && +est.value !== slotMin(e, t);
@@ -5756,6 +6121,430 @@ $('#import-input').addEventListener('change', async e => {
 });   // 회의록처럼 다시 그리지 않고 고치는 칸도 저장
 window.addEventListener('hashchange', render);
 boot();
+/* 체크인 노트(마이노트) 화면 — 플러그인 checkins/*.md. 규격: docs/PLUGIN.md › 체크인
+   편집기 두 개(주요 업무·과제)를 한 화면에 묶고 제출 미리보기·점검(AI 티)·점수·카드에서 넣기를 더한다.
+   편집기(ped*)·AI(aiAsk)·플러그인 상태(PL)를 그대로 쓴다. */
+
+/* ---------- 찾기 ---------- */
+function pckList(){
+  if (!PL.st || PL.p !== S.profile) return [];
+  return Object.entries(PL.st.plugins || {}).flatMap(([id, x]) => (x.checkins || []).map(c => {
+    const set = (x.local && x.local.settings) || {};
+    const fill = v => v == null ? null : String(v).replace(/\{([a-z_][a-z0-9_]*)\}/g, (m, k) => set[k] != null ? String(set[k]) : '').trim() || null;
+    return { id, ...c, rubric:fill(c.rubric), form:fill(c.form), rules:fill(c.rules) };
+  }));
+}
+const pckHref = (c, tab = 'main', rest = '') => `#/plugins/${encodeURIComponent(c.id)}/checkin/${encodeURIComponent(c.name)}/${tab}${rest}`;
+function pckFor(id, edName){ return pckList().find(c => c.id === id && (c.main === edName || c.tasks === edName)) || null; }
+const pckEdTab = (c, eds) => eds.some(e => e.name === c.tasks) && !eds.some(e => e.name === c.main) ? 'tasks' : 'main';
+const pckSubNum = t => (/^(\d+(?:-\d+)?)\.?\s/.exec(String(t).trim()) || [])[1] || '';
+
+/* 지금 글(저장 안 한 칸 포함)을 한 곳에 모은다 */
+function pckCtx(c){
+  const eds = pedList().filter(e => e.id === c.id), em = eds.find(e => e.name === c.main), et = eds.find(e => e.name === c.tasks);
+  const nm = em && pedNote(em.noteTitle), nt = et && pedNote(et.noteTitle);
+  const Pm = nm ? pedParse(nm.body, em) : null, Pt = nt ? pedParse(nt.body, et) : null;
+  const dv = name => { const d = PED_DRAFT[pedKey(c.id, name)] || {}; return (k, o) => k in d ? d[k] : o; };
+  const vm = dv(c.main), vt = dv(c.tasks);
+  const main = Pm ? Pm.blocks.map((bk, i) => { const title = vm(`t${i}`, bk.title), body = vm(`b${i}`, bk.body);
+    return { id:`M${i + 1}`, i, title, sub:pedSubmitTitle(title), body, combined:pedCombined(title, body) }; }) : [];
+  const tasks = Pt ? Pt.blocks.map((bk, i) => {
+    const title = vt(`t${i}`, bk.title), f = {}; bk.fields.forEach((x, j) => { f[x.name] = vt(`f${i}_${j}`, x.value); });
+    return { id:`T${pckSubNum(title) || i + 1}`, i, group:bk.group, groupSub:pedSubmitTitle(bk.group || ''), title, sub:pedSubmitTitle(title), body:vt(`b${i}`, bk.body), f };
+  }) : [];
+  return { c, em, et, nm, nt, Pm, Pt, main, tasks };
+}
+/* 칸 값에서 고를 값만(뒤 메모 빼고) */
+const pckOpt = (e, name, v) => { const o = e && ((e.choices || {})[name] || (e.check || {})[name]); return o ? pedSplit(o, v).opt : null; };
+const pckHi = (X, t) => pckOpt(X.et, '하이라이트', t.f['하이라이트'] || '') === ((X.et.check || {})['하이라이트'] || [])[0];
+
+/* ---------- 점검: AI 티·제출 칸 규칙 ---------- */
+const PCK_LINT = {};
+function pckLintRules(id){
+  const c = pckList().find(x => x.id === id), src = c && c.prompts && c.prompts.lint || '';
+  if (PCK_LINT[id] && PCK_LINT[id].src === src) return PCK_LINT[id].rules;
+  // '## 이름' 줄이 그 아래 규칙의 갈래(예: AI 티, 제출 칸)가 된다
+  let cat = '점검';
+  const rules = src.split(/\r?\n/).map(l => l.trim()).map(line => {
+    const h = /^##\s+(.+)$/.exec(line); if (h){ cat = h[1]; return null; }
+    if (!line || line.startsWith('#')) return null;
+    const m = line.match(/^(.+?)\t+\s*(.+)$/) || line.match(/^(.+?)\s+(?:→|->)\s+(.+)$/);
+    try { return m ? { re:new RegExp(m[1], 'g'), msg:m[2], cat } : null; } catch (e) { return null; }
+  }).filter(Boolean);
+  PCK_LINT[id] = { src, rules };
+  return rules;
+}
+function pckLint(id, text){
+  return pckLintRules(id).map(r => { const hits = String(text).match(r.re) || []; return hits.length ? { msg:r.msg, cat:r.cat, hits:[...new Set(hits)].slice(0, 4), n:hits.length } : null; }).filter(Boolean);
+}
+function pckLintHTML(id, text){
+  return pckLint(id, text).map(l => `<span class="lint-chip" title="${esc(l.msg)}"><b>${esc(l.hits.join(' '))}</b>${l.n > 1 ? ` ${l.n}곳` : ''} · ${esc(l.msg.split('.')[0])}</span>`).join('');
+}
+
+/* 갈래별 점검 개수 — 갈래는 규칙이 있으면 0이어도 보인다 */
+function pckLintCount(X){
+  const out = {}; pckLintRules(X.c.id).forEach(r => { out[r.cat] = 0; });
+  [...X.main.map(m => m.combined), ...X.tasks.map(t => `${t.sub}\n${t.body}`)].forEach(s => pckLint(X.c.id, s).forEach(l => { out[l.cat] += l.n; }));
+  return out;
+}
+/* 내기 전에 확인할 것 — [{ st:'ok'|'warn'|'bad', text }] */
+function pckChecks(X){
+  const { c, em, et, main, tasks } = X, out = [], add = (st, text) => out.push({ st, text });
+  if (em){
+    const n = main.length;
+    add(n > c.main_max ? 'bad' : n > c.main_rec ? 'warn' : n ? 'ok' : 'bad', `주요 업무 ${n}개 (권장 ${c.main_rec}개, 최대 ${c.main_max}개)`);
+    const lim = em.combine || em.body, over = main.filter(m => pedLen(em.combine ? m.combined : m.body) > lim);
+    add(over.length ? 'bad' : 'ok', over.length ? `제출 칸 ${lim}자를 넘는 주요 업무 ${over.map(m => m.id.slice(1) + '번').join(', ')} — 붙여 넣으면 뒤가 잘려요` : `주요 업무 모두 제출 칸 ${lim}자 안`);
+  }
+  if (et){
+    const over = tasks.filter(t => et.body && pedLen(t.body) > et.body);
+    add(over.length ? 'bad' : 'ok', over.length ? `실행 계획 ${et.body}자를 넘는 과제 ${over.map(t => t.sub.slice(0, 18)).join(', ')}` : `과제 ${tasks.length}개 모두 실행 계획 ${et.body}자 안`);
+    const longT = tasks.filter(t => et.title && pedLen(t.sub) > et.title);
+    if (longT.length) add('bad', `제목이 ${et.title}자를 넘는 세부 과제 ${longT.length}개`);
+    if ((et.check || {})['하이라이트']){ const h = tasks.filter(t => pckHi(X, t)).length; add(h > c.highlight_max ? 'warn' : h ? 'ok' : 'warn', `하이라이트 ${h}개 (최대 ${c.highlight_max}개 권장)`); }
+    if ((et.choices || {})['진행상태']){ const bad = tasks.filter(t => !pckOpt(et, '진행상태', t.f['진행상태'] || '')); if (bad.length) add('warn', `진행상태를 제출 화면 값으로 못 고른 과제 ${bad.length}개`); }
+    if ((et.period || []).length){ const bad = tasks.filter(t => !pedPeriod(t.f['진행기간'] || '')); if (bad.length) add('warn', `진행기간이 'YYYY-MM ~ YYYY-MM' 꼴이 아닌 과제 ${bad.length}개`); }
+    if ((et.after || []).includes('협업 동료')){ const none = tasks.filter(t => !String(t.f['협업 동료'] || '').trim()); if (none.length) add('warn', `협업 동료가 빈 과제 ${none.length}개`); }
+  }
+  for (const [cat, n] of Object.entries(pckLintCount(X))) add(n ? 'warn' : 'ok', n ? `${esc(cat)}: ${n}곳 (각 칸 아래 노란 표시)` : `${esc(cat)}: 없음`);
+  const mir = pckMirror(X); if (mir && mir.diff.length) add('warn', `${esc(X.nt.title)}의 주요 업무와 다른 칸 ${mir.diff.length}개`);
+  return out;
+}
+const pckMark = { ok:'✓', warn:'!', bad:'✕' };
+const pckCheckHTML = list => `<ul class="pck-check">${list.map(x => `<li class="${x.st}"><span class="mk" aria-hidden="true">${pckMark[x.st]}</span><span><span class="sr-only">${x.st === 'ok' ? '통과' : x.st === 'bad' ? '고쳐야 함' : '확인'}: </span>${x.text}</span></li>`).join('')}</ul>`;
+
+/* 과제 노트 안의 주요 업무 사본(mirror) — 제출용 노트와 다른 칸 */
+function pckMirror(X){
+  const { c, em, nt, main } = X; if (!c.mirror || !em || !nt) return null;
+  const L = nt.body.split('\n'), re = new RegExp(c.mirror), k = L.findIndex(l => re.test(l)); if (k < 0) return null;
+  const lv = (/^(#+)\s/.exec(L[k]) || [, ''])[1].length; if (!lv || lv >= 6) return null;
+  const spec = { ...em, within:c.mirror, block:'#'.repeat(lv + 1), group:null };
+  const P = pedParse(nt.body, spec); if (!P.blocks.length) return null;
+  const diff = main.map((m, i) => ({ m, b:P.blocks[i] })).filter(({ m, b }) => !b || pedSubmitTitle(b.title) !== m.sub || b.body.trim() !== m.body.trim());
+  return { P, spec, diff, extra:Math.max(0, P.blocks.length - main.length) };
+}
+function pckMirrorSync(c){
+  const X = pckCtx(c), mir = pckMirror(X); if (!mir || !mir.diff.length) return;
+  if (pedDirty(c.id, c.main)){ toast('주요 업무에 저장 안 한 칸이 있어요. 먼저 저장해 주세요'); return; }
+  const vals = mir.P.blocks.map((bk, i) => { const m = X.main[i]; if (!m) return null; const num = (/^(\d+\.\s*)/.exec(bk.title) || [, ''])[1];
+    return { title:num + m.sub, body:m.body, fields:bk.fields.map(f => f.value) }; });
+  const undo = snapshot(); X.nt.body = pedApply(mir.P, mir.spec, vals); if (X.nt.history) X.nt.updated = TODAY;
+  render(); toast(`${X.nt.title}의 주요 업무를 제출용과 같게 맞췄어요`, { label:'되돌리기', fn:undo });
+}
+
+/* ---------- 지난 공유본(제출 화면 HTML 노트) ---------- */
+const PCK_FORM = {};
+function pckForm(c){
+  const n = c.form && pedNote(c.form); if (!n || typeof DOMParser === 'undefined') return null;
+  if (PCK_FORM[n.id] && PCK_FORM[n.id].body === n.body) return PCK_FORM[n.id].v;
+  const m = /```html\s*\n([\s\S]*?)```/.exec(n.body), doc = new DOMParser().parseFromString(m ? m[1] : n.body, 'text/html');
+  const val = el => el ? (el.getAttribute('value') || '') : '', txt = el => el ? el.textContent : '';
+  const main = [...doc.querySelectorAll('textarea[placeholder^="주요 업무"]')].map(t => { const s = t.textContent, k = s.indexOf('\n\n');
+    return { text:s, title:k < 0 ? s.trim() : s.slice(0, k).trim(), body:k < 0 ? '' : s.slice(k + 2).trim() }; });
+  const tasks = [];
+  doc.querySelectorAll('input[placeholder^="올해 주요 업무"]').forEach(g => {
+    const box = g.closest('.cont_form'); if (!box) return;
+    box.querySelectorAll('.cont_sub').forEach(sub => tasks.push({ group:val(g), num:txt(sub.querySelector('.tit_form')).trim(), title:val(sub.querySelector('input[placeholder^="업무 수행"]')),
+      from:val(sub.querySelector('input[placeholder="시작월"]')), to:val(sub.querySelector('input[placeholder="종료월"]')), status:txt(sub.querySelector('.txt_selected')).trim(),
+      body:txt(sub.querySelector('textarea')), hi:!!sub.querySelector('input[name$="highlightFlag"][checked]'), peers:[...sub.querySelectorAll('.chip_tag')].map(x => (x.firstChild && x.firstChild.textContent || '').trim()).filter(Boolean) }));
+  });
+  const all = doc.body ? doc.body.textContent : '';
+  const v = { note:n, main, tasks, growth:(/Stage\s*\d+\s*:\s*[A-Za-z]+(?:\s*\d+)?/.exec(all) || [''])[0].trim(), shared:(/최근 공유 시점\s*:\s*(\d{4}-\d{2}-\d{2})/.exec(all) || [])[1] || '' };
+  PCK_FORM[n.id] = { body:n.body, v };
+  return v;
+}
+const pckSame = (a, b) => String(a || '').replace(/\s+/g, ' ').trim() === String(b || '').replace(/\s+/g, ' ').trim();
+function pckOldTask(F, t){ return F.tasks.find(x => pckSame(x.title, t.sub)) || F.tasks.find(x => x.num && x.num === pckSubNum(t.title)) || null; }
+const pckDiffTag = (old, now) => !old ? '<span class="pck-diff new">공유본에 없던 칸</span>' : pckSame(old, now) ? '<span class="pck-diff same">공유본과 같음</span>' : '<span class="pck-diff chg">공유본에서 바뀜</span>';
+
+/* ---------- 점수 ---------- */
+const pckScoreKey = c => `pkm:v1:pck-score:${S.profile}:${c.id}/${c.name}`;
+function pckSig(X){ const s = JSON.stringify([X.main.map(m => m.combined), X.tasks.map(t => [t.title, t.body])]); let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) | 0; return String(h >>> 0); }
+function pckRubric(c){
+  if (!c.rubric) return [];
+  return db().ctxs.filter(n => n.title.startsWith(c.rubric) && n.title.length > c.rubric.length)
+    .map(n => ({ name:n.title.slice(c.rubric.length).trim(), title:n.title, id:n.id, body:String(n.body).split(/^# 바뀐 기록/m)[0].trim() }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+}
+function pckSystem(c){
+  const rules = c.rules && pedNote(c.rules);
+  return [c.prompts.style || '', rules ? `내 작성 규칙(꼭 지킨다):\n${String(rules.body).split(/^# 바뀐 기록/m)[0].replace(/^#\s.*$/gm, '').trim()}` : ''].filter(Boolean).join('\n\n');
+}
+const pckFill = (tpl, vars) => String(tpl).replace(/\{([a-z_]+)\}/g, (m, k) => vars[k] != null ? String(vars[k]) : m);
+const pckItemsText = X => [...X.main.map(m => `[${m.id}] 주요 업무 ${m.id.slice(1)}. ${m.sub}\n${m.body}`),
+  ...X.tasks.map(t => `[${t.id}] 세부 과제 (묶음: ${t.groupSub}) ${t.sub}\n진행상태: ${pckOpt(X.et, '진행상태', t.f['진행상태'] || '') || t.f['진행상태'] || ''}\n${t.body}`)].join('\n\n');
+async function pckScoreRun(c){
+  const X = pckCtx(c), R = pckRubric(c), F = pckForm(c); if (!R.length || !c.prompts.score) return;
+  const key = `pck-score:${c.id}/${c.name}`, sig = pckSig(X);
+  const prompt = pckFill(c.prompts.score, { growth:(F && F.growth) || '알 수 없음', rubric:R.map(r => `## ${r.name}\n${r.body.slice(0, 6000)}`).join('\n\n'), items:pckItemsText(X) });
+  await aiAsk(key, prompt, true, { system:pckSystem(c) });
+  const r = AIR[key]; if (r && r.state === 'ok' && r.data && Array.isArray(r.data.axes)){ LS.set(pckScoreKey(c), { at:new Date().toISOString(), sig, data:r.data }); delete AIR[key]; render(); }
+}
+const pckScore = c => LS.get(pckScoreKey(c), null);
+const pckMeter = n => `<span class="pck-meter" aria-hidden="true">${[1, 2, 3, 4, 5, 6, 7].map(k => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+function pckItemBadge(c, id){
+  const sc = pckScore(c), it = sc && (sc.data.items || []).find(x => x.id === id); if (!it || !it.scores) return '';
+  const top = Object.entries(it.scores).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  return top.length ? `<span class="pck-sbadge" title="${esc(it.note || '')}">${top.map(([k, v]) => `<span>${esc(k)} S${v}</span>`).join('')}</span>` : '';
+}
+
+/* ---------- 화면 ---------- */
+function pckStrip(X){
+  const { c, em, et, main, tasks } = X;
+  const li = (cls, label, v) => `<li class="${cls}">${label} <b>${v}</b></li>`;
+  const out = [];
+  if (em){ const lim = em.combine || em.body, over = main.filter(m => pedLen(em.combine ? m.combined : m.body) > lim).length;
+    out.push(li(main.length > c.main_max ? 'bad' : '', '주요 업무', `${main.length}/${c.main_max}`), li(over ? 'bad' : 'ok', '제출 칸 넘음', over)); }
+  if (et){ out.push(li('', '과제', tasks.length), li(tasks.filter(t => et.body && pedLen(t.body) > et.body).length ? 'bad' : 'ok', '1000자 넘음', tasks.filter(t => et.body && pedLen(t.body) > et.body).length));
+    if ((et.check || {})['하이라이트']){ const h = tasks.filter(t => pckHi(X, t)).length; out.push(li(h > c.highlight_max ? 'bad' : '', '하이라이트', `${h}/${c.highlight_max}`)); } }
+  for (const [cat, n] of Object.entries(pckLintCount(X))) out.push(li(n ? 'bad' : 'ok', esc(cat), `${n}곳`));
+  const dirty = pedDirty(c.id, c.main) + pedDirty(c.id, c.tasks); if (dirty) out.push(li('bad', '저장 안 한 칸', dirty));
+  return `<ul class="pck-strip" id="pck-strip" aria-label="지금 상태">${out.join('')}</ul>`;
+}
+// 칸을 고칠 때마다 위 띠만 다시 그린다(입력 중인 칸은 그대로)
+function pckLive(id, edName){ const c = pckFor(id, edName), el = c && document.getElementById('pck-strip'); if (el) el.outerHTML = pckStrip(pckCtx(c)); }
+
+function vCheckin(id, name, tab, arg){
+  if (plOK()) plLoad();
+  const c = pckList().find(x => x.id === id && x.name === name);
+  if (!c) return PL.st ? vNotFound() : `<div class="page"><p class="faint" role="status">불러오는 중…</p></div>`;
+  const X = pckCtx(c), TABS = ['main', 'tasks', 'preview', 'score', 'intake'];
+  if (!TABS.includes(tab)) tab = 'main';
+  // 플러그인 메뉴에서 왔을 때 다른 플러그인으로 옮겨 갈 탭(목록 플러그인 + 체크인)
+  const fids = plIds(), cks = pckList().filter(x => !fids.includes(x.id)), ptabs = fids.length + cks.length > 1 ? seg([...fids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), ...cks.map(x => [`ck:${x.id}`, `#/plugins/${x.id}`, esc(x.name)])], `ck:${id}`, 'seg-compact', fids.length + cks.length > 3 ? '플러그인 보기' : '') : '';
+  const head = `${ptabs || `<a class="back" href="#/plugins/_manage"><span aria-hidden="true">‹</span> 플러그인 관리</a>`}<p class="eyebrow">${esc(plName(id))} · 체크인 노트</p><h1 tabindex="-1">${esc(c.name)}</h1>`;
+  const gate = (!X.em ? empty('주요 업무 편집기를 찾지 못했어요', '플러그인을 다시 설치해 주세요.') : pedGate(X.em, X.nm, id)) || (!X.et ? '' : pedGate(X.et, X.nt, id));
+  if (gate) return `<div class="page">${head}${gate}</div>`;
+  const pending = pckCandidates(c).length;
+  // 카드에서 [올해 성과로 넣기]로 왔으면 AI를 바로 부른다(한 번만 — 실패해도 다시 부르지 않는다)
+  if (tab === 'intake' && arg && aiReady() && c.prompts.intake && !AIR[`pck-intake:${c.id}/${c.name}:${arg}`] && find('tasks', arg)) setTimeout(() => pckIntakeRun(c, arg), 0);
+  const tabs = seg([['main', pckHref(c, 'main'), '주요 업무', X.main.length], ['tasks', pckHref(c, 'tasks'), '과제 관리', X.tasks.length], ['preview', pckHref(c, 'preview'), '제출 미리보기'],
+    ['score', pckHref(c, 'score'), '점수'], ['intake', pckHref(c, 'intake'), '카드에서 넣기', pending || undefined]], tab, 'seg-compact pck-tabs', '마이노트 보기');
+  const body = { main:() => pckEditTab(X, 'main'), tasks:() => pckEditTab(X, 'tasks'), preview:() => pckPreview(X), score:() => pckScoreTab(X), intake:() => pckIntake(X, arg) }[tab]();
+  return `<div class="page">${head}${c.description ? `<p class="faint">${esc(c.description)}</p>` : ''}${pckStrip(X)}${tabs}${body}</div>`;
+}
+
+function pckEditTab(X, which){
+  const { c } = X, e = which === 'main' ? X.em : X.et, n = which === 'main' ? X.nm : X.nt, P = which === 'main' ? X.Pm : X.Pt, items = which === 'main' ? X.main : X.tasks;
+  let top = '';
+  if (which === 'main'){ const mir = pckMirror(X);
+    if (mir && mir.diff.length) top = `<div class="ai-state wait" style="margin-top:16px"><b>${esc(X.nt.title)}의 주요 업무와 ${mir.diff.length}칸이 달라요</b><span>제출용 노트(이 화면)를 기준으로 그쪽을 맞출 수 있어요.</span><div><button class="btn btn-tonal btn-sm" type="button" data-pck="mirror">그쪽도 똑같이 맞추기</button></div></div>`; }
+  const side = i => {
+    const it = items[i], key = `pck-polish:${which}:${i}`, r = AIR[key], lint = pckLint(c.id, which === 'main' ? it.combined : it.body);
+    const btn = aiReady() && c.prompts.polish ? `<button class="btn btn-text btn-sm" type="button" data-pck="polish" data-ed="${which}" data-i="${i}" ${r && r.state === 'run' ? 'disabled aria-busy="true"' : ''}>${r && r.state === 'run' ? 'AI가 다듬는 중…' : lint.length || pedLen(it.body) > (e.body || 1e9) ? 'AI 티 걷어내기' : 'AI로 다듬기'}</button>` : '';
+    const out = r && r.state === 'ok' ? `<div class="pck-ai">${aiOut('AI가 다듬은 본문', `<pre>${esc(r.text)}</pre><p class="faint">${pedLen(r.text)}자${e.body ? ` / ${e.body}자` : ''}${pckLint(c.id, r.text).length ? ' · 아직 짚을 곳이 있어요' : ''}</p>`,
+        `<button class="btn btn-tonal btn-sm" type="button" data-pck="polish-use" data-ed="${which}" data-i="${i}">이 글로 바꾸기</button><button class="btn btn-text btn-sm" type="button" data-pck="polish-drop" data-ed="${which}" data-i="${i}">버리기</button>`)}</div>`
+      : r && r.state === 'err' ? `<p class="err pck-ai" role="alert">${esc(r.msg)}</p>` : '';
+    return pckItemBadge(c, it.id) + btn + out;
+  };
+  return top + pedForm(c.id, which === 'main' ? c.main : c.tasks, e, n, P, { lint:text => pckLintHTML(c.id, text), side });
+}
+function pckPolish(c, which, i){
+  const X = pckCtx(c), e = which === 'main' ? X.em : X.et, it = (which === 'main' ? X.main : X.tasks)[+i]; if (!it || !c.prompts.polish) return;
+  const lim = which === 'main' && e.combine ? e.combine - pedLen(it.sub) - 2 : e.body;
+  const issues = pckLint(c.id, it.body).map(l => `${l.hits.join(' ')} (${l.msg})`).join('; ') || '없음';
+  aiAsk(`pck-polish:${which}:${i}`, pckFill(c.prompts.polish, { label:which === 'main' ? `주요 업무 — ${it.sub}` : `실행 계획 및 내용 — ${it.sub}`, limit:lim || 1000, issues, text:it.body }), false, { system:pckSystem(c) });
+}
+function pckPolishUse(c, which, i){
+  const key = `pck-polish:${which}:${i}`, r = AIR[key]; if (!r || r.state !== 'ok') return;
+  const ed = which === 'main' ? c.main : c.tasks, X = pckCtx(c), P = which === 'main' ? X.Pm : X.Pt, d = PED_DRAFT[pedKey(c.id, ed)] || (PED_DRAFT[pedKey(c.id, ed)] = {});
+  const text = r.text.replace(/^```[a-z]*\n?|```$/g, '').trim();
+  if (text === P.blocks[+i].body) delete d[`b${i}`]; else d[`b${i}`] = text;
+  delete AIR[key]; render(); toast('본문을 바꿨어요. [저장하기]를 눌러야 노트에 들어가요');
+}
+
+/* 제출 미리보기 — 체크인 노트 작성 화면과 같은 순서·칸으로 보이고 칸마다 복사 */
+function pckPreview(X){
+  const { c, em, et, main, tasks } = X, F = pckForm(c);
+  const cnt = (v, max) => `<span class="pck-cnt ${max && pedLen(v) > max ? 'over' : ''}">${pedLen(v)}${max ? ` / ${max}` : ''}자</span>`;
+  const cp = (text, label) => `<button class="btn btn-text btn-sm" type="button" data-pck="copy" data-text="${esc(text)}" aria-label="${esc(label)} 복사">복사</button>`;
+  const steps = `<ol class="pck-steps">
+      <li>성과관리 시스템에서 <b>체크인 노트 작성</b>을 열어요.</li>
+      <li><b>주요 업무</b>: [업무 추가]로 칸을 ${main.length}개 만들고, 아래 1번부터 차례로 [복사]해 붙여요. 칸 하나에 제목, 빈 줄, 본문이 함께 들어가요(최대 ${em.combine || em.body}자, 넘으면 잘려요).</li>
+      ${et ? `<li><b>과제 관리</b>: 묶음마다 [업무 추가]를 누르고 '주요 업무' 칸에 묶음 이름을 붙여요. [+ 세부 과제 추가하기]로 세부 과제를 만들고 세부 과제, 진행기간(시작월·종료월, 끝이 없으면 '종료 시점 미정'), 진행상태, 실행 계획 및 내용을 채워요.</li>
+      <li>큰 영향을 준 과제는 <b>주요 과제 하이라이트</b>를 체크해요(최대 ${c.highlight_max}개 권장). 협업 동료는 아이디로 찾아 넣어요.</li>` : ''}
+      <li>맨 아래 논의하고 싶은 내용을 고르고 [임시저장] 한 뒤 [제출하기]를 눌러 리더에게 공유해요.</li></ol>`;
+  const mainBox = main.map((m, i) => { const old = F && (F.main.find(x => pckSame(x.title, m.sub)) || null);
+    return `<div class="pck-fbox"><div class="pck-fhead"><span class="pck-num">${i + 1}</span>${F ? pckDiffTag(old && old.text, m.combined) : ''}<span style="margin-left:auto">${cnt(m.combined, em.combine || em.body)}</span>${cp(m.combined, `주요 업무 ${i + 1}`)}</div>
+      <div class="pck-inp ta">${esc(m.combined)}</div>${old && !pckSame(old.text, m.combined) ? `<details><summary class="faint">공유본 보기</summary><p class="pck-old">${esc(old.text)}</p></details>` : ''}</div>`; }).join('');
+  let taskBox = '';
+  if (et){
+    const groups = []; tasks.forEach(t => { let g = groups.find(x => x.name === t.group); if (!g) groups.push(g = { name:t.group, items:[] }); g.items.push(t); });
+    taskBox = groups.map((g, gi) => `<div class="pck-fbox"><div class="pck-fhead"><span class="pck-num">${gi + 1}</span><span class="pck-lbl">주요 업무</span><span class="pck-inp">${esc(pedSubmitTitle(g.name || ''))}</span>${cp(pedSubmitTitle(g.name || ''), `과제 묶음 ${gi + 1}`)}</div>
+      ${g.items.map((t, ti) => { const p = pedPeriod(t.f['진행기간'] || ''), st = pckOpt(et, '진행상태', t.f['진행상태'] || '') || t.f['진행상태'] || '', old = F && pckOldTask(F, t), peers = String(t.f['협업 동료'] || '').split(/\s*,\s*/).filter(Boolean);
+        return `<div class="pck-fbox" style="margin-left:12px"><div class="pck-fhead"><span class="pck-num">${gi + 1}-${ti + 1}</span>${F ? pckDiffTag(old && old.body, t.body) : ''}${pckHi(X, t) ? '<span class="pck-chip">★ 하이라이트</span>' : ''}</div>
+          <div class="pck-fhead"><span class="pck-lbl">세부 과제</span><span class="pck-inp">${esc(t.sub)}</span>${cp(t.sub, `세부 과제 ${gi + 1}-${ti + 1} 제목`)}</div>
+          <div class="pck-fhead"><span class="pck-lbl">진행기간</span><span>${p ? `${esc(p.from)} - ${p.to ? esc(p.to) : '종료 시점 미정'}` : esc(t.f['진행기간'] || '없음')}</span><span class="pck-lbl" style="margin-left:16px">진행상태</span><span>${esc(st || '없음')}</span></div>
+          <div class="pck-fhead"><span class="pck-lbl">실행 계획 및 내용</span><span style="margin-left:auto">${cnt(t.body, et.body)}</span>${cp(t.body, `세부 과제 ${gi + 1}-${ti + 1} 실행 계획`)}</div>
+          <div class="pck-inp ta">${esc(t.body)}</div>
+          ${old && !pckSame(old.body, t.body) ? `<details><summary class="faint">공유본 보기</summary><p class="pck-old">${esc(old.body)}</p></details>` : ''}
+          ${peers.length ? `<div class="pck-fhead"><span class="pck-lbl">협업 동료</span><span>${peers.map(x => `<span class="pck-chip">${esc(x)}</span>`).join('')}</span></div>` : ''}</div>`; }).join('')}</div>`).join('');
+  }
+  const fnote = !c.form ? '<p class="faint">플러그인 설정에 제출 화면 노트를 적으면 지난 공유본과 견줘 보여요.</p>'
+    : !F ? `<p class="faint">'${esc(c.form)}' 노트를 찾지 못해 지난 공유본과 견주지 못했어요.</p>`
+    : `<p class="faint"><a href="#/knowledge/ctx/${F.note.id}">${esc(F.note.title)}</a>${F.shared ? `의 ${md2(F.shared)} 공유본` : ''}과 견줬어요${F.growth ? ` · 내 Growth Stage: ${esc(F.growth)}` : ''}.</p>`;
+  return `${section('내기 전에 확인', pckCheckHTML(pckChecks(X)))}${section('제출하는 순서', steps + fnote)}
+    ${section('주요 업무', `<div class="pck-form">${mainBox}</div>`)}${et ? section('과제 관리', `<div class="pck-form">${taskBox}</div>`) : ''}`;
+}
+
+function pckScoreTab(X){
+  const { c } = X, R = pckRubric(c), sc = pckScore(c), key = `pck-score:${c.id}/${c.name}`, r = AIR[key], F = pckForm(c);
+  if (!c.rubric) return empty('점수 기준 노트를 정하지 않았어요', "플러그인 설정에 '점수 기준 노트 제목 앞부분'(예: 2026년 성과 - )을 적어 주세요.", `<a class="btn btn-tonal" href="#/plugins/${encodeURIComponent(c.id)}/setup">설정 열기</a>`);
+  if (!R.length) return empty(`'${esc(c.rubric)}'로 시작하는 맥락노트가 없어요`, '항목마다 STAGE 기준을 적은 맥락노트를 만들어 주세요.');
+  const run = r && r.state === 'run';
+  const btn = aiReady() ? `<button class="btn ${sc ? 'btn-ghost' : 'btn-primary'} btn-sm" type="button" data-pck="score" ${run ? 'disabled aria-busy="true"' : ''}>${run ? 'AI가 매기는 중…' : sc ? '다시 매기기' : 'AI로 점수 매기기'}</button>` : '<p class="faint">AI 서버에 연결하면 점수를 매길 수 있어요.</p>';
+  const intro = `<p class="faint">기준 ${R.map(x => `<a href="#/knowledge/ctx/${x.id}">${esc(x.name)}</a>`).join(', ')} · 글에 적힌 사실만으로 평가책임자가 몇 STAGE로 볼지 매겨요${F && F.growth ? ` · 지금 ${esc(F.growth)}` : ''}.</p>`;
+  const stale = sc && sc.sig !== pckSig(X) ? '<div class="ai-state wait"><b>점수를 매긴 뒤 글이 바뀌었어요</b><span>다시 매기면 지금 글로 봐요.</span></div>' : '';
+  let res = '';
+  if (sc){
+    const d = sc.data, names = R.map(x => x.name), axes = d.axes || [];
+    res = `${d.summary ? `<p style="margin:12px 0">${esc(d.summary)}</p>` : ''}
+      <div class="table-wrap" tabindex="0" role="region" aria-label="항목별 점수"><table><thead><tr><th scope="col">항목</th><th scope="col">STAGE</th><th scope="col">근거</th><th scope="col">한 단계 올리려면</th></tr></thead><tbody>
+      ${axes.map(a => `<tr><th scope="row">${esc(a.name)}</th><td class="pck-st" data-s="${+a.stage || 0}">${+a.stage ? `${pckMeter(+a.stage)} ${+a.stage}` : '근거 없음'}</td><td style="white-space:normal">${esc(a.why || '')}</td><td style="white-space:normal">${esc(a.next || '')}</td></tr>`).join('')}</tbody></table></div>
+      <h3 style="margin:20px 0 8px">칸별</h3>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="칸별 점수"><table><thead><tr><th scope="col">칸</th>${names.map(n => `<th scope="col">${esc(n)}</th>`).join('')}<th scope="col">더 좋게 하려면</th></tr></thead><tbody>
+      ${(d.items || []).map(it => { const m = [...X.main, ...X.tasks].find(x => x.id === it.id), tab = it.id[0] === 'M' ? 'main' : 'tasks';
+        return `<tr><th scope="row" style="white-space:normal">${m ? `<a href="${pckHref(c, tab)}" data-pck-go="ped-${m.i}">${esc(it.id)} ${esc(m.sub.slice(0, 24))}</a>` : esc(it.id)}</th>${names.map(n => { const v = +((it.scores || {})[n]) || 0; return `<td class="pck-st" data-s="${v}">${v || '·'}</td>`; }).join('')}<td style="white-space:normal">${esc(it.note || '')}</td></tr>`; }).join('')}</tbody></table></div>
+      <p class="faint" style="margin-top:8px">${fmtDate(sc.at.slice(0, 10))}에 매김 · 이 브라우저에만 저장해요.</p>`;
+  }
+  return section('성과 기준 점수', `${intro}${stale}<div class="ai-row">${btn}${r && r.state === 'err' ? `<p class="err" role="alert" style="margin:0">${esc(r.msg)}</p>` : ''}</div>${res}`);
+}
+
+/* ---------- 카드에서 넣기 ---------- */
+const pckDoneKey = c => `pkm:v1:pck-done:${S.profile}:${c.id}/${c.name}`;
+const pckDone = c => LS.get(pckDoneKey(c), {});
+function pckCandidates(c){
+  const y = TODAY.slice(0, 4), done = pckDone(c);
+  return db().tasks.filter(t => !done[t.id] && t.status !== '대기' && ((t.created || '').slice(0, 4) === y || (t.doneAt || '').slice(0, 4) === y || t.status === '진행'))
+    .sort((a, b) => (a.status === '완료' ? 0 : 1) - (b.status === '완료' ? 0 : 1) || String(b.doneAt || b.created || '').localeCompare(String(a.doneAt || a.created || '')));
+}
+/* 단기 카드 화면·⋯ 메뉴의 [올해 성과로 넣기] */
+function pckCardBtn(t, where){
+  if (typeof plOK !== 'function' || !plOK()) return '';
+  plLoad();
+  return pckList().filter(c => c.card).map(c => { const d = pckDone(c)[t.id];
+    const a = `<a class="btn ${where === 'menu' ? 'btn-tonal' : 'btn-ghost'} btn-sm" href="${pckHref(c, 'intake', '/' + encodeURIComponent(t.id))}" ${where === 'menu' ? 'data-act="close-dlg"' : ''}><span aria-hidden="true">★</span> ${esc(c.card)}${d ? ' · 넣음' : ''}</a>`;
+    return where === 'menu' ? `<p style="margin:12px 0 0">${a}${d ? ` <span class="faint">${esc(d.where)}에 넣었어요</span>` : ''}</p>` : a; }).join('');
+}
+function pckCardText(t){
+  const lines = [`제목: ${t.title}`, `상태: ${t.status}`, t.created ? `만든 날: ${t.created.slice(0, 10)}` : '', t.doneAt ? `끝낸 날: ${t.doneAt.slice(0, 10)}` : '', t.due ? `마감: ${t.due}` : '', t.area ? `쌓이는 곳: ${t.area}` : '', t.result ? `결과: ${t.result}` : ''];
+  if (t.todos.length) lines.push('할 일:', ...t.todos.map(x => `- [${x.d ? 'x' : ' '}] ${x.t}`));
+  if (t.done.filter(Boolean).length) lines.push('완료 조건:', ...t.done.filter(Boolean).map(x => `- ${x}`));
+  if (t.memo) lines.push('메모:', String(t.memo).slice(0, 4000));
+  return lines.filter(Boolean).join('\n');
+}
+function pckIntakeRun(c, tid){
+  const t = find('tasks', tid), X = pckCtx(c); if (!t || !c.prompts.intake) return;
+  const prompt = pckFill(c.prompts.intake, { limit:X.et.body || 1000, today:TODAY, card:pckCardText(t),
+    main:X.main.map(m => `[${m.id}] ${m.sub}`).join('\n') || '(없음)',
+    tasks:X.tasks.map(x => `[${x.id}] 묶음: ${x.groupSub} / ${x.sub}\n진행기간: ${x.f['진행기간'] || ''} / 진행상태: ${x.f['진행상태'] || ''} / ${pedLen(x.body)}자\n${x.body}`).join('\n\n') });
+  S.pckIn = null;
+  aiAsk(`pck-intake:${c.id}/${c.name}:${tid}`, prompt, true, { system:pckSystem(c) });
+}
+/* 넣기 폼 상태 — AI 답을 받으면 거기서 시작하고, 사람이 고친 값은 S.pckIn에 */
+function pckInState(c, X, tid){
+  const r = AIR[`pck-intake:${c.id}/${c.name}:${tid}`];
+  if (S.pckIn && S.pckIn.tid === tid && S.pckIn.at === (r && r.state === 'ok' ? r.text : '')) return S.pckIn;
+  const a = r && r.state === 'ok' ? r.data || {} : {}, hit = X.tasks.find(x => x.id === a.target);
+  const groups = [...new Set(X.tasks.map(x => x.group))];
+  S.pckIn = { tid, at:r && r.state === 'ok' ? r.text : '', target:hit ? hit.id : r && r.state === 'ok' ? 'new' : '', group:groups.includes(a.group) ? a.group : groups.find(g => pedSubmitTitle(g) === a.group) || groups[groups.length - 1] || '',
+    title:a.title || '', period:a.period || '', status:a.status || '', body:a.body || '', bullet:a.bullet || '', reason:a.reason || '', check:Array.isArray(a.check) ? a.check : [], main:a.main || '' };
+  return S.pckIn;
+}
+function pckIntake(X, tid){
+  const { c, et } = X;
+  if (!et) return empty('과제 편집기가 없어요', '');
+  if (!tid){
+    const list = pckCandidates(c).slice(0, 40), done = pckDone(c), doneIds = Object.keys(done).filter(id => find('tasks', id));
+    return section('아직 성과에 넣지 않은 카드', list.length ? `<p class="faint" style="margin:-4px 0 12px">올해 만들었거나 끝낸 단기 카드예요. 누르면 AI가 들어갈 과제와 문장을 골라요.</p><ul class="list">${list.map(t => `<li><a class="row" href="${pckHref(c, 'intake', '/' + encodeURIComponent(t.id))}"><span class="body"><span class="title">${esc(t.title)}</span><span class="meta">${statusBadge(t.status)}<span>${t.doneAt ? `${md2(t.doneAt)} 끝냄` : t.created ? `${md2(t.created)} 만듦` : ''}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`).join('')}</ul>` : '<p class="faint">넣을 카드가 없어요.</p>')
+      + (doneIds.length ? section(`넣은 카드 <span class="count num">${doneIds.length}</span>`, `<ul class="list">${doneIds.map(id => `<li class="row"><span class="body"><span class="title">${esc(find('tasks', id).title)}</span><span class="meta"><span>${esc(done[id].where)}</span><span>${md2(done[id].at)}</span></span></span><button class="btn btn-text btn-sm" type="button" data-pck="undone" data-tid="${esc(id)}">목록에 다시 올리기</button></li>`).join('')}</ul>`) : '');
+  }
+  const t = find('tasks', tid); if (!t) return empty('카드를 찾지 못했어요', '', `<a class="btn btn-tonal" href="${pckHref(c, 'intake')}">카드 목록</a>`);
+  const key = `pck-intake:${c.id}/${c.name}:${tid}`, r = AIR[key], st = pckInState(c, X, tid), groups = [...new Set(X.tasks.map(x => x.group))];
+  const head = `<p style="margin:16px 0 0"><a href="${pckHref(c, 'intake')}">‹ 카드 목록</a></p>${section(`<a href="#/action/short/${t.id}">${esc(t.title)}</a>`, `<div class="meta">${statusBadge(t.status)} ${t.todos.length ? `<span>할 일 ${t.todos.filter(x => x.d).length}/${t.todos.length}</span>` : ''} ${t.result ? `<span>결과: ${esc(t.result)}</span>` : ''}</div>`)}`;
+  const aiRow = aiReady() ? `<div class="ai-row"><button class="btn ${r ? 'btn-ghost' : 'btn-primary'} btn-sm" type="button" data-pck="intake" data-tid="${esc(tid)}" ${r && r.state === 'run' ? 'disabled aria-busy="true"' : ''}>${r && r.state === 'run' ? 'AI가 고르는 중…' : r ? '다시 고르기' : 'AI로 넣을 곳 고르기'}</button>${r && r.state === 'err' ? `<p class="err" role="alert" style="margin:0">${esc(r.msg)}</p>` : ''}</div>` : '<p class="faint">AI 서버에 연결하면 AI가 넣을 곳과 문장을 골라 줘요. 지금은 직접 골라 적어요.</p>';
+  const target = st.target, cur = X.tasks.find(x => x.id === target), body = st.body || (cur ? cur.body : '');
+  const opt = (v, l, sel) => `<option value="${esc(v)}" ${sel ? 'selected' : ''}>${esc(l)}</option>`;
+  const statuses = (et.choices || {})['진행상태'] || [];
+  const form = `<form data-form="pck-in" class="card pck-in-new" novalidate data-tid="${esc(tid)}">
+      ${st.reason ? `<p style="margin:0"><b>AI가 고른 이유</b> ${esc(st.reason)}${st.main ? ` · 받쳐 주는 주요 업무 ${esc(st.main)}` : ''}</p>` : ''}
+      <label class="field"><span>넣을 곳</span><select data-pck-in="target">${opt('', '고르기', !target)}${groups.map(g => `<optgroup label="${esc(pedSubmitTitle(g || '묶음 없음'))}">${X.tasks.filter(x => x.group === g).map(x => opt(x.id, x.sub, x.id === target)).join('')}</optgroup>`).join('')}${opt('new', '새 세부 과제 만들기', target === 'new')}</select></label>
+      ${target === 'new' ? `<label class="field"><span>묶음</span><select data-pck-in="group">${groups.map(g => opt(g, pedSubmitTitle(g || ''), g === st.group)).join('')}</select></label>
+        <label class="field"><span>세부 과제 제목 <span class="hint">[신규]·[운영]·[기타]로 시작</span></span><input data-pck-in="title" value="${esc(st.title)}"></label>` : ''}
+      ${target ? `<div class="ped-row"><label class="field"><span>진행기간</span><input data-pck-in="period" value="${esc(st.period || (cur ? cur.f['진행기간'] || '' : ''))}" placeholder="2026-10 ~ 2026-11"></label>
+        ${statuses.length ? `<label class="field"><span>진행상태</span><select data-pck-in="status">${statuses.map(s => opt(s, s, s === (st.status || (cur && pckOpt(et, '진행상태', cur.f['진행상태'] || ''))))).join('')}</select></label>` : ''}</div>
+      <div class="field"><div class="ped-lab"><label for="pck-in-body">실행 계획 및 내용</label><span class="ped-count ${et.body && pedLen(body) > et.body ? 'over' : ''}" id="pck-in-cnt">${pedCountText(body, et.body)}</span></div><textarea id="pck-in-body" data-pck-in="body" rows="10" class="ped-f-like" style="field-sizing:content;min-height:200px">${esc(body)}</textarea></div>
+      <div class="ped-lint" id="pck-in-lint">${pckLintHTML(c.id, body)}</div>
+      ${st.check.length ? `<div><b>확인할 것</b><ul>${st.check.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
+      <div class="dlg-actions"><button class="btn btn-primary" type="submit">${target === 'new' ? '새 세부 과제로 넣기' : '이 과제에 넣기'}</button></div>` : ''}
+    </form>`;
+  return head + section('넣을 곳과 문장', aiRow + (r && r.state === 'run' ? '' : form));
+}
+function pckIntakeApply(c, tid){
+  const X = pckCtx(c), st = S.pckIn, e = X.et, n = X.nt; if (!st || !e || !n) return;
+  const body = String(st.body || '').replace(/\s+$/, '');
+  if (!st.target){ toast('넣을 곳을 골라 주세요'); return; }
+  if (!body.trim()){ toast('실행 계획 및 내용이 비어 있어요'); return; }
+  if (pedDirty(c.id, c.tasks)){ toast('과제 관리에 저장 안 한 칸이 있어요. 먼저 저장하거나 지워 주세요'); return; }
+  const P = pedParse(n.body, e), undo = snapshot(); let where;
+  if (st.target !== 'new'){
+    const it = X.tasks.find(x => x.id === st.target), bk = it && P.blocks[it.i]; if (!bk) return;
+    const vals = []; vals[it.i] = { title:bk.title, body, fields:bk.fields.map(f => f.name === '진행기간' && st.period ? st.period : f.name === '진행상태' && st.status ? pckKeepRest(e, f, st.status) : f.value) };
+    n.body = pedApply(P, e, vals); where = it.sub;
+  } else {
+    const inG = P.blocks.filter(b => b.group === st.group); if (!inG.length || !st.title.trim()){ toast('묶음과 세부 과제 제목을 적어 주세요'); return; }
+    const last = inG[inG.length - 1], L = P.lines.slice(), gnum = (/^(\d+)\./.exec(st.group) || [])[1], tmpl = P.blocks.find(b => b.bodyStart >= 0);
+    const title = (gnum && !/^\d/.test(st.title) ? `${gnum}-${inG.length + 1}. ` : '') + st.title.trim();
+    const fl = name => name === '진행기간' ? st.period || `${TODAY.slice(0, 7)} ~ ${TODAY.slice(0, 7)}` : name === '진행상태' ? st.status || '진행중' : name === '하이라이트' ? (((e.check || {})[name] || [])[1] || '') : '';
+    const block = [`${last.hashes} ${title}`, ...e.fields.map(f => `- ${f}: ${fl(f)}`), '', ...(tmpl ? [P.lines[tmpl.bodyStart], ''] : []), ...body.split('\n'), '', ...(e.after || []).map(f => `- ${f}: `)];
+    let at = last.end; while (at > last.head + 1 && (!L[at - 1].trim() || L[at - 1].trim() === '---')) at--;
+    L.splice(at, 0, '', ...block); n.body = L.join('\n'); where = `새 세부 과제 ${pedSubmitTitle(title)}`;
+  }
+  if (n.history) n.updated = TODAY;
+  const done = pckDone(c); done[tid] = { at:TODAY, where }; LS.set(pckDoneKey(c), done);
+  delete AIR[`pck-intake:${c.id}/${c.name}:${tid}`]; S.pckIn = null;
+  go(pckHref(c, 'tasks'));
+  toast(`${where}에 넣었어요`, { label:'되돌리기', fn:() => { const d = pckDone(c); delete d[tid]; LS.set(pckDoneKey(c), d); undo(); } });
+}
+const pckKeepRest = (e, f, opt) => { const o = (e.choices || {})[f.name]; return o ? opt + pedSplit(o, f.value).rest : opt; };
+
+/* ---------- 이벤트 ---------- */
+function pckHere(){ const p = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent); return p[0] === 'plugins' && p[2] === 'checkin' ? pckList().find(c => c.id === p[1] && c.name === p[3]) : null; }
+document.addEventListener('click', ev => {
+  const g = ev.target.closest && ev.target.closest('[data-pck-go]'); if (g){ const to = g.dataset.pckGo; setTimeout(() => { const el = document.getElementById(to); if (el) el.scrollIntoView({ block:'start' }); }, 80); }
+  const b = ev.target.closest && ev.target.closest('[data-pck]'); if (!b) return;
+  const c = pckHere(); if (!c) return;
+  switch (b.dataset.pck){
+    case 'copy': copyText(b.dataset.text, '복사했어요. 체크인 노트의 같은 칸에 붙여 넣으세요'); break;
+    case 'mirror': pckMirrorSync(c); break;
+    case 'polish': pckPolish(c, b.dataset.ed, b.dataset.i); break;
+    case 'polish-use': pckPolishUse(c, b.dataset.ed, b.dataset.i); break;
+    case 'polish-drop': delete AIR[`pck-polish:${b.dataset.ed}:${b.dataset.i}`]; render(); break;
+    case 'score': pckScoreRun(c); break;
+    case 'intake': pckIntakeRun(c, b.dataset.tid); break;
+    case 'undone': { const d = pckDone(c); delete d[b.dataset.tid]; LS.set(pckDoneKey(c), d); render(); break; }
+  }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target, k = t.dataset && t.dataset.pckIn; if (!k || !S.pckIn) return;
+  const c = pckHere(); if (!c) return;
+  S.pckIn[k] = t.value;
+  if (k === 'target' || k === 'group'){
+    if (k === 'target'){ const X = pckCtx(c), it = X.tasks.find(x => x.id === t.value), ai = AIR[`pck-intake:${c.id}/${c.name}:${S.pckIn.tid}`], a = ai && ai.data || {};
+      // AI가 고른 곳이면 AI 본문, 다른 과제면 그 과제 본문 끝에 AI가 쓴 불릿만 붙인다
+      S.pckIn.body = it && a.target === it.id ? a.body || it.body : it ? `${it.body.replace(/\s+$/, '')}${S.pckIn.bullet ? `\n\n${S.pckIn.bullet}` : ''}` : a.target === 'new' ? a.body || '' : S.pckIn.bullet || '';
+      S.pckIn.period = ''; S.pckIn.status = ''; }
+    render(); return;
+  }
+  if (k === 'body'){ const X = pckCtx(c), cnt = document.getElementById('pck-in-cnt'), max = X.et.body;
+    if (cnt){ cnt.textContent = pedCountText(t.value, max); cnt.classList.toggle('over', !!max && pedLen(t.value) > max); }
+    const li = document.getElementById('pck-in-lint'); if (li) li.innerHTML = pckLintHTML(c.id, t.value); }
+});
+document.addEventListener('submit', ev => {
+  const f = ev.target; if (!f.matches || !f.matches('form[data-form="pck-in"]')) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const c = pckHere(); if (c) pckIntakeApply(c, f.dataset.tid);
+}, true);
 })();
 </script>
 </body>

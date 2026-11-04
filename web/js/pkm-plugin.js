@@ -9,7 +9,11 @@
   const DOC_EXT = /\.(md|json|ya?ml|txt)$/i, IMG_EXT = /\.(png|jpe?g|gif|webp)$/i, SCRIPT_EXT = /\.(mjs|cjs|js|sh|py)$/i;
   const LIMITS = { files: 200, file: 1024 * 1024, total: 5 * 1024 * 1024 };
   const ID_RE = /^[a-z0-9][a-z0-9-]{1,40}$/, NAME_RE = /^[\w.-]{1,40}$/, KEY_RE = /^[a-z_][a-z0-9_]{0,40}$/, SECRET_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
-  const SETTING_TYPES = ['text', 'lines', 'path', 'toggle'];
+  const SETTING_TYPES = ['text', 'lines', 'path', 'toggle', 'pairs'];
+  const PAIR_CHECKS = ['regex', 'url'];
+  /* pairs 설정의 두 칸: [{ label, placeholder, check(regex|url) }]. 값은 한 줄에 한 쌍, 두 칸을 탭으로 나눈 글 */
+  const pairColumns = s => (Array.isArray(s.columns) ? s.columns : []).map(c => typeof c === 'string' ? { label: c } : c && typeof c === 'object' ? c : {})
+    .map(c => ({ label: String(c.label || ''), placeholder: c.placeholder ? String(c.placeholder) : '', check: PAIR_CHECKS.includes(String(c.check)) ? String(c.check) : null }));
   const HOURS_RE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
   const ignored = p => p.split('/').some(s => s.startsWith('.')) || /(^|\/)(node_modules|__pycache__)\//.test(p);
 
@@ -45,10 +49,37 @@
   }
 
   /* 검색·편집기 문서도 피드와 같은 꼴: "## 이름" 아래 "- 키: 값" 줄, 다른 줄은 설명 */
-  const parseSearches = parseFeeds, parseEditors = parseFeeds, parseChats = parseFeeds;
+  const parseSearches = parseFeeds, parseEditors = parseFeeds, parseChats = parseFeeds, parseLinks = parseFeeds;
   const CHAT_SCOPES = ['profile', 'card', 'project'];
   const startsOf = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
   const reOk = v => { try { new RegExp(v); return true; } catch { return false; } };
+  /* 편집기 고를 값: "진행상태=진행 예정|진행중|중단됨|진행 완료; 하이라이트=체크|없음" → { 진행상태: [...], 하이라이트: [...] } */
+  function parseChoices(v){
+    const out = {};
+    for (const part of String(v || '').split(';')){ const m = part.match(/^\s*([^=]+?)\s*=\s*(.+?)\s*$/); if (m) out[m[1]] = m[2].split('|').map(x => x.trim()).filter(Boolean); }
+    return out;
+  }
+  /* 체크인 점검 규칙: 한 줄에 "정규식<탭>안내" 또는 "정규식 → 안내". #으로 시작하는 줄·빈 줄은 건너뛴다 */
+  function parseLintRules(text){
+    return String(text || '').split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#')).map(line => {
+      const m = line.match(/^(.+?)\t+\s*(.+)$/) || line.match(/^(.+?)\s+(?:→|->)\s+(.+)$/);
+      if (!m) return { line, bad: '"정규식 → 안내" 꼴이 아니에요' };
+      if (!reOk(m[1])) return { line, bad: '정규식이 맞지 않아요' };
+      return { line, re: m[1], msg: m[2] };
+    });
+  }
+
+  /* 퀵링크 규칙: 한 줄에 "정규식<탭>주소"(pairs 설정이 저장하는 꼴) 또는 "정규식 → 주소"(->도 됨). 주소의 $&·$1~$9는 맞은 글자로 바뀐다. 설정 자리({rules})는 검사하지 않는다(값은 설치 뒤 채운다) */
+  function parseLinkRules(text){
+    return String(text || '').split(/\r?\n|\\n/).map(l => l.trim()).filter(Boolean).map(line => {
+      if (/^\{[a-z_][a-z0-9_]*\}$/.test(line)) return { line, setting: line.slice(1, -1) };
+      const m = line.match(/^(.+?)\t+\s*(\S+)$/) || line.match(/^(.+?)\s+(?:→|->)\s+(\S+)$/);
+      if (!m) return { line, bad: '"정규식 → 주소" 꼴이 아니에요' };
+      if (!reOk(m[1])) return { line, bad: '정규식이 맞지 않아요' };
+      if (!/^https?:\/\//.test(m[2])) return { line, bad: '주소는 http(s)://로 시작해요' };
+      return { line, re: m[1], url: m[2] };
+    });
+  }
 
   /* files: [{ path, size, text? }] — text는 문서·스크립트만. 돌려주는 값: { ok, manifest, workflows, scripts, errors, warnings } */
   function validate(files){
@@ -86,6 +117,7 @@
     for (const s of settings){
       if (!KEY_RE.test(String(s.key || '')) || !s.label) err(`settings 항목에는 key(영문 소문자)와 label이 있어야 해요: ${JSON.stringify(s)}`);
       if (s.type != null && !SETTING_TYPES.includes(String(s.type))) err(`settings ${s.key}: type은 ${SETTING_TYPES.join(', ')}`);
+      if (s.type === 'pairs' && (pairColumns(s).length !== 2 || pairColumns(s).some(c => !c.label))) err(`settings ${s.key}: pairs는 columns에 label이 있는 칸 두 개를 적어요`);
     }
     const collects = fm.collects && typeof fm.collects === 'object' ? { tag: fm.collects.tag ? String(fm.collects.tag) : null, area: fm.collects.area ? String(fm.collects.area) : null } : null;
 
@@ -160,12 +192,40 @@
         if (!d.note) err(`${where}: note(고칠 노트 제목)가 없어요`);
         if (!/^#{2,6}$/.test(String(d.block || ''))) err(`${where}: block은 ## ~ ###### 중 하나예요`);
         if (d.group && !/^#{1,5}$/.test(d.group)) err(`${where}: group은 # ~ ##### 중 하나예요`);
-        for (const k of ['within', 'body_start', 'body_end', 'count']) if (d[k] && !reOk(d[k])) err(`${where}: ${k} 정규식이 맞지 않아요`);
+        for (const k of ['within', 'body_start', 'body_end', 'count', 'only']) if (d[k] && !reOk(d[k])) err(`${where}: ${k} 정규식이 맞지 않아요`);
         for (const k of ['title', 'body']) if (d[k] != null && d[k] !== '' && !(Number(d[k]) > 0)) err(`${where}: ${k}는 글자 수(숫자)예요`);
+        if (d.combine != null && d.combine !== '' && !(Number(d.combine) > 0)) err(`${where}: combine은 글자 수(숫자)예요`);
+        const choices = parseChoices(d.choices), check = parseChoices(d.check);
+        for (const [k, v] of Object.entries({ ...choices, ...check })) if (v.length < 2) err(`${where}: ${k}의 고를 값은 |로 두 개 이상이에요`);
+        for (const [k, v] of Object.entries(check)) if (v.length !== 2) err(`${where}: check ${k}는 "켬|끔" 두 값이에요`);
         if (editors.some(x => x.name === d.name)) err(`${where}: 편집기 이름이 겹쳐요`);
+        const list_ = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
         editors.push({ name: d.name, file: f.path, description: d.description, note: String(d.note || ''), block: String(d.block || ''), group: d.group || null, within: d.within || null,
           title: d.title ? Number(d.title) : null, body: d.body ? Number(d.body) : null, body_start: d.body_start || null, body_end: d.body_end || null, count: d.count || null,
-          fields: String(d.fields || '').split(',').map(x => x.trim()).filter(Boolean) });
+          fields: list_(d.fields), after: list_(d.after), only: d.only || null, choices, check, period: list_(d.period), combine: d.combine ? Number(d.combine) : null });
+      }
+    }
+    // 체크인 — 편집기 두 개(주요 업무·과제)를 한 화면으로 묶어 제출 미리보기·점검·점수·카드에서 넣기를 더한다. 앱이 화면을 그리고 AI는 도구 없는 AI(chat)만 쓴다
+    const checkins = [];
+    for (const f of list.filter(f => /^checkins\/[^/]+\.md$/.test(f.path))){
+      for (const d of parseFeeds(f.text)){
+        const where = `${f.path} › ${d.name}`, ed = n => editors.find(x => x.name === n);
+        if (!d.main || !ed(d.main)) err(`${where}: main(주요 업무 편집기 이름)이 이 플러그인 편집기에 없어요`);
+        if (!d.tasks || !ed(d.tasks)) err(`${where}: tasks(과제 편집기 이름)가 이 플러그인 편집기에 없어요`);
+        if (d.mirror && !reOk(d.mirror)) err(`${where}: mirror 정규식이 맞지 않아요`);
+        const prompts = {};
+        for (const k of ['style', 'lint', 'score', 'intake', 'polish']){
+          if (!d[k]) continue;
+          if (!/^prompts\/\S+\.md$/.test(d[k]) || !byPath[d[k]]) { err(`${where}: ${k} 프롬프트 파일이 없어요 ${d[k]}`); continue; }
+          prompts[k] = String(byPath[d[k]].text || '');
+        }
+        if (['score', 'intake', 'polish'].some(k => d[k]) && !ai.includes('chat')) err(`${where}: score·intake·polish를 쓰려면 permissions.ai에 chat이 있어야 해요`);
+        if (prompts.lint) for (const r of parseLintRules(prompts.lint)) if (r.bad) err(`${where}: lint 규칙 "${r.line}" — ${r.bad}`);
+        const num = (k, dv) => { if (d[k] == null || d[k] === '') return dv; const n = Number(d[k]); if (!(n >= 1 && n <= 50)) err(`${where}: ${k}는 1~50이에요`); return n || dv; };
+        if (checkins.some(x => x.name === d.name)) err(`${where}: 체크인 이름이 겹쳐요`);
+        checkins.push({ name: d.name, file: f.path, description: d.description, main: String(d.main || ''), tasks: String(d.tasks || ''), mirror: d.mirror || null,
+          rubric: d.rubric ? String(d.rubric) : null, form: d.form ? String(d.form) : null, rules: d.rules ? String(d.rules) : null, card: d.card ? String(d.card) : null,
+          main_rec: num('main_rec', 3), main_max: num('main_max', 5), highlight_max: num('highlight_max', 3), prompts });
       }
     }
     // 채팅 — 오른쪽 아래 AI 챗봇 창(profile: 프로필 데이터 고치기, card: 단기 카드마다 세션). 앱이 화면을 그리고,
@@ -183,18 +243,30 @@
         chats.push({ name: d.name, file: f.path, description: d.description, scope: d.scope, mode: cmode, prompt: d.prompt || null, cwd: d.cwd || null, label: d.label || null });
       }
     }
-    if (!workflows.length && !feeds.length && !searches.length && !editors.length && !chats.length) warn('워크플로우·피드·검색·편집기·채팅이 하나도 없어요(workflows/ feeds/ searches/ editors/ chats/)');
+    // 퀵링크 — 카드 제목 맨 앞이 규칙의 정규식에 맞으면 그 부분을 링크로 그린다. 실행되는 것은 없다
+    const links = [];
+    for (const f of list.filter(f => /^links\/[^/]+\.md$/.test(f.path))){
+      for (const d of parseLinks(f.text)){
+        const where = `${f.path} › ${d.name}`;
+        if (!d.rules) err(`${where}: rules(링크 규칙)가 없어요`);
+        else for (const r of parseLinkRules(d.rules)) if (r.bad) err(`${where}: 규칙 "${r.line}" — ${r.bad}`);
+        if (links.some(x => x.name === d.name)) err(`${where}: 퀵링크 이름이 겹쳐요`);
+        links.push({ name: d.name, file: f.path, description: d.description, rules: String(d.rules || '') });
+      }
+    }
+    if (!workflows.length && !feeds.length && !searches.length && !editors.length && !chats.length && !links.length) warn('워크플로우·피드·검색·편집기·채팅·퀵링크가 하나도 없어요(workflows/ feeds/ searches/ editors/ chats/ links/)');
     if (mode === 'full') warn('에이전트가 모든 확인을 건너뛰는 full 모드를 요구해요');
 
     const manifest = { spec: SPEC, id: String(fm.id || ''), name: String(fm.name || ''), version: String(fm.version || ''), description: String(fm.description || doc.pre || '').slice(0, 500),
       author: fm.author ? String(fm.author) : null, homepage: fm.homepage ? String(fm.homepage) : null, requires: fm.requires || {},
       collects, permissions: { ai, agent_mode: mode, scripts, bundled, secrets: secrets.map(x => x.name) }, secrets,
       settings: settings.map(s => ({ key: String(s.key), label: String(s.label), hint: s.hint ? String(s.hint) : '', type: SETTING_TYPES.includes(String(s.type)) ? String(s.type) : 'text',
-        default: s.default == null ? (s.type === 'toggle' ? false : '') : s.type === 'toggle' ? s.default === true : String(s.default), placeholder: s.placeholder ? String(s.placeholder) : '' })) };
-    return { ok: !errors.length, manifest, workflows, feeds, searches, editors, chats, scripts: bundled, errors, warnings };
+        default: s.default == null ? (s.type === 'toggle' ? false : '') : s.type === 'toggle' ? s.default === true : String(s.default), placeholder: s.placeholder ? String(s.placeholder) : '',
+        ...(s.type === 'pairs' ? { columns: pairColumns(s) } : {}) })) };
+    return { ok: !errors.length, manifest, workflows, feeds, searches, editors, checkins, chats, links, scripts: bundled, errors, warnings };
   }
 
-  const api = { SPEC, DIR, MODES, LIMITS, validate, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, startsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
+  const api = { SPEC, DIR, MODES, LIMITS, validate, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, parseLinks, parseLinkRules, parseChoices, parseLintRules, startsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMPlugin = api;
 })(typeof self !== 'undefined' ? self : this);

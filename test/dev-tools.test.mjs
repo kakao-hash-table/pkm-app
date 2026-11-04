@@ -53,6 +53,12 @@ test('명령 찾기: dev·serve·local → start* → pnpm 워크스페이스 �
   assert.equal(g.pm, null);
   assert.deepEqual(g.commands.map(c => c.command), ['./gradlew bootRun']);
   assert.deepEqual(dev.detect(project('empty', { 'README.md': '' })).commands, []);
+  // 노트의 Spring 프로필 명령은 gradle 프로젝트에서만, 프로필 글자만
+  const sp = project('spring-prof', { gradlew: '#!/bin/sh', 'build.gradle': '' });
+  assert.deepEqual(dev.detect(sp, './gradlew bootRun --args=--spring.profiles.active=dev,local').commands.map(c => c.argv),
+    [['./gradlew', 'bootRun', '--args=--spring.profiles.active=dev,local'], ['./gradlew', 'bootRun']]);
+  assert.deepEqual(dev.detect(sp, './gradlew bootRun --args=--spring.profiles.active=dev;rm').commands.map(c => c.command), ['./gradlew bootRun']);
+  assert.deepEqual(dev.detect(project('np', { 'package.json': {} }), './gradlew bootRun --args=--spring.profiles.active=dev').commands.map(c => c.command), ['npm install']);
 });
 
 test('--port: next·vite·webpack·nuxt·astro에만, npm·pnpm은 -- 뒤에', () => {
@@ -100,7 +106,7 @@ test('프로젝트 목록: 폴더/* 펼치기, 항목 모양, 없는 폴더는 n
   const r = await run('projects.mjs', 'list', `--projects=${root}/*\n# 주석\n${single}\n${path.join(tmp, 'nope')}\n${single}`);
   assert.deepEqual(r.items.map(i => i.title), ['alpha', 'beta', 'linked', 'single']);
   const [alpha, beta, linked, one] = r.items;
-  assert.deepEqual(alpha, { id: path.join(root, 'alpha'), title: 'alpha', url: '', meta: ['멈춤', 'npm run dev', 'node 20.11.1'], tags: [], vars: { path: path.join(root, 'alpha'), name: 'alpha' } });
+  assert.deepEqual(alpha, { id: path.join(root, 'alpha'), title: 'alpha', url: '', meta: ['멈춤', 'npm run dev', 'node 20.11.1'], tags: [], detail: [], vars: { path: path.join(root, 'alpha'), name: 'alpha', command: 'npm run dev', port: '' } });
   assert.deepEqual(beta.meta, ['멈춤', './gradlew bootRun']);
   assert.equal(linked.id, path.join(root, 'linked'));
   assert.deepEqual(one.meta, ['멈춤', 'npm run start', 'feature/x']);
@@ -112,6 +118,44 @@ test('프로젝트 목록: 폴더/* 펼치기, 항목 모양, 없는 폴더는 n
   const empty = await run('projects.mjs', 'list', '--projects=');
   assert.deepEqual(empty.items, []);
   assert.match(empty.note, /프로젝트/);
+});
+
+test('FE 프로젝트 노트: 로컬 폴더를 더하고, 노트의 실행 명령(찾은 명령일 때만)을 띄울 명령으로, 배포·브랜치 한 줄', async () => {
+  const profile = path.join(tmp, 'profile'), notes = path.join(profile, '01_지식', '맥락노트', 'FE 프로젝트');
+  const web = project('fe/web', { 'package.json': { scripts: { dev: 'vite', 'dev:mock': 'vite --mode mock' } } });
+  const odd = project('fe/odd', { 'package.json': { scripts: { dev: 'vite' } } });
+  write(path.join(notes, 'web.md'), `---
+type: context
+---
+# 내용
+- 레포: a/web
+- 로컬: ${web}
+- 실행: \`npm run dev:mock\` · 목 서버로 (명시)
+- 배포: Jenkins · real은 금요일 (관례)
+- 브랜치: feature/* → develop → main (관례)
+`);
+  write(path.join(notes, 'odd.md'), `# 내용
+- 레포: a/odd
+- 로컬: ${odd}
+- 실행: \`rm -rf /\` · 노트가 틀려도 찾은 명령만 띄운다
+`);
+  write(path.join(notes, 'gone.md'), `# 내용
+- 레포: a/gone
+- 로컬: ${path.join(tmp, 'fe/없음')}
+`);
+
+  const r = await run('projects.mjs', 'list', `--projects=${web}`, '--fe=FE 프로젝트', `--profile=${profile}`);
+  assert.deepEqual(r.items.map(i => i.title), ['web', 'odd']);   // 설정 폴더와 겹치면 한 번, 없는 폴더는 뺀다
+  const [w, o] = r.items;
+  assert.equal(w.vars.command, 'npm run dev:mock');
+  assert.deepEqual(w.detail, [{ text: '브랜치 feature/* → develop → main (관례) · 배포 Jenkins' }]);
+  assert.equal(o.vars.command, 'npm run dev');
+  assert.equal(w.vars.port, '');
+  const pr = await import(path.join(SCRIPTS, 'projects.mjs'));
+  assert.equal(pr.portOf({ 실행: '`./gradlew bootRun` · 포트 8090 · mmap-hash.fedev.kakao.com' }), 8090);
+  assert.equal(pr.portOf({ 실행: '`pnpm dev` · 포트 99999' }), null);
+  // 묶음을 비우면 노트를 보지 않는다
+  assert.deepEqual((await run('projects.mjs', 'list', `--projects=${web}`, '--fe=', `--profile=${profile}`)).items.map(i => i.title), ['web']);
 });
 
 test('에이전트 목록: 프런트매터 읽기', async () => {
@@ -193,6 +237,50 @@ test('개발 서버: 띄운 스크립트가 끝나도 서버는 돌고, 상태�
   assert.equal((await run('devserver.mjs', 'start', `--path=${d}`, '--command=npm run dev')).ask.placeholder, String(port));
 });
 
+test('띄우기 한 번에(up): 묻지 않고 넘겨받은 명령·빈 포트로 띄우고, [명령 바꾸기]면 고르게 묻는다', { timeout: 90000 }, async () => {
+  const d = project('one-click', {
+    'package.json': { name: 'one-click', scripts: { dev: 'node server.js', 'dev:alt': 'node server.js' } },
+    'server.js': "require('http').createServer((q, s) => s.end('ok')).listen(Number(process.env.PORT));"
+  });
+  let pid = null;
+  after(() => { if (pid) try { process.kill(-pid, 'SIGKILL'); } catch {} });
+
+  // 찾은 명령이 아니면(노트가 틀렸거나 '-') 띄우지 않고 고르게 묻는다
+  const bad = await run('devserver.mjs', 'up', `--path=${d}`, '--command=rm -rf /');
+  assert.deepEqual(bad.ask.choices.map(c => c.value), ['npm run dev', 'npm run dev:alt', 'npm install']);
+  assert.match(bad.ask.hint, /찾은 명령이 아니에요/);
+  assert.equal(bad.ask.inline, true);
+  assert.doesNotMatch((await run('devserver.mjs', 'up', `--path=${d}`, '--command=-')).ask.hint, /찾은 명령이 아니에요/);
+  assert.ok((await run('devserver.mjs', 'up', `--path=${d}`, '--command=npm run dev', '--answer=?')).ask, '[명령 바꾸기]는 묻는다');
+
+  const up = await run('devserver.mjs', 'up', `--path=${d}`, '--command=npm run dev', '--answer=npm run dev:alt');
+  pid = up.pid;
+  assert.match(up.summary, /^http:\/\/localhost:\d+\/ 에서 실행 중$/);
+  assert.equal(up.command, 'npm run dev:alt');
+  assert.deepEqual(up.change, { label: '명령 바꾸기', value: '?' });
+  assert.match(await get(up.url.replace('localhost', '127.0.0.1')), /^ok$/);
+  // 목록은 지난번에 띄운 명령을 띄울 명령으로 둔다
+  assert.equal((await run('projects.mjs', 'list', `--projects=${d}`)).items[0].vars.command, 'npm run dev:alt');
+  assert.match((await run('devserver.mjs', 'up', `--path=${d}`, '--command=npm run dev')).summary, /^이미 .* 실행 중이에요$/);
+  await run('devserver.mjs', 'stop', `--path=${d}`);
+  pid = null;
+
+  // 노트의 포트가 비어 있으면 그 포트로
+  const want = await freePort();
+  const fixed = await run('devserver.mjs', 'up', `--path=${d}`, '--command=npm run dev', `--port=${want}`);
+  pid = fixed.pid;
+  assert.equal(fixed.port, want);
+  await run('devserver.mjs', 'stop', `--path=${d}`);
+  pid = null;
+
+  // 다시 띄우면 (포트를 안 주면) 지난 포트를 그대로 쓴다
+  const again = await run('devserver.mjs', 'up', `--path=${d}`, '--command=npm run dev');
+  pid = again.pid;
+  assert.equal(again.port, want);
+  await run('devserver.mjs', 'stop', `--path=${d}`);
+  pid = null;
+});
+
 test('개발 서버: 바로 죽으면 기록 끝을 보여 준다', { timeout: 60000 }, async () => {
   const d = project('broken', { 'package.json': { scripts: { dev: 'node -e "console.error(\'boom-err\'); process.exit(3)"' } } });
   const port = await freePort();
@@ -208,6 +296,8 @@ test('검사기가 개발 도구 플러그인을 받는다', () => {
   assert.equal(r.ok, true, r.errors.join('\n'));
   assert.equal(r.manifest.id, 'dev-tools');
   assert.deepEqual(r.workflows.map(w => w.name), ['띄우기', '멈추기', 'AI로 고치기', 'AI 사용성 점검', 'AI로 에이전트 고치기']);
+  assert.equal(r.workflows[0].steps.length, 1, '띄우기는 한 단계(묻지 않고 바로)');
+  assert.equal(P.parseFeeds(fs.readFileSync(path.join(PLUGIN, 'feeds/개발.md'), 'utf8'))[0].view, 'inline');   // 실행기는 parseFeeds 그대로 쓴다
   assert.deepEqual(r.feeds.map(f => f.name), ['프로젝트', '에이전트']);
   assert.equal(r.workflows[2].steps[0].kind, 'ask');
 });

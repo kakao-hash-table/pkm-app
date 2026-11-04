@@ -47,6 +47,7 @@ test('ww 데일리와 같은 글 — 약속(시각)과 계획, 지라 링크, �
     '**이슈**', '- 10월 29일 목요일입니다.', '- 11/3(화) 연차', '- 11/10(화) 워크샵', '',
     '[#hash202610](https://kakao.agit.in/search?q=%23hash202610) [#hash20261005](https://kakao.agit.in/search?q=%23hash20261005)'
   ].join('\n'));
+  assert.equal(r.findings[0].rich, true);   // 아지트에는 마크다운이 아니라 서식 있는 글로 붙여 넣는다
   assert.deepEqual(r.ask.choices.map(c => c.value), ['done', 'doing']);
   assert.equal(r.ask.inline, true);
 });

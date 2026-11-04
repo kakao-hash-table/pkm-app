@@ -90,15 +90,20 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     if (!x) throw fail(404, '설치된 플러그인이 아니에요');
     const files = Object.fromEntries((await fs.promises.readdir(path.join(x.path, 'feeds')).catch(() => [])).filter(f => f.endsWith('.md')).map(f => [f, fs.readFileSync(path.join(x.path, 'feeds', f), 'utf8')]));
     const wf = Object.fromEntries((await fs.promises.readdir(path.join(x.path, 'workflows')).catch(() => [])).filter(f => f.endsWith('.md')).map(f => [f, fs.readFileSync(path.join(x.path, 'workflows', f), 'utf8')]));
+    // 체크인이 부르는 프롬프트는 이름 그대로(prompts/…md) 넘겨야 검사기가 찾는다
+    const named = async dir => (await fs.promises.readdir(path.join(x.path, dir)).catch(() => [])).filter(f => f.endsWith('.md')).map(f => { const t = fs.readFileSync(path.join(x.path, dir, f), 'utf8'); return { path: `${dir}/${f}`, size: t.length, text: t }; });
     const docs = async dir => Object.values(Object.fromEntries((await fs.promises.readdir(path.join(x.path, dir)).catch(() => [])).filter(f => f.endsWith('.md')).map(f => [f, fs.readFileSync(path.join(x.path, dir, f), 'utf8')])));
     const workflows = Object.values(wf).flatMap(t => P.parseWorkflows(t));
     const feeds = Object.values(files).flatMap(t => P.parseFeeds(t)).map(d => { const starts = P.startsOf(d.start);
       return { ...d, every: Number(String(d.every || 60).replace(/분$/, '')) || 60, days: d.days || 'daily', start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null }; });
-    // 검색·편집기는 검사기가 정리한 꼴 그대로 쓴다(설치할 때 이미 검사했다)
+    // 검색·편집기·퀵링크는 검사기가 정리한 꼴 그대로 쓴다(설치할 때 이미 검사했다)
     const v = P.validate([{ path: 'plugin.md', size: 0, text: fs.readFileSync(path.join(x.path, 'plugin.md'), 'utf8') },
       ...(await docs('searches')).map((t, i) => ({ path: `searches/${i}.md`, size: t.length, text: t })), ...(await docs('editors')).map((t, i) => ({ path: `editors/${i}.md`, size: t.length, text: t })),
+      ...(await docs('links')).map((t, i) => ({ path: `links/${i}.md`, size: t.length, text: t })),
+      ...(await docs('checkins')).map((t, i) => ({ path: `checkins/${i}.md`, size: t.length, text: t })),
+      ...(await named('prompts')),
       ...x.manifest.permissions.bundled.map(b => ({ path: b, size: 0, text: '' }))]);
-    return { ...x, feeds, workflows, searches: v.searches || [], editors: v.editors || [] };
+    return { ...x, feeds, workflows, searches: v.searches || [], editors: v.editors || [], checkins: v.checkins || [], links: v.links || [] };
   }
   function settingsFor(x, conf){
     const v = conf.settings || {};
@@ -444,7 +449,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const out = {};
     for (const x of list){
       const st = readState(p, x.id), pc = plugConf(c, p, x.id), full = await pluginOf(p, x.id);
-      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
+      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, checkins: full.checkins, links: full.links, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
         local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null, every: pc.every || {}, gates: pc.gates || {} } };
     }
     return { here: here(p), plugins: out };
