@@ -1,0 +1,133 @@
+{
+ "type": "object",
+ "properties": {
+  "_solution": {
+   "type": "object",
+   "properties": {
+    "forms": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "form": {
+        "type": "string",
+        "enum": [
+         "대행",
+         "도구",
+         "제품"
+        ]
+       },
+       "offer": {
+        "type": "string"
+       },
+       "how": {
+        "type": "string"
+       },
+       "weeks": {
+        "type": "number"
+       },
+       "automation": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "form",
+       "offer",
+       "how",
+       "weeks",
+       "automation"
+      ]
+     }
+    },
+    "first_hours": {
+     "type": "number"
+    },
+    "revenue": {
+     "type": "object",
+     "properties": {
+      "payer": {
+       "type": "string"
+      },
+      "cost_now": {
+       "type": "string"
+      },
+      "price": {
+       "type": "string"
+      },
+      "channel": {
+       "type": "string"
+      },
+      "first3": {
+       "type": "string"
+      },
+      "monthly": {
+       "type": "string"
+      },
+      "running_cost": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "payer",
+      "cost_now",
+      "price",
+      "channel",
+      "first3",
+      "monthly",
+      "running_cost"
+     ]
+    },
+    "abroad": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string"
+       },
+       "how": {
+        "type": "string"
+       },
+       "url": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "name",
+       "how",
+       "url"
+      ]
+     }
+    },
+    "step": {
+     "type": "string"
+    },
+    "contact": {
+     "type": "string"
+    },
+    "goal": {
+     "type": "string"
+    },
+    "risks": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "forms",
+    "first_hours",
+    "revenue",
+    "abroad",
+    "step",
+    "contact",
+    "goal",
+    "risks"
+   ]
+  }
+ },
+ "required": [
+  "_solution"
+ ]
+}

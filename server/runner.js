@@ -278,6 +278,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
           }
           run.lane = lane;
         }
+        if (out && Array.isArray(out.forget)) forgetAnswers(run, step, out.forget);
         Object.assign(step, { status: 'done', output: out, text, finished: now(), session: j.result.session || undefined, until: null, reason: null });
         run.updated = now();
         continue;
@@ -289,6 +290,15 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     if (fd && (fd.starts.length > 1 || fd.start_mode !== 'auto') && fs_) fs_.at = null;   // 늘 남는 목록(자동 시작이 아닌 것)
     slim(run);
   }
+  // 스크립트가 forget: [단계 키]를 내면 그 앞 단계의 사람 답(붙여 넣은 원문 등)을 실행 기록에서 지운다 — 상태 파일은 동기화된다
+  const forgetAnswers = (run, step, keys) => {
+    for (const k of keys.slice(0, 10)){
+      const s = run.steps.find(z => z !== step && z.key === k && ['done', 'skipped'].includes(z.status));
+      if (!s) continue;
+      const out = s.output && typeof s.output === 'object' ? Object.fromEntries(Object.entries(s.output).filter(([f]) => f !== 'answer')) : null;
+      Object.assign(s, { answer: null, answer_label: null, text: '(지웠어요)', output: { ...(out || {}), forgotten: true } });
+    }
+  };
   // 끝난 실행은 다음 단계에 넘기려고 받은 큰 값(이름이 _로 시작하는 필드, 예: diff)을 버린다 — 상태 파일은 동기화된다
   const slim = run => { for (const s of run.steps) if (s.output && typeof s.output === 'object') for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k]; };
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',

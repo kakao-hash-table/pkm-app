@@ -1,0 +1,98 @@
+{
+ "type": "object",
+ "properties": {
+  "_analysis": {
+   "type": "object",
+   "properties": {
+    "problems": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "post": {
+        "type": "integer"
+       },
+       "title": {
+        "type": "string"
+       },
+       "who": {
+        "type": "string"
+       },
+       "loss": {
+        "type": "string"
+       },
+       "workaround": {
+        "type": "string"
+       },
+       "summary": {
+        "type": "string"
+       },
+       "domain": {
+        "type": "string"
+       },
+       "qualifies": {
+        "type": "boolean"
+       },
+       "reject_why": {
+        "type": "string"
+       },
+       "money": {
+        "type": "integer"
+       },
+       "money_why": {
+        "type": "string"
+       },
+       "pain": {
+        "type": "integer"
+       },
+       "auto": {
+        "type": "integer"
+       },
+       "build": {
+        "type": "integer"
+       },
+       "out_of_scope": {
+        "type": "boolean"
+       },
+       "scope_why": {
+        "type": "string"
+       },
+       "match": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "post",
+       "title",
+       "who",
+       "loss",
+       "workaround",
+       "summary",
+       "domain",
+       "qualifies",
+       "reject_why",
+       "money",
+       "money_why",
+       "pain",
+       "auto",
+       "build",
+       "out_of_scope",
+       "scope_why",
+       "match"
+      ]
+     }
+    },
+    "note": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "problems",
+    "note"
+   ]
+  }
+ },
+ "required": [
+  "_analysis"
+ ]
+}
