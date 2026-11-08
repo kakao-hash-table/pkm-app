@@ -4734,7 +4734,7 @@ function plCardsFeed(id, x, f){
     const tk = plTrackOf(id, x, f, it) || (open ? { t:{ n:`r${String(open.id).replace(/[^\w-]/g, '')}` }, run:open, fb:PKMPlugin.runFeedback(open) } : null);
     const locked = tk && plTrackBusy(tk), done = tk && ['done', 'failed'].includes(tk.fb.phase), shut = hide && !PL.reveal[key];   // 멈추면 버튼 줄은 [다시 하기] 하나
     const box = d => `<div class="pl-callout"><span class="lbl">${esc(d.kind)}</span><p>${esc(d.text)}</p></div>`;
-    const body = (it.detail || []).filter(d => d.text && d.kind !== hide).map(d => d.kind ? box(d) : `<p class="pl-cbody">${esc(d.text)}</p>`).join('');
+    const body = (it.detail || []).filter(d => d.text && (!hide || d.kind !== hide)).map(d => d.kind ? box(d) : `<p class="pl-cbody">${esc(d.text)}</p>`).join('');
     const ans = hide && !shut ? (it.detail || []).filter(d => d.kind === hide).map(d => `<div class="pl-callout pl-ans" id="pla-${PL.reveal[key]}" tabindex="-1"><span class="lbl">${esc(d.kind)}</span><p>${esc(d.text)}</p></div>`).join('') : '';
     const btns = shut ? `<button class="btn btn-primary btn-sm" type="button" data-pl="reveal" data-key="${esc(key)}" aria-label="${name} ${esc(hide)} 보기">${esc(hide)} 보기</button>`
       : f.starts.map((w, i) => `<button class="btn ${i ? 'btn-ghost' : 'btn-primary'} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-wf="${esc(w)}" data-title="${esc(it.title)}" aria-label="${name} ${esc(w)}" ${locked || live(it, w) || PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(w)}</button>`).join('');
