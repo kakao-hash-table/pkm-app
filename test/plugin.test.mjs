@@ -64,6 +64,12 @@ test('피드·비밀값·단계 폴더 — 선언한 스크립트로만 가져�
   assert.match(P.validate(feed('## a\n- run: scripts/none.mjs\n')).errors.join(), /선언하지 않은 스크립트 "scripts\/none.mjs"/);
   assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- every: 1\n- start: 없는것\n')).errors.join(), /every는 5~1440분[\s\S]*워크플로우 "없는것"가 없어요/);
   assert.match(P.validate(manifest(t => t.replace('bundled: [scripts/pr-body.mjs]', 'bundled: [scripts/pr-body.mjs]\n  secrets: [token]'))).errors.join(), /영문 대문자/);
+  assert.equal(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- start: 배포\n- view: cards\n- reveal: 정답\n')).ok, true);
+  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- view: cards\n')).errors.join(), /view: cards은 start와 함께/);
+  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- start: 배포\n- reveal: 정답\n')).errors.join(), /reveal은 view: cards에서만/);
+  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- start: 배포\n- view: grid\n')).errors.join(), /view는 inline·sections·cards/);
+  assert.equal(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- start: 배포\n- view: cards\n- undo: 배포\n- undo_for: 배포\n')).ok, true);
+  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- start: 배포\n- view: cards\n- undo: 없는것\n- undo_for: 다른것\n')).errors.join(), /undo 워크플로우 "없는것"가 없어요[\s\S]*undo_for의 "다른것"는 start에 없어요/);
   const wf = P.parseWorkflows('## a\n- [구현] 고치기 · agent(read) in {프로젝트.dir}: 고쳐 줘\n- [확인] 보기 · manual');
   assert.deepEqual(wf[0].steps.map(s => [s.kind, s.mode, s.cwd, s.body]), [['agent', 'read', '{프로젝트.dir}', '고쳐 줘'], ['manual', null, null, '']]);
 });
@@ -216,8 +222,9 @@ test('누른 항목 자리 — 실행이 사라지면 추적을 지우고, 글�
   const fn = name => { const i = app.indexOf(`function ${name}(`); let d = 0, j = app.indexOf('){', i) + 1; for (; j < app.length; j++){ if (app[j] === '{') d++; else if (app[j] === '}' && --d === 0) break; } return app.slice(i, j + 1); };
   const line = name => app.match(new RegExp(`const ${name} = [^\\n]+`))[0];
   const live = { textContent: '' }, els = {}, PL = { track: {}, sent: {} };
-  const T = new Function('PKMPlugin', 'PL', '$', 'plRunner', 'esc', `${line('PL_POLL_MS')}\n${line('plTrackKey')}\n${line('plDoneLeaves')}\n${line('plTrackHidden')}\n${fn('plTrackOf')}\n${line('plTrackDue')}\n${fn('plTrackUpdate')}\nreturn { plTrackKey, plTrackUpdate, plTrackHidden };`)(
-    P, PL, q => q === '#pl-live' ? live : els[q] || null, () => '', s => String(s));
+  const toasts = [], folded = [];
+  const T = new Function('PKMPlugin', 'PL', '$', 'plRunner', 'esc', 'plCalm', 'plFold', 'toast', 'plUndo', `${line('PL_POLL_MS')}\n${line('PL_CARD_DONE_MS')}\n${line('plTrackKey')}\n${line('plDoneLeaves')}\n${line('plTrackWait')}\n${line('plUndoable')}\n${line('plTrackHidden')}\n${fn('plTrackOf')}\n${line('plTrackDue')}\n${fn('plTrackUpdate')}\nreturn { plTrackKey, plTrackUpdate, plTrackHidden, PL_LEAVE_MS };`)(
+    P, PL, q => q === '#pl-live' ? live : els[q] || null, () => '', s => String(s), () => false, k => folded.push(k), (m, a) => toasts.push([m, a.label]), () => {});
   const now = Date.now(), iso = ms => new Date(now + ms).toISOString();
   const leave = { name: '할 일', start: '했어요', starts: ['했어요'], count: 'yes' }, stay = { name: '프로젝트', start: '점검', starts: ['점검'], count: 'no' };
   const setup = (f, runs, t) => { PL.st = { plugins: { p: { feeds: [f], state: { feeds: { [f.name]: { at: iso(-60000), items: [{ id: 'i1' }] } }, runs } } } };
@@ -243,5 +250,17 @@ test('누른 항목 자리 — 실행이 사라지면 추적을 지우고, 글�
   setup(leave, [run(leave, done)], { run: 'r1', said: 'done', doneAt: now - 5000 });   // 끝나면 빠지는 목록 — 숨기고, 목록을 새로 가져올 때까지 둔다
   assert.equal(T.plTrackUpdate(), true); assert.equal(T.plTrackHidden('p', leave, { id: 'i1' }), true);
   setup(stay, [run(stay, done)], { run: 'r1', said: 'done', doneAt: now - 5000 });   // 늘 남는 목록 — 결과 줄만 지운다
+  assert.equal(T.plTrackUpdate(), true); assert.deepEqual(PL.track, {});
+
+  // 카드 보기 — 결과 1.2초 → 밀려 나가는 그림(자리 접기) → 숨김 + 되돌리기 토스트(undo_for에 든 것만)
+  const cards = { name: '카드', start: '담기', starts: ['담기', '적용'], view: 'cards', undo: '되돌리기', undo_for: '담기' };
+  setup(cards, [run(cards, done)], { run: 'r1', said: 'done', doneAt: now - 1300, doneMs: 1200 });
+  const tc = Object.values(PL.track)[0];
+  assert.equal(T.plTrackUpdate(), true); assert.ok(tc.leaving); assert.equal(tc.hidden, undefined); assert.equal(folded.length, 1);
+  tc.leaving = now - T.PL_LEAVE_MS - 10;
+  assert.equal(T.plTrackUpdate(), true); assert.equal(tc.hidden, true); assert.deepEqual(toasts, [['담기 · 예시', '되돌리기']]);
+  setup(cards, [run(cards, { ...done, workflow: '적용' })], { run: 'r1', workflow: '적용', said: 'done', doneAt: now - 1300, doneMs: 1200, leaving: now - 1000 });
+  T.plTrackUpdate(); assert.equal(toasts.length, 1);   // 되돌릴 수 없는 워크플로우는 토스트 없이
+  setup(cards, [run(cards, done)], { run: 'r1', said: 'done', doneAt: now - 1300, doneMs: 1200, stay: true });   // 되돌린 카드는 끝나도 남는다
   assert.equal(T.plTrackUpdate(), true); assert.deepEqual(PL.track, {});
 });

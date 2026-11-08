@@ -34,7 +34,7 @@
   }
 
   /* 피드 문서: "## 이름" 아래 "- 키: 값" 줄. 키 = run(필수) · every(분) · days(weekdays|daily) · hours(09:00-18:00) · start(워크플로우) · start_mode(auto|button)
-     · view(sections|inline — inline이면 항목 자리에서 진행 상태를 보인다) · start_label(시작 버튼 글자) · dismiss(yes — 확인하고 닫기) · count · empty. 다른 줄은 설명 */
+     · view(sections|inline|cards — inline이면 항목 자리에서 진행 상태를, cards면 항목마다 카드 한 장에 다 보이고 끝나면 사라진다) · reveal(cards에서 [이 kind 보기]를 누른 뒤에 보일 detail kind) · undo·undo_for(cards에서 끝난 뒤 토스트 [되돌리기]로 돌릴 워크플로우와 그 대상) · start_label(시작 버튼 글자) · dismiss(yes — 확인하고 닫기) · count · empty. 다른 줄은 설명 */
   function parseFeeds(text){
     const out = []; let cur = null;
     for (const line of String(text || '').split('\n')){
@@ -161,8 +161,12 @@
         if (d.start_mode && !['auto', 'button'].includes(d.start_mode)) err(`${where}: start_mode는 auto 또는 button`);
         const starts = startsOf(d.start);   // "실행, 멈추기" — 항목마다 버튼 하나씩, 첫 번째가 주 버튼
         for (const w of starts) if (!workflows.some(x => x.name === w)) err(`${where}: 워크플로우 "${w}"가 없어요`);
-        if (d.view && !['inline', 'sections'].includes(d.view)) err(`${where}: view는 inline 또는 sections`);
-        if (d.view === 'inline' && !d.start) err(`${where}: view: inline은 start와 함께 써요`);
+        if (d.view && !['inline', 'sections', 'cards'].includes(d.view)) err(`${where}: view는 inline·sections·cards 중 하나`);
+        if (['inline', 'cards'].includes(d.view) && !d.start) err(`${where}: view: ${d.view}은 start와 함께 써요`);
+        if (d.reveal && d.view !== 'cards') err(`${where}: reveal은 view: cards에서만 써요`);
+        if (d.undo && !workflows.some(x => x.name === d.undo)) err(`${where}: undo 워크플로우 "${d.undo}"가 없어요`);
+        if (d.undo && d.view !== 'cards') err(`${where}: undo는 view: cards에서만 써요`);
+        for (const w of startsOf(d.undo_for)) if (!starts.includes(w)) err(`${where}: undo_for의 "${w}"는 start에 없어요`);
         if (d.dismiss && d.dismiss !== 'yes') err(`${where}: dismiss는 yes만 써요`);
         if (d.dismiss && d.start) err(`${where}: dismiss는 start가 없는 목록에만 써요`);
         if (feeds.some(x => x.name === d.name)) err(`${where}: 피드 이름이 겹쳐요`);
