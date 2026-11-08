@@ -37,7 +37,7 @@ export function splitSummary(text){
   return { text: (s.slice(0, m.index) + s.slice(m.index + m[0].length)).trimEnd(), summary: q || a ? { q, a } : null };
 }
 
-export function createChats({ DATA, readConf, findCard, findProject = async () => null }){
+export function createChats({ DATA, readConf, findCard, findProject = async () => null, onPush = null }){
   /* ---------- pkm-ai-server ---------- */
   async function ai(conn, pathname, opt = {}){
     let r;
@@ -125,7 +125,15 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     const t = lastTurn(r);
     return { id: r.id, kind: r.kind, card: r.card, cwd: r.cwd, memo: r.memo || null, created: r.created, updated: r.updated, turns: r.turns.length,
       status: t ? t.status : null, state: stateOf(r), unread: unreadOf(r), read: r.read || null, finished: t ? t.finished : null,
-      pending: t ? (t.pending || []).length : 0, last: t ? clip(t.reply || t.error || t.text, 120) : '' };
+      pending: t ? (t.pending || []).length : 0, last: t ? clip(t.reply || t.error || t.text, 120) : '', ...live(t) };
+  };
+  // 실시간 현황 — 하는 중인 말의 시작 시각·보낸 말·지금 하는 일(마지막 진행 한 줄)·확인 요청 제목
+  const live = t => {
+    if (!t || FINAL.has(t.status)) return {};
+    const l = [...(t.log || [])].reverse().find(x => x.kind === 'tool' || x.kind === 'text'), q = (t.pending || [])[0];
+    const doing = !l ? '' : l.kind === 'tool' ? `${l.tool}${l.text ? ` · ${l.text}` : ''}` : String(l.text).trim().split('\n').pop();
+    return { started: t.started || t.created, asked: clip(t.text, 80), doing: clip(doing, 100), until: t.until || null,
+      question: q ? clip(q.tool === 'AskUserQuestion' ? ((q.input && q.input.questions && q.input.questions[0] && q.input.questions[0].question) || '물어볼 게 있어요') : (q.description || q.title || q.tool), 100) : '' };
   };
 
   /* ---------- 열기·지우기 ---------- */
@@ -278,7 +286,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     const j = (await ai(conn, `/v1/jobs/${t.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id, allow: allow === true, input: input && typeof input === 'object' ? input : undefined, message: allow ? '' : '사용자가 채팅에서 거절했어요' }) })).job;
     const q = t.pending.find(q => q.id === request_id);
     note(t, allow ? `허락함 · ${q.title || q.tool}` : `거절함 · ${q.title || q.tool}`);
-    applyJob(r, t, j); touch(p, true);
+    applyJob(r, t, j); emit(p, r, t); touch(p, true);
     return t;
   }
 
@@ -290,11 +298,30 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       const t = r.turns.find(t => ['running', 'waiting'].includes(t.status) && t.job) || r.turns.find(t => t.status === 'queued');
       if (!t) continue;
       running.add(k);
-      run(p, r, t).catch(e => { Object.assign(t, { status: 'error', error: clip(e.message, 500), finished: now(), pending: [] }); touch(p); })
+      run(p, r, t).catch(e => { Object.assign(t, { status: 'error', error: clip(e.message, 500), finished: now(), pending: [] }); emit(p, r, t); touch(p); })
         .finally(() => { running.delete(k); if (state(p).rooms.includes(r)) pump(p); });
     }
   }
 
+  // 알림(server/push.js) — 말마다 한 번씩만: 새 확인 요청, 시작, 끝(답·멈춤). 기록에 남겨 서버를 다시 켜도 또 보내지 않는다
+  function emit(p, r, t){
+    if (!onPush) return;
+    const pu = t.pushed || (t.pushed = {}), name = r.kind === 'data' ? '데이터 관리' : r.card ? r.card.title : r.id;
+    const say = (kind, title, body) => Promise.resolve().then(() => onPush(p, { kind, title, body: clip(body, 160), room: r.id, tag: `${r.id}:${t.id}`, url: `/?chat=${encodeURIComponent(r.id)}&profile=${encodeURIComponent(p)}` })).catch(() => {});
+    const fresh = (t.pending || []).filter(q => !(pu.ask || []).includes(q.id));
+    if (fresh.length){
+      pu.ask = [...(pu.ask || []), ...fresh.map(q => q.id)].slice(-20);
+      const q = fresh[0], inp = q.input || {};
+      say('ask', `답해 주세요 · ${name}`, q.tool === 'AskUserQuestion' ? `질문이 있어요 — ${(inp.questions && inp.questions[0] && inp.questions[0].question) || '열어서 골라 주세요'}`
+        : `허락이 필요해요 — ${q.description || inp.command || inp.file_path || q.title || q.tool}`);
+    }
+    if (!pu.run && ['running', 'waiting'].includes(t.status)){ pu.run = true; say('run', `시작했어요 · ${name}`, t.text); }
+    if (!pu.end && (t.status === 'done' || t.status === 'error')){
+      pu.end = pu.run = true;
+      if (t.status === 'done') say('done', `답이 왔어요 · ${name}`, (t.summary && t.summary.a) || t.reply || '끝났어요');
+      else say('done', `멈췄어요 · ${name}`, `${clip(t.error || '', 100)} 열어서 다시 보내 주세요`.trim());
+    }
+  }
   function note(t, text){ t.log.push({ at: now(), kind: 'note', text: clip(text, 300) }); if (t.log.length > KEEP_LOG) t.log.splice(0, t.log.length - KEEP_LOG); }
   function applyJob(r, t, j){
     if (j.session && r.session !== j.session) r.session = j.session;   // 중간에 멈춰도 같은 세션에서 이어 가게
@@ -351,7 +378,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       }
       const body = { plugin: { id: pl.id, root: pl.path }, provider: 'claude', prompt, system: ctx.system, tag: `plugin:${pl.id}`, agent };
       const j = (await ai(conn, '/v1/jobs', { method: 'POST', body: JSON.stringify(body) })).job;
-      t.job = j.id; applyJob(r, t, j); touch(p, true);
+      t.job = j.id; applyJob(r, t, j); emit(p, r, t); touch(p, true);
     }
     // 끝날 때까지 진행 상황을 받는다. 스트림이 끊기면 상태를 다시 읽고 이어 받는다(이 서버를 다시 켜도 같은 작업에 다시 붙는다)
     for (let tries = 0; !FINAL.has(t.status) && state(p).rooms.includes(r); tries++){
@@ -365,15 +392,15 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
             const line = buf.slice(0, i).split('\n').find(l => l.startsWith('data: ')); buf = buf.slice(i + 2);
             if (!line) continue;
             let ev; try { ev = JSON.parse(line.slice(6)); } catch { continue; }
-            if (ev.type === 'status'){ applyJob(r, t, ev.job); touch(p, FINAL.has(t.status) || !!t.pending.length); }
+            if (ev.type === 'status'){ applyJob(r, t, ev.job); emit(p, r, t); touch(p, FINAL.has(t.status) || !!t.pending.length); }
             else if (ev.type === 'text' && ev.text){ const x = splitSummary(ev.text).text; if (x.trim()) t.log.push({ at: now(), kind: 'text', text: clip(x, 4000) }); touch(p); }
             else if (ev.type === 'tool'){ t.log.push({ at: now(), kind: 'tool', tool: clip(ev.tool, 60), text: clip(ev.summary, 300) }); touch(p); }
             if (t.log.length > KEEP_LOG) t.log.splice(0, t.log.length - KEEP_LOG);
           }
         }
-      } catch (e) { if (e.status === 404){ Object.assign(t, { status: 'error', error: 'AI 서버에서 이 작업을 찾지 못했어요', finished: now(), pending: [] }); touch(p); return; } }
+      } catch (e) { if (e.status === 404){ Object.assign(t, { status: 'error', error: 'AI 서버에서 이 작업을 찾지 못했어요', finished: now(), pending: [] }); emit(p, r, t); touch(p); return; } }
       if (FINAL.has(t.status)) break;
-      try { applyJob(r, t, (await ai(conn, `/v1/jobs/${t.job}`)).job); touch(p); } catch {}
+      try { applyJob(r, t, (await ai(conn, `/v1/jobs/${t.job}`)).job); emit(p, r, t); touch(p); } catch {}
       if (!FINAL.has(t.status)) await new Promise(res => setTimeout(res, Math.min(30000, 1000 * 2 ** Math.min(tries, 5))));
     }
     touch(p, true);

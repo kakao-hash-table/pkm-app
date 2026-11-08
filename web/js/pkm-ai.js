@@ -25,21 +25,33 @@
     return { urls:j.urls.map(u => String(u).replace(/\/+$/, '')), token:j.token };
   }
 
-  const conn = () => { const c = LS.get(null); return c && c.url && c.token ? c : null; };
+  /* PKM 서버를 거치는 길 — 이 브라우저에 연결이 없거나 저장한 주소에 닿지 않으면(https로 연 휴대폰 화면은 http 주소를 막는다)
+     pkm 서버가 가진 '이 컴퓨터의 AI 연결'(플러그인·채팅이 쓰는 것)로 보낸다. 토큰은 서버에만 있다 */
+  const SERVER = { url:'/api/ai', token:'', via:'server' };
+  let serverOk = false, viaServer = false;
+  const stored = () => { const c = LS.get(null); return c && c.url && c.token ? c : null; };
+  const conn = () => { const c = stored(); if (c) return viaServer ? { ...c, via:'server' } : c; return serverOk && !(LS.get(null) || {}).no_server ? SERVER : null; };
+  const via = () => { const c = conn(); return c ? c.via || 'direct' : null; };
   const prefs = () => Object.assign(DEF_PREFS(), (LS.get(null) || {}).prefs || {});
-  function setPrefs(p){ const c = conn(); if (!c) return; c.prefs = Object.assign(prefs(), p); LS.set(c); }
+  function setPrefs(p){ if (!conn()) return; const c = LS.get(null) || {}; c.prefs = Object.assign(prefs(), p); LS.set(c); }
+  async function probe(){
+    try { const r = await fetch(SERVER.url + '/v1/providers'); serverOk = r.ok; } catch (e) { serverOk = false; }
+    return serverOk;
+  }
 
-  async function call(path, opt = {}, c = conn()){
+  async function call(path, opt = {}, given){
+    const c = given || (viaServer ? SERVER : stored() || (conn() ? SERVER : null));
     if (!c) throw err('AI 서버에 연결돼 있지 않아요', { code:'none' });
     let r;
-    try { r = await fetch(c.url + path, { ...opt, headers:{ authorization:`Bearer ${c.token}`, ...(opt.body ? { 'content-type':'application/json' } : {}), ...(opt.headers || {}) } }); }
+    try { r = await fetch(c.url + path, { ...opt, headers:{ ...(c.token ? { authorization:`Bearer ${c.token}` } : {}), ...(opt.body ? { 'content-type':'application/json' } : {}), ...(opt.headers || {}) } }); }
     catch (e) {
       if (e.name === 'AbortError') throw e;
+      if (!given && c !== SERVER && await probe()){ viaServer = true; return call(path, opt); }   // 저장한 주소가 안 닿으면 pkm 서버를 거쳐 다시
       throw err(`AI 서버(${c.url})에 닿지 않아요. 그 컴퓨터에서 pkm-ai-server가 켜져 있는지 확인해 주세요`, { code:'offline' });
     }
     if (opt.raw && r.ok) return r;
     const b = await r.json().catch(() => ({}));
-    if (r.status === 401) throw err('접속 토큰이 맞지 않아요. 서버에서 지웠다면 새 연결 코드로 다시 연결해 주세요', { code:'token', status:401 });
+    if (r.status === 401) throw err(c === SERVER ? 'pkm 서버의 AI 연결 토큰이 맞지 않아요. 플러그인 화면에서 이 컴퓨터의 AI 연결을 다시 넣어 주세요' : '접속 토큰이 맞지 않아요. 서버에서 지웠다면 새 연결 코드로 다시 연결해 주세요', { code:'token', status:401 });
     if (r.status === 403) throw err(b.error || '이 웹 주소는 AI 서버의 허용 목록에 없어요', { code:'origin', status:403 });
     if (!r.ok) throw err(b.error || `AI 서버 오류(${r.status})`, { status:r.status });
     return b;
@@ -53,22 +65,22 @@
       try {
         const b = await call('/v1/providers', {}, { url, token });
         const old = LS.get(null) || {};
-        LS.set({ url, urls, token, connected:new Date().toISOString(), prefs:Object.assign(DEF_PREFS(), old.prefs || {}) });
+        LS.set({ url, urls, token, connected:new Date().toISOString(), prefs:Object.assign(DEF_PREFS(), old.prefs || {}) }); viaServer = false;
         return { url, providers:b.providers };
       } catch (e) { last = e; if (e.code !== 'offline') break; }
     }
     throw last;
   }
-  const disconnect = () => LS.clear();
+  const disconnect = () => { LS.set({ no_server:true }); viaServer = false; };   // 끊으면 pkm 서버를 거치는 길도 쓰지 않는다(다시 연결하면 풀린다)
 
   /* 저장된 주소가 안 닿으면 연결 코드의 다른 주소로 옮겨 본다 */
   async function providers(refresh){
-    const c = conn();
+    const c = stored();
     try { return (await call(`/v1/providers${refresh ? '?refresh=1' : ''}`)).providers; }
     catch (e) {
       if (e.code !== 'offline' || !c || !c.urls || c.urls.length < 2) throw e;
       for (const url of c.urls.filter(u => u !== c.url)){
-        try { const b = await call('/v1/providers', {}, { ...c, url }); LS.set({ ...c, url }); return b.providers; } catch (e2) {}
+        try { const b = await call('/v1/providers', {}, { ...c, url }); LS.set({ ...c, url }); viaServer = false; return b.providers; } catch (e2) {}
       }
       throw e;
     }
@@ -122,5 +134,5 @@
     return job;
   }
 
-  root.PKMAI = { parseCode, conn, prefs, setPrefs, connect, disconnect, providers, usage, windows, guard, run, ratio };
+  root.PKMAI = { parseCode, conn, via, probe, prefs, setPrefs, connect, disconnect, providers, usage, windows, guard, run, ratio };
 })(typeof self !== 'undefined' ? self : this);

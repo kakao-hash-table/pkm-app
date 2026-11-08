@@ -32,6 +32,8 @@
 // POST …/chats/:room/send {id, text}  말 보내기 · …/cancel  그만두기 · …/reset  새 대화 · …/answer {request_id, allow}  확인 요청에 답하기(server/chats.js)
 // POST …/chats/:room/memo {text}  방 메모 적기(빈 글이면 지운다) · …/read  끝난 답을 읽었다고 적기(카드의 '새 답'을 지운다)
 // POST …/chats/:room/cwd {cwd|null}  카드 세션의 작업 폴더 고르기·비우기 · GET …/chats/_dirs?path=  폴더 고르기 화면의 하위 폴더 목록
+// GET  /api/profile/:p/push?endpoint=   휴대폰 알림 서명 키와 이 기기의 구독 · POST …/push {subscription, kinds}  켜기·종류 바꾸기
+// POST …/push/off {endpoint}  끄기 · …/push/test {endpoint}  테스트 알림 · …/push/seen {dev, visible}  이 기기로 앱을 보는 중(그동안은 안 보낸다)(server/push.js)
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -47,6 +49,7 @@ import * as textbook from './textbook.js';
 import { createRunner, readConf } from './runner.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
+import { createPush } from './push.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.PKM_DATA ? path.resolve(process.env.PKM_DATA) : path.join(ROOT, 'data');
@@ -240,7 +243,8 @@ async function findProject(p, id){
     file:rec ? path.join(DATA, p, '_플러그인', '.data', 'project-pilot', `${id}.json`) : '', hub:rec && rec.hub && rec.hub.path ? path.join(DATA, p, rec.hub.path) : '',
     work:rec && rec.work ? rec.work : '', cards };
 }
-const chats = createChats({ DATA, readConf, findCard, findProject });
+const push = createPush();
+const chats = createChats({ DATA, readConf, findCard, findProject, onPush:(p, msg) => push.notify(p, msg) });
 
 /* ---------- 교과서: 원본(Obsidian)이 정본, 바뀌면 다시 복제 ---------- */
 // 책 폴더의 .source.json 이 가리키는 원본을 지켜본다. 놓친 변경은 5분마다 한 번 더 맞춘다.
@@ -301,6 +305,24 @@ const AI_CONNECT = ['http://127.0.0.1:*', 'http://localhost:*', 'https://*.ts.ne
 const sameHost = req => { const h = String(req.headers.host || '').replace(/:\d+$/, ''); return /^[a-z0-9.-]+$/i.test(h) ? ` http://${h}:* https://${h}:*` : ''; };
 const SEC = req => ({ 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com ${AI_CONNECT}${sameHost(req)}; frame-ancestors 'none'` });
 const send = (res, code, body, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'content-type':type, 'cache-control':'no-store', ...SEC(res.req) }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
+/* 화면의 AI 요청을 이 컴퓨터의 AI 연결(플러그인·채팅이 쓰는 ~/.pkm-app/runner.json의 ai)로 넘긴다.
+   https로 연 화면(휴대폰 홈 화면 앱)은 http인 pkm-ai-server에 직접 닿지 못한다. 화면이 쓰는 요청만, 작업은 도구 없는 AI만 */
+const AI_ROUTES = [['GET', /^providers$/], ['GET', /^usage$/], ['POST', /^jobs$/], ['GET', /^jobs\/[\w-]+$/], ['GET', /^jobs\/[\w-]+\/events$/], ['DELETE', /^jobs\/[\w-]+$/]];
+const AI_JOB_KEYS = ['provider', 'model', 'effort', 'prompt', 'system', 'json_schema', 'tag', 'wait'];
+async function aiProxy(req, res, sub, url){
+  if (!AI_ROUTES.some(([m, re]) => m === req.method && re.test(sub))) return send(res, 404, { error:'없는 API' });
+  const conn = readConf().ai;
+  if (!conn || !conn.url || !conn.token) return send(res, 409, { error:'이 pkm 서버에 AI 연결이 없어요. 플러그인 화면에서 이 컴퓨터의 AI 연결을 넣어 주세요', code:'no_server_ai' });
+  let payload;
+  if (req.method === 'POST'){ const b = await body(req); payload = JSON.stringify(Object.fromEntries(AI_JOB_KEYS.filter(k => b[k] !== undefined).map(k => [k, b[k]]))); }
+  const ac = new AbortController(); res.on('close', () => ac.abort());
+  let r;
+  try { r = await fetch(`${conn.url}/v1/${sub}${url.search}`, { method:req.method, body:payload, signal:ac.signal, headers:{ authorization:`Bearer ${conn.token}`, ...(payload ? { 'content-type':'application/json' } : {}) } }); }
+  catch { return send(res, 502, { error:`AI 서버(${conn.url})에 닿지 않아요. 이 컴퓨터에서 pkm-ai-server가 켜져 있는지 확인해 주세요` }); }
+  res.writeHead(r.status, { 'content-type':r.headers.get('content-type') || 'application/json; charset=utf-8', 'cache-control':'no-store', 'x-content-type-options':'nosniff' });
+  try { if (r.body) for await (const chunk of r.body) res.write(chunk); } catch {}
+  res.end();
+}
 async function body(req){ let s = ''; for await (const c of req){ s += c; if (s.length > 20e6) throw Object.assign(new Error('너무 커요'), { status:413 }); } return s ? JSON.parse(s) : {}; }
 
 /* Obsidian으로 열기 — 프로필 이름이 보관함 이름과 같다는 보장이 없어, Obsidian에 등록된 보관함 중 이 파일을 품은 것을 찾아 그 ID로 연다 */
@@ -328,6 +350,7 @@ async function api(req, res, url){
     if (!site && req.headers.origin){ let host = ''; try { host = new URL(req.headers.origin).host; } catch {} cross = host !== req.headers.host && host !== req.headers['x-forwarded-host']; }
     if (cross) return send(res, 403, { error:'다른 사이트에서 온 요청이에요' });
   }
+  if (parts[0] === 'ai' && parts[1] === 'v1') return aiProxy(req, res, parts.slice(2).join('/'), url);
   if (parts[0] === 'plugins' && parts[1] === 'bundled' && req.method === 'GET') return send(res, 200, { plugins:await plugins.bundled(path.join(ROOT, 'plugins')) });
   if (parts[0] === 'plugins' && parts[1] === 'inspect' && req.method === 'POST') return send(res, 200, await plugins.inspect(await body(req)));
   if (parts[0] === 'gcal'){
@@ -356,7 +379,7 @@ async function api(req, res, url){
     if (sub === 'plugins' && parts[3] === 'state' && req.method === 'GET') return send(res, 200, await runner.status(p));
     if (sub === 'chats'){
       const rid = parts[3], act = parts[4];
-      if (!rid && req.method === 'GET') return send(res, 200, await chats.status(p));
+      if (!rid && req.method === 'GET'){ push.mark(url.searchParams.get('dev'), true); return send(res, 200, await chats.status(p)); }
       if (rid === '_dirs' && req.method === 'GET') return send(res, 200, await chats.dirs(p, url.searchParams.get('path')));
       if (!rid && req.method === 'POST'){ const b = await body(req); return send(res, 200, await chats.open(p, { card:b.card ? String(b.card) : null, project:b.project ? String(b.project) : null, cwd:b.cwd ? String(b.cwd) : null })); }
       if (rid && !act && req.method === 'GET') return send(res, 200, chats.room(p, rid));
@@ -368,6 +391,14 @@ async function api(req, res, url){
       if (rid && req.method === 'POST' && act === 'read') return send(res, 200, chats.markRead(p, rid));
       if (rid && req.method === 'POST' && act === 'memo'){ const b = await body(req); return send(res, 200, await chats.setMemo(p, rid, b.text)); }
       if (rid && req.method === 'POST' && act === 'cwd'){ const b = await body(req); return send(res, 200, await chats.setCwd(p, rid, b.cwd ? String(b.cwd) : null)); }
+    }
+    if (sub === 'push'){
+      const act = parts[3] || '';
+      if (!act && req.method === 'GET') return send(res, 200, push.status(p, url.searchParams.get('endpoint')));
+      if (!act && req.method === 'POST') return send(res, 200, { sub:push.subscribe(p, await body(req)) });
+      if (act === 'off' && req.method === 'POST') return send(res, 200, push.unsubscribe(p, String((await body(req)).endpoint || '')));
+      if (act === 'test' && req.method === 'POST') return send(res, 200, await push.test(p, String((await body(req)).endpoint || '')));
+      if (act === 'seen' && req.method === 'POST'){ const b = await body(req); push.mark(b.dev, b.visible !== false); return send(res, 200, { ok:true }); }
     }
     if (sub === 'plugins' && parts[3] && parts[4]){
       const id = parts[3], what = parts[4];
@@ -455,4 +486,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)){
   runner.start(); jobs.start(); chats.start((await listProfiles()).map(x => x.name));
   server.listen(PORT, HOST, () => console.log(`PKM: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}/  (데이터: ${DATA})`));
 }
-export { server, runner, gcal, jobs, chats, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };
+export { server, runner, gcal, jobs, chats, push, readProfile, save, createProfile, listProfiles, versionOf, inProfile, syncTemplates, syncNow as syncNowForTest, syncTextbooks };

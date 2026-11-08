@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PKM</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1B64DA">
 <style>
 /* 디자인 토큰 — 토스 회색·파랑 계열. 글자·경계 대비는 WCAG AA(본문 4.5:1, UI 3:1) 이상으로 맞춤 */
 :root{
@@ -770,6 +773,34 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .choice small{color:var(--text-2);font-size:.875rem}
 
 /* 토스트 */
+/* 당겨서 새로고침 */
+.ptr{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 8px);z-index:60;display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--surface);color:var(--text);box-shadow:var(--shadow-pop);font-size:.875rem;font-weight:600;transform:translate(-50%,-80px);opacity:0;pointer-events:none}
+.ptr.on{opacity:1}
+.ptr.back{transition:transform .2s ease,opacity .2s ease}
+.ptr-i{display:inline-block;transition:transform .15s ease;color:var(--primary)}
+.ptr[data-state="ready"] .ptr-i{transform:rotate(180deg)}
+.ptr[data-state="go"] .ptr-i{animation:ptr-spin .8s linear infinite}
+@keyframes ptr-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.ptr.back,.ptr-i{transition:none}.ptr[data-state="go"] .ptr-i{animation:none}}
+/* AI 실시간 현황 — 화면 위쪽에 붙어 있는 줄. 하는 중(파랑 점)·내 답 필요(주황 점, 글로도 표시) */
+.top-stack{position:sticky;top:0;z-index:10}
+.top-stack .topbar{position:static}
+.ai-now{background:var(--surface);border-bottom:1px solid var(--line);padding:6px 12px}
+.ai-now ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.ai-now button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:4px 8px;border:0;border-radius:var(--r-sm);background:none;color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.ai-now button:hover{background:var(--fill)}
+.ai-now button:focus-visible{outline:3px solid var(--primary);outline-offset:-3px}
+.ai-now .dot{flex:none;width:10px;height:10px;border-radius:50%;background:var(--primary)}
+.ai-now [data-state="run"] .dot{animation:ai-pulse 1.4s ease-in-out infinite}
+.ai-now [data-state="ask"] .dot{background:var(--s-review)}
+.ai-now .tx{min-width:0;flex:1;display:flex;flex-direction:column}
+.ai-now .t{font-weight:700;font-size:.875rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-now .d{font-size:.8125rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-now [data-state="ask"] .w{color:var(--s-review);font-weight:700}
+.ai-now .tm{flex:none;font-size:.75rem;color:var(--text-3)}
+.ai-now .more{font-size:.8125rem;color:var(--text-2);padding:2px 8px}
+@keyframes ai-pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.ai-now [data-state="run"] .dot{animation:none}}
 /* AI 챗봇 — 오른쪽 아래 떠 있는 버튼과 채팅 창(ai-chat 플러그인, 같은 컴퓨터의 pkm-ai-server에 연결돼 있을 때만) */
 .chat-fab{position:fixed;right:24px;bottom:24px;z-index:30;display:flex;align-items:center;gap:8px;min-height:52px;padding:0 20px 0 16px;border:0;border-radius:999px;background:var(--primary-fill);color:var(--on-primary);font:inherit;font-weight:700;box-shadow:var(--shadow-pop);cursor:pointer}
 .chat-fab:focus-visible{outline:3px solid var(--primary);outline-offset:3px}
@@ -1026,12 +1057,16 @@ body.has-chat-fab main{padding-bottom:120px}
   </aside>
 
   <div style="min-width:0">
+    <div class="top-stack">
     <header class="topbar">
       <button class="profile-btn" type="button" data-act="profiles" aria-haspopup="dialog"><span class="brand">pkm</span><span class="profile-name"></span><span aria-hidden="true">▾</span></button>
       <span style="display:flex;gap:8px"><a class="btn btn-ghost btn-sm" href="#/search">찾기</a><button class="btn btn-tonal btn-sm" type="button" data-act="capture">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>메모하기
       </button></span>
     </header>
+    <!-- AI 실시간 현황 — 하는 중이거나 내 답을 기다리는 채팅이 있을 때만 보인다. 누르면 그 채팅을 연다 -->
+    <section class="ai-now" id="ai-now" aria-label="AI 실시간 현황" hidden></section>
+    </div>
     <main id="main" tabindex="-1"></main>
   </div>
 </div>
@@ -1039,6 +1074,8 @@ body.has-chat-fab main{padding-bottom:120px}
 <nav class="tabbar" aria-label="영역"><ul id="nav-tab"></ul></nav>
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<!-- 당겨서 새로고침 — 홈 화면 앱에는 새로고침 버튼이 없어서, 맨 위에서 아래로 당기면 저장을 마친 뒤 다시 연다 -->
+<div class="ptr" id="ptr" role="status" aria-live="polite"><span class="ptr-i" aria-hidden="true">↓</span><span class="ptr-t"></span></div>
 <p class="sr-only" id="pl-live" aria-live="polite"></p>
 
 <!-- AI 챗봇 — ai-chat 플러그인을 설치하고 이 컴퓨터의 pkm-ai-server에 연결돼 있을 때만 보인다 -->
@@ -1051,7 +1088,7 @@ body.has-chat-fab main{padding-bottom:120px}
   <div class="chat-split" data-ch-drag="side" tabindex="0" role="separator" aria-orientation="vertical" aria-controls="chat-rooms" aria-label="채팅방 목록 너비" title="끌어서 목록 너비 조절 · 두 번 누르면 처음 너비"></div>
   <div class="chat-main">
   <div class="chat-head"><h2 id="chat-h" tabindex="-1">AI 챗봇</h2><select id="chat-room" aria-label="채팅 고르기"></select>
-    <button class="btn btn-text btn-sm" type="button" data-ch="close">닫기</button></div>
+    <button class="btn btn-text btn-sm" type="button" data-ch="push" aria-haspopup="dialog">알림 설정</button><button class="btn btn-text btn-sm" type="button" data-ch="close">닫기</button></div>
   <div class="chat-tools" id="chat-tools"></div>
   <section class="chat-memo" id="chat-memo" aria-label="메모" hidden></section>
   <div class="chat-log" id="chat-log" tabindex="0" aria-label="대화 기록"></div>
@@ -1063,6 +1100,14 @@ body.has-chat-fab main{padding-bottom:120px}
   </form>
   </div>
 </aside>
+
+<!-- 휴대폰 알림 — AI 챗봇에서 내 답이 필요하거나 답이 끝나면 이 기기에 알린다(server/push.js) -->
+<dialog id="dlg-push" aria-labelledby="pu-title">
+  <div><h2 id="pu-title" tabindex="-1">알림 설정</h2><p class="faint" style="margin:4px 0 0">AI 챗봇에서 고른 때에 이 기기로 알려요. 앱을 보고 있을 때는 보내지 않아요.</p></div>
+  <div id="pu-body" style="margin:16px 0 8px"></div>
+  <p class="faint" id="pu-live" role="status" style="margin:0 0 8px;min-height:1.4em"></p>
+  <div class="dlg-actions" id="pu-actions"></div>
+</dialog>
 
 <!-- 복사하기(클립보드를 못 쓸 때) -->
 <dialog id="dlg-copy" aria-labelledby="copy-title">
@@ -2401,7 +2446,7 @@ function renderAI(){
   const d = $('#dlg-ai'), c = PKMAI.conn(), form = !c || AI.recode, a = document.activeElement;
   const key = a && a !== d && d.contains(a) ? a.name ? `[name="${a.name}"]${a.type === 'radio' ? `[value="${CSS.escape(a.value)}"]` : ''}` : a.dataset.act ? `[data-act="${a.dataset.act}"]` : a.id ? '#' + a.id : null : null;
   $('#ai-title').textContent = !c ? 'AI 연결하기' : AI.recode ? '연결 코드 다시 넣기' : 'AI 연결';
-  $('#ai-sub').innerHTML = !c ? '내 컴퓨터에 띄운 pkm-ai-server에 연결하면, 그 컴퓨터에 로그인해 둔 Claude·GPT·Gemini를 pkm이 쓸 수 있어요.' : `연결한 서버 <span class="num">${esc(c.url)}</span>`;
+  $('#ai-sub').innerHTML = !c ? '내 컴퓨터에 띄운 pkm-ai-server에 연결하면, 그 컴퓨터에 로그인해 둔 Claude·GPT·Gemini를 pkm이 쓸 수 있어요.' : c.via === 'server' ? 'pkm 서버를 거쳐 <b>이 컴퓨터의 AI 연결</b>(플러그인·채팅과 같은 것)을 써요' : `연결한 서버 <span class="num">${esc(c.url)}</span>`;
   $('#ai-body').innerHTML = form ? aiFormHTML() : aiMainHTML();
   $('#ai-actions').innerHTML = form ? '<button class="btn btn-text" type="button" data-act="close-dlg">닫기</button><button class="btn btn-primary" type="submit" id="ai-submit">연결하기</button>'
     : '<button class="btn btn-text btn-danger" type="button" data-act="ai-off" style="margin-right:auto">연결 끊기</button><button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>';
@@ -5099,23 +5144,45 @@ async function chLoad(){
   CH.loading = true;
   const before = JSON.stringify(CH.st && [CH.st.ok, CH.st.rooms]);
   try {
-    CH.st = await capi('');
+    CH.st = await capi(puDev() && document.visibilityState === 'visible' ? `?dev=${encodeURIComponent(puDev())}` : '');
     const ended = [...CH.wasActive].filter(id => { const r = chSum(id); return !r || !CH_ACTIVE.includes(r.status); });
     CH.wasActive = new Set((CH.st.rooms || []).filter(r => CH_ACTIVE.includes(r.status)).map(r => r.id));
     if (ended.length) setTimeout(poll, 300);   // 에이전트가 고친 파일을 바로 불러온다
     chNotice(CH.st.rooms || []);
     if (CH.open) await chRoomLoad();
+    if (PU.go && chOn()){ const g = PU.go; PU.go = null; setTimeout(() => chOpen(g.room), 0); }
   } catch (e) { CH.st = CH.st || null; CH.err = e.message; }
   finally { CH.loading = false; }
   const active = ((CH.st && CH.st.rooms) || []).some(r => CH_ACTIVE.includes(r.status));
   if (CH.st && CH.st.plugin) CH.timer = setTimeout(chLoad, CH.open && active ? 1200 : active ? 4000 : CH.open ? 5000 : 30000);
   else CH.timer = setTimeout(chLoad, 60000);   // 설치하면 1분 안에 버튼이 생긴다(설치 화면은 바로 부른다)
-  chFab(); if (CH.open) chPaint();
+  chFab(); aiNowPaint(); if (CH.open) chPaint();
   // 카드 아이콘(세션 상태)은 보드·카드 화면에만 — 입력 중이면 그리지 않는다
   if (before !== JSON.stringify(CH.st && [CH.st.ok, CH.st.rooms]) && /^#\/(action\/short|plugins\/[^/]+\/setup)/.test(location.hash) && !document.querySelector('dialog[open]')
     && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#main input, #main textarea, #main select'))) render();
 }
 // 보고 있는 방의 끝난 답은 읽은 것으로 — 카드의 '새 답'이 '내 차례'로 바뀐다. 창이 열려 있고 탭이 보일 때만
+// 실시간 현황 줄 — 내 답이 필요한 방을 먼저, 그다음 오래 돈 순. 세 개까지 보이고 나머지는 개수로
+const aiAgo = iso => { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return !iso ? '' : m < 1 ? '방금' : m < 60 ? `${m}분째` : `${Math.floor(m / 60)}시간 ${m % 60}분째`; };
+function aiNowPaint(){
+  const el = $('#ai-now'); if (!el) return;
+  const rooms = chOn() ? ((CH.st && CH.st.rooms) || []).filter(r => ['run', 'ask'].includes(chState(r))) : [];
+  rooms.sort((a, b) => (chState(b) === 'ask') - (chState(a) === 'ask') || String(a.started || '').localeCompare(String(b.started || '')));
+  const name = r => r.kind === 'data' ? '데이터 관리' : `${chRoomWord(r)} · ${r.card ? r.card.title : r.id}`;
+  const line = r => {
+    const st = chState(r), ask = st === 'ask';
+    const what = ask ? `<span class="w">답해 주세요</span> — ${esc(r.question || '확인 요청')}` : r.status === 'queued' ? '차례를 기다려요' : r.status === 'waiting' ? `기다리는 중이에요${r.until ? ` · ${plTime(r.until)}에 다시` : ''}` : esc(r.doing || r.asked || '하는 중이에요');
+    return `<li><button type="button" data-ch="goto-live" data-room="${esc(r.id)}" data-state="${st}" aria-label="${esc(name(r))} · ${ask ? '답해 주세요' : '하는 중'} · 채팅 열기"><span class="dot" aria-hidden="true"></span><span class="tx"><span class="t">${esc(name(r))}</span><span class="d">${what}</span></span><span class="tm">${aiAgo(r.started)}</span></button></li>`;
+  };
+  const html = rooms.length ? `<ul>${rooms.slice(0, 3).map(line).join('')}</ul>${rooms.length > 3 ? `<p class="more" style="margin:0">그 밖에 ${rooms.length - 3}개 더 — 채팅방 목록에서 볼 수 있어요</p>` : ''}` : '';
+  el.hidden = !html;
+  if (el.dataset.sig !== html){
+    const had = document.activeElement && document.activeElement.closest && document.activeElement.closest('#ai-now') ? document.activeElement.dataset.room : null;
+    el.innerHTML = html; el.dataset.sig = html;
+    if (had){ const b = el.querySelector(`[data-room="${CSS.escape(had)}"]`); if (b) b.focus(); }
+  }
+}
+setInterval(aiNowPaint, 30000);   // 'N분째'를 고친다
 async function chMarkRead(sum){
   if (!sum || !sum.unread || !CH.open || document.visibilityState !== 'visible' || CH.reading === sum.id) return;
   CH.reading = sum.id;
@@ -5430,6 +5497,8 @@ document.addEventListener('click', async e => {
   const act = b.dataset.ch;
   if (act === 'open') return chOpen();
   if (act === 'close') return chClose();
+  if (act === 'push') return puOpen();
+  if (act === 'goto-live') return chOpen(b.dataset.room);
   if (act === 'card') return chCard(b.dataset.id);
   if (act === 'project'){ if (b.closest('summary')) e.preventDefault(); return chProject(b.dataset.id); }   // 묶음 머리 안의 아이콘 — 펼치고 접기는 하지 않는다
   if (act === 'pick'){ const r = CH.rooms[CH.room]; return chPickGo((r && r.cwd) || (CH.st && CH.st.card_cwd) || ''); }
@@ -6288,8 +6357,171 @@ $('#import-input').addEventListener('change', async e => {
     toast(`노트 ${Object.keys(writes).length}개를 가져왔어요${skipped ? ` · 이미 있는 ${skipped}개는 건너뛰었어요` : ''}`);
   } catch (err) { toast(`가져오지 못했어요 — ${err.message}`); }
 });   // 회의록처럼 다시 그리지 않고 고치는 칸도 저장
+/* ---------------- 휴대폰 알림(웹 푸시) ----------------
+   서비스 워커(sw.js)가 알림을 받아 보이고, 누르면 그 채팅을 연다. 구독·서명 키는 서버(server/push.js)가 이 컴퓨터에 둔다.
+   iOS는 https 주소를 홈 화면에 추가해 연 앱에서만, 그리고 버튼을 눌렀을 때만 권한을 물을 수 있다 */
+const PU = { st:null, sub:null, busy:false, err:'', go:null };
+const PU_KINDS = [['ask', '내 답이 필요할 때', '확인 요청이나 질문이 왔을 때'], ['done', '답이 끝났을 때', '멈췄을 때도 알려요'], ['run', '시작했을 때', '말을 보낼 때마다 와서 많을 수 있어요']];
+const puDev = () => LS.get('pkm:v1:push-dev', '');
+const puIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const puAlone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const puCan = () => window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const puKey = k => { const s = atob(k.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - k.length % 4) % 4)); return Uint8Array.from(s, c => c.charCodeAt(0)); };
+let puReg = null;
+async function puRegister(){
+  if (puReg || !plOK() || !window.isSecureContext || !('serviceWorker' in navigator)) return puReg;
+  try { puReg = await navigator.serviceWorker.register('sw.js'); } catch { puReg = null; }
+  return puReg;
+}
+function puSeen(visible){
+  const dev = puDev(); if (!dev || !plOK() || !S.profile) return;
+  fetch(`/api/profile/${encodeURIComponent(S.profile)}/push/seen`, { method:'POST', keepalive:true, headers:{ 'content-type':'application/json' }, body:JSON.stringify({ dev, visible }) }).catch(() => {});
+}
+document.addEventListener('visibilitychange', () => puSeen(document.visibilityState === 'visible'));
+async function puOpen(){
+  PU.err = ''; PU.st = null; $('#pu-live').textContent = ''; puPaint(); if (!$('#dlg-push').open) openDlg('dlg-push');
+  if (!puCan() || (puIOS() && !puAlone())) return;
+  try {
+    const reg = await puRegister(); PU.sub = reg ? await reg.pushManager.getSubscription() : null;
+    PU.st = await papi(`/push${PU.sub ? `?endpoint=${encodeURIComponent(PU.sub.endpoint)}` : ''}`);
+    if (PU.st.sub) LS.set('pkm:v1:push-dev', PU.st.sub.dev);
+  } catch (e) { PU.err = puMsg(e); }
+  puPaint();
+}
+function puPaint(){
+  const body = $('#pu-body'), acts = $('#pu-actions'); if (!body) return;
+  const f = document.activeElement && document.activeElement.closest && document.activeElement.closest('#dlg-push') ? document.activeElement.dataset : null;
+  const close = '<button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>';
+  const say = (t, a = '') => { body.innerHTML = `<p style="margin:0">${t}</p>`; acts.innerHTML = close + a; };
+  const busy = PU.busy ? 'disabled' : '', on = PU.st && PU.st.sub;
+  const err = PU.err ? `<p class="err" role="alert" style="margin:12px 0 0">${esc(PU.err)}</p>` : '';
+  if (!plOK()) say('알림은 이 컴퓨터의 PKM 서버에 연결해 쓸 때만 받을 수 있어요. 데스크톱 앱이나 서버 주소로 열어 주세요.');
+  else if (!window.isSecureContext) say(`지금 주소(${esc(location.origin)})는 https가 아니라서 알림을 받을 수 없어요. <b>https://</b>로 시작하는 주소로 열어 주세요.`);
+  else if (puIOS() && !puAlone()) say('iPhone에서는 홈 화면 앱에서만 알림을 받을 수 있어요. Safari의 <b>공유</b> › <b>홈 화면에 추가</b>를 누른 뒤, 홈 화면의 PKM 아이콘으로 열어 여기서 켜 주세요.');
+  else if (!puCan()) say(puIOS() ? 'iOS 16.4 이상으로 업데이트하면 알림을 받을 수 있어요.' : '이 브라우저는 알림을 지원하지 않아요. Safari·Chrome·Edge 최신 버전으로 열어 주세요.');
+  else if (Notification.permission === 'denied') say(puIOS() ? '알림이 꺼져 있어요. iPhone <b>설정</b> › <b>알림</b> › <b>PKM</b>에서 알림 허용을 켠 뒤 다시 열어 주세요.' : '이 사이트의 알림이 막혀 있어요. 브라우저의 사이트 설정에서 알림을 허용한 뒤 다시 열어 주세요.');
+  else if (!PU.st){ body.innerHTML = PU.err ? err : '<p class="faint" style="margin:0">불러오는 중이에요…</p>'; acts.innerHTML = close + (PU.err ? '<button class="btn btn-tonal" type="button" data-pu="reload">다시 불러오기</button>' : ''); }
+  else if (!on){
+    body.innerHTML = `<p style="margin:0">이 기기에서 알림이 꺼져 있어요. 켜면 기기에서 알림 허용을 한 번 물어봐요.</p>${err}`;
+    acts.innerHTML = close + `<button class="btn btn-primary" type="button" data-pu="on" ${busy}>알림 켜기</button>`;
+  } else {
+    const none = !PU_KINDS.some(([k]) => on.kinds[k]);
+    body.innerHTML = `<fieldset style="border:0;margin:0;padding:0"><legend class="faint" style="padding:0;margin-bottom:4px">이럴 때 알려요</legend>${PU_KINDS.map(([k, l, d]) =>
+      `<label class="check opt"><input type="checkbox" data-pu-kind="${k}" ${on.kinds[k] ? 'checked' : ''} ${busy}><span>${l}<br><span class="faint" style="font-weight:400;font-size:.8125rem">${d}</span></span></label>`).join('')}</fieldset>
+      ${none ? '<p class="faint" style="margin:8px 0 0">켜진 알림이 없어요. 위에서 하나를 골라 주세요.</p>' : ''}${err}
+      <button class="btn btn-text btn-sm pl-danger" type="button" data-pu="off" style="margin-top:8px" ${busy}>이 기기 알림 끄기</button>`;
+    acts.innerHTML = close + `<button class="btn btn-tonal" type="button" data-pu="test" ${busy}>테스트 알림 보내기</button>`;
+  }
+  // 다시 그려도 누르던 자리에 포커스를 둔다 — 켜기처럼 버튼이 사라지면 첫 칸으로
+  if (f){ const el = (f.puKind && $(`#dlg-push [data-pu-kind="${f.puKind}"]`)) || (f.pu && $(`#dlg-push [data-pu="${f.pu}"]`)) || $('#dlg-push [data-pu-kind], #dlg-push [data-pu]'); if (el) el.focus(); }
+}
+const puMsg = e => /fetch|network|load failed/i.test(e.message || '') ? 'PKM 서버에 연결하지 못했어요. 컴퓨터가 켜져 있는지 확인해 주세요' : e.message;
+async function puDo(fn, done){
+  PU.busy = true; PU.err = ''; $('#pu-live').textContent = ''; puPaint();
+  try { await fn(); if (done) $('#pu-live').textContent = done; }
+  catch (e) { PU.err = puMsg(e); }
+  finally { PU.busy = false; puPaint(); }
+}
+function puOn(){
+  // 권한은 누른 그 순간에 물어야 한다(iOS) — 다른 기다림보다 먼저 부른다
+  const ask = Notification.requestPermission();
+  return puDo(async () => {
+    if (await ask !== 'granted') throw new Error("아직 켜지 않았어요. '알림 켜기'를 다시 누르고 '허용'을 골라 주세요");
+    const reg = await puRegister(); if (!reg) throw new Error('알림 준비(서비스 워커)를 하지 못했어요');
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    const key = puKey(PU.st.key);
+    if (sub && sub.options && sub.options.applicationServerKey && new Uint8Array(sub.options.applicationServerKey).join() !== key.join()){ await sub.unsubscribe(); sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:key });
+    const r = await papi('/push', { subscription:sub.toJSON(), label:puIOS() ? 'iPhone' : navigator.platform || '' });
+    PU.sub = sub; PU.st = { ...PU.st, sub:r.sub }; LS.set('pkm:v1:push-dev', r.sub.dev);
+  }, '이 기기에서 알림을 켰어요');
+}
+function puOff(){
+  return puDo(async () => {
+    if (PU.sub){ await papi('/push/off', { endpoint:PU.sub.endpoint }); await PU.sub.unsubscribe().catch(() => {}); }
+    PU.sub = null; PU.st = { ...PU.st, sub:null }; LS.set('pkm:v1:push-dev', '');
+  }, '이 기기 알림을 껐어요');
+}
+$('#dlg-push').addEventListener('click', e => {
+  const b = e.target.closest('[data-pu]'); if (!b || PU.busy) return;
+  if (b.dataset.pu === 'on') return puOn();
+  if (b.dataset.pu === 'reload') return puOpen();
+  if (b.dataset.pu === 'off') return puOff();
+  if (b.dataset.pu === 'test') return puDo(() => papi('/push/test', { endpoint:PU.sub.endpoint }), '테스트 알림을 보냈어요. 잠깐 뒤 알림이 와요');
+});
+$('#dlg-push').addEventListener('change', e => {
+  const c = e.target.closest('[data-pu-kind]'); if (!c || !PU.sub) return;
+  const kinds = { ...PU.st.sub.kinds, [c.dataset.puKind]:c.checked };
+  puDo(async () => { const r = await papi('/push', { subscription:PU.sub.toJSON(), kinds }); PU.st = { ...PU.st, sub:r.sub }; }, '저장했어요');
+});
+// 알림을 눌러 들어오면 그 채팅을 연다 — 새로 열린 창은 주소(?chat=)로, 이미 열린 창은 서비스 워커의 메시지로
+async function puGo(room, profile){
+  if (!room) return;
+  if (profile && profile !== S.profile && (PLIST || []).some(x => x.name === profile)){ PU.go = { room }; await openProfile(profile); chLoad(); return; }
+  const d = document.querySelector('dialog[open]'); if (d) d.close();   // 열린 대화상자가 채팅을 가리지 않게
+  if (chOn() && chSum(room)) chOpen(room); else { PU.go = { room }; chLoad(); }   // 목록에 아직 없는 새 방이면 다시 읽은 뒤에 연다
+}
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get('chat')){ PU.go = { room:q.get('chat'), profile:q.get('profile') }; history.replaceState(null, '', location.pathname + location.hash); }
+  if ('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'pkm-open-chat') puGo(e.data.room, e.data.profile); });
+    navigator.serviceWorker.startMessages();   // 붙이자마자 받는다(서비스 워커가 보낸 메시지를 쌓아 두지 않게)
+  }
+}
+/* ---------------- 당겨서 새로고침 ----------------
+   홈 화면 앱(standalone)은 주소창·새로고침 버튼이 없다. 페이지 맨 위에서 아래로 70px 넘게 당겼다 놓으면, 저장할 것을 먼저 저장하고 다시 연다.
+   채팅 창·대화상자·안쪽 스크롤 영역에서 시작한 당김은 무시한다(그 안의 스크롤을 빼앗지 않게) */
+const PTR = { y0:null, x0:0, d:0, busy:false };
+const PTR_GO = 70;
+function ptrShow(d, state){
+  const el = $('#ptr'); if (!el) return;
+  el.classList.toggle('on', d > 8 || state === 'go'); el.classList.toggle('back', state !== 'pull' && state !== 'ready');
+  el.dataset.state = state;
+  el.style.transform = `translate(-50%, ${state === 'go' ? 0 : Math.min(d, 110) - 80}px)`;
+  const t = state === 'go' ? '새로고침 중이에요…' : state === 'ready' ? '놓으면 새로고침해요' : state === 'pull' ? '당겨서 새로고침' : '';
+  const tx = el.querySelector('.ptr-t'); if (tx.textContent !== t) tx.textContent = t;   // 같은 말을 다시 읽지 않게
+}
+function ptrSkip(t){
+  if (window.scrollY > 0 || document.querySelector('dialog[open]') || document.body.style.position === 'fixed') return true;
+  for (let n = t; n && n !== document.body; n = n.parentElement){
+    if (n.id === 'chat' || n.tagName === 'TEXTAREA' || n.tagName === 'INPUT' || n.tagName === 'SELECT') return true;
+    if (n.scrollTop > 0) return true;
+  }
+  return false;
+}
+async function ptrReload(){
+  PTR.busy = true; ptrShow(PTR_GO, 'go');
+  try {
+    if (CH.open) chDraftSave(CH.room);
+    if (saveTimer){ clearTimeout(saveTimer); await saveNow(); }
+    for (let i = 0; saving && i < 50; i++) await new Promise(r => setTimeout(r, 100));
+    if (SAVE.state === 'error' || saving){ toast('저장이 끝나지 않아 새로고침하지 않았어요. 잠깐 뒤 다시 당겨 주세요'); PTR.busy = false; ptrShow(0, 'idle'); return; }
+  } catch { PTR.busy = false; ptrShow(0, 'idle'); return; }
+  location.reload();
+}
+if (matchMedia('(pointer:coarse)').matches){
+  addEventListener('touchstart', e => {
+    if (PTR.busy || e.touches.length !== 1 || ptrSkip(e.target)){ PTR.y0 = null; return; }
+    PTR.y0 = e.touches[0].clientY; PTR.x0 = e.touches[0].clientX; PTR.d = 0;
+  }, { passive:true });
+  addEventListener('touchmove', e => {
+    if (PTR.y0 === null) return;
+    const dy = e.touches[0].clientY - PTR.y0, dx = Math.abs(e.touches[0].clientX - PTR.x0);
+    if (dy <= 0 || dx > dy || window.scrollY > 0){ if (PTR.d) ptrShow(0, 'idle'); PTR.d = 0; if (dy < 0 || dx > dy) PTR.y0 = null; return; }
+    PTR.d = dy * 0.55;   // 손가락보다 덜 따라와야 '당기는' 느낌이 난다
+    ptrShow(PTR.d, PTR.d >= PTR_GO ? 'ready' : 'pull');
+  }, { passive:true });
+  addEventListener('touchend', () => {
+    if (PTR.y0 === null) return;
+    const go = PTR.d >= PTR_GO; PTR.y0 = null; PTR.d = 0;
+    if (go) ptrReload(); else ptrShow(0, 'idle');
+  }, { passive:true });
+  addEventListener('touchcancel', () => { PTR.y0 = null; PTR.d = 0; if (!PTR.busy) ptrShow(0, 'idle'); }, { passive:true });
+}
 window.addEventListener('hashchange', render);
-boot();
+boot().then(() => { PKMAI.probe().then(ok => { if (!ok) return; syncAiLine(); if (PKMAI.conn() && !PKMAI.prefs().provider) loadAI(false); }); puRegister(); if (PU.go && PU.go.profile && PU.go.profile !== S.profile){ const g = PU.go; PU.go = null; puGo(g.room, g.profile); } });
 /* 체크인 노트(마이노트) 화면 — 플러그인 checkins/*.md. 규격: docs/PLUGIN.md › 체크인
    편집기 두 개(주요 업무·과제)를 한 화면에 묶고 제출 미리보기·점검(AI 티)·점수·카드에서 넣기를 더한다.
    편집기(ped*)·AI(aiAsk)·플러그인 상태(PL)를 그대로 쓴다. */

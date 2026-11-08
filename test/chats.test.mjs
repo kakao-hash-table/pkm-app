@@ -54,6 +54,7 @@ const ai = http.createServer(async (req, res) => {
 });
 
 let chats, conf;
+const pushed = [];
 const card = { id: 't1abc', title: '견적서 보내기', status: '진행', path: '03_행동/단기보드/견적서 보내기.md', body: '# 할 일\n- [ ] 초안' };
 before(async () => {
   await new Promise(r => ai.listen(0, '127.0.0.1', r));
@@ -65,7 +66,7 @@ before(async () => {
   const { createChats } = await import('../server/chats.js');
   const project = { id: 'pabc123', title: '쉐어링크 월 10만', goal: '하루 10분으로 월 10만원', status: 'running', file: '/x/pabc123.json', hub: '/x/설계.md', work: T,
     cards: [{ id: 't1', title: '쉐어링크 월 10만 · 오퍼 — 니치 정하기', status: '진행', path: '03_행동/단기보드/a.md', open: ['🙋 니치 고르기 (3분)'] }] };
-  chats = createChats({ DATA, readConf: () => conf, findCard: async (p, id) => id === card.id ? card : null, findProject: async (p, id) => id === project.id ? project : null });
+  chats = createChats({ DATA, readConf: () => conf, findCard: async (p, id) => id === card.id ? card : null, findProject: async (p, id) => id === project.id ? project : null, onPush: (p, m) => { pushed.push({ p, ...m }); } });
 });
 after(() => { ai.close(); fs.rmSync(T, { recursive: true, force: true }); });
 
@@ -257,4 +258,29 @@ test('프로젝트 세션 — 프로젝트마다 방 하나, 처음 작업 폴�
   assert.match(body.system, /- \[진행\] 쉐어링크 월 10만 · 오퍼 — 니치 정하기[\s\S]*🙋 니치 고르기/);
   assert.ok((await chats.setCwd(P, r.id, null)).cwd === null, '프로젝트 방도 작업 폴더를 바꿀 수 있다');
   await chats.remove(P, r.id);
+});
+
+test('알림 — 말마다 시작·확인 요청·끝을 한 번씩만, 채팅을 여는 주소와 함께', async () => {
+  await chats.open(P, {});
+  await chats.send(P, 'data', { id: 'push-msg-01', text: '물어봐 — 알림 확인' });
+  await until(() => lastTurn('data').pending.length);
+  await chats.answer(P, 'data', { request_id: 'req-1', allow: true });
+  await until(() => lastTurn('data').status === 'done');
+  await new Promise(r => setTimeout(r, 50));
+  const mine = pushed.filter(m => m.tag === 'data:push-msg-01');
+  assert.deepEqual(mine.map(m => m.kind), ['run', 'ask', 'done']);
+  assert.ok(mine.every(m => m.p === P && m.room === 'data' && m.url === `/?chat=data&profile=${encodeURIComponent(P)}`));
+  assert.equal(mine[1].title, '답해 주세요 · 데이터 관리'); assert.match(mine[1].body, /^허락이 필요해요 — a\.txt/);
+  assert.equal(mine[2].title, '답이 왔어요 · 데이터 관리'); assert.match(mine[2].body, /^끝났어요/);
+});
+
+test('실시간 현황 — 하는 중인 방은 시작 시각·보낸 말·지금 하는 일, 확인 요청이면 그 내용을 요약에 싣는다', async () => {
+  await chats.open(P, {});
+  await chats.send(P, 'data', { id: 'live-msg-01', text: '물어봐 — 현황 확인' });
+  const s = await until(async () => { const x = (await chats.status(P)).rooms.find(r => r.id === 'data'); return x.state === 'ask' ? x : null; });
+  assert.equal(s.asked, '물어봐 — 현황 확인'); assert.ok(s.started); assert.equal(s.question, 'a.txt'); assert.equal(typeof s.doing, 'string');
+  await chats.answer(P, 'data', { request_id: 'req-1', allow: true });
+  await until(() => lastTurn('data').status === 'done');
+  const e = (await chats.status(P)).rooms.find(r => r.id === 'data');
+  assert.equal(e.asked, undefined); assert.equal(e.doing, undefined);
 });

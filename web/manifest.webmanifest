@@ -1,0 +1,16 @@
+{
+  "name": "PKM",
+  "short_name": "PKM",
+  "description": "지식·시간·행동을 한 화면에서 다루는 개인 지식관리",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F2F4F6",
+  "theme_color": "#1B64DA",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
