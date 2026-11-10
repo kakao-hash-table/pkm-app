@@ -1,0 +1,90 @@
+{
+ "type": "object",
+ "properties": {
+  "_fplan": {
+   "type": "object",
+   "properties": {
+    "answers": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "description": "문항 id, 예: q3"
+       },
+       "text": {
+        "type": "string",
+        "description": "넣을 답 — 자리표시({{작품}} {{이름}} …)나 보기 글 그대로. 비워 둘 문항은 빈 글"
+       },
+       "consent": {
+        "type": "boolean",
+        "description": "동의·서약·확인처럼 응모자의 의사 표시를 받는 문항이면 true"
+       },
+       "format": {
+        "type": "string",
+        "enum": [
+         "",
+         "digits"
+        ],
+        "description": "숫자만 적으라는 연락처 문항이면 digits"
+       }
+      },
+      "required": [
+       "id",
+       "text",
+       "consent",
+       "format"
+      ]
+     }
+    },
+    "extras": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "cand": {
+        "type": "integer",
+        "description": "후보 번호"
+       },
+       "values": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "value"
+         ]
+        }
+       }
+      },
+      "required": [
+       "cand",
+       "values"
+      ]
+     }
+    },
+    "note": {
+     "type": "string",
+     "description": "응모자에게 할 말 한 줄, 없으면 빈 글"
+    }
+   },
+   "required": [
+    "answers",
+    "extras",
+    "note"
+   ]
+  }
+ },
+ "required": [
+  "_fplan"
+ ]
+}

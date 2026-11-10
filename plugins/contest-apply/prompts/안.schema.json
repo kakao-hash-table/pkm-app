@@ -1,0 +1,68 @@
+{
+ "type": "object",
+ "properties": {
+  "_draft": {
+   "type": "object",
+   "properties": {
+    "candidates": {
+     "type": "array",
+     "description": "좋은 것부터",
+     "items": {
+      "type": "object",
+      "properties": {
+       "kind": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "why": {
+        "type": "string"
+       },
+       "read": {
+        "type": "string",
+        "description": "영문·한자가 섞여 읽는 법이 필요할 때만 한글 읽기. 없으면 빈 글"
+       },
+       "form": {
+        "type": "array",
+        "description": "신청서 칸(요강의 '신청서 칸' 목록에 있는 것만)과 이 후보로 채울 값. 신청서가 없으면 빈 배열",
+        "items": {
+         "type": "object",
+         "properties": {
+          "label": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "label",
+          "value"
+         ]
+        }
+       }
+      },
+      "required": [
+       "kind",
+       "text",
+       "why",
+       "read",
+       "form"
+      ]
+     }
+    },
+    "note": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "candidates",
+    "note"
+   ]
+  }
+ },
+ "required": [
+  "_draft"
+ ]
+}
