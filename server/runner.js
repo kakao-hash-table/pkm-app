@@ -583,8 +583,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     try {
       const [ap, sec] = await Promise.all([ai(conn, '/v1/plugins'), ai(conn, '/v1/secrets').catch(() => ({ secrets: [] }))]);
       const mine = ap.plugins.find(a => a.id === x.id && a.root === x.path);
-      const same = !!mine && x.scripts.every(s => mine.files[s.path] === s.sha256) && x.manifest.permissions.secrets.every(n => (mine.permissions.secrets || []).includes(n));
-      return { connected: true, approved: same, approved_before: !!mine && !same, secrets: x.manifest.secrets.map(s => ({ ...s, set_at: (sec.secrets.find(z => z.name === s.name) || {}).set_at || null })) };
+      const same = !!mine && x.scripts.every(s => mine.files[s.path] === s.sha256) && x.manifest.permissions.secrets.every(n => (mine.permissions.secrets || []).includes(n))
+        && (!x.manifest.permissions.browser || mine.permissions.browser === true);   // 브라우저를 새로 쓰게 됐으면 다시 승인
+      return { connected: true, approved: same, approved_before: !!mine && !same, browser_new: !!mine && x.manifest.permissions.browser && mine.permissions.browser !== true, secrets: x.manifest.secrets.map(s => ({ ...s, set_at: (sec.secrets.find(z => z.name === s.name) || {}).set_at || null })) };
     } catch (e) { return { connected: false, error: e.message, approved: false, secrets: [] }; }
   }
   async function setSecret(p, id, name, value){

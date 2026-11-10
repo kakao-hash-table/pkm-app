@@ -17,7 +17,7 @@ test('예시 플러그인을 받는다', () => {
   const r = P.validate(base());
   assert.equal(r.ok, true, r.errors.join('\n'));
   assert.equal(r.manifest.id, 'deploy-loop');
-  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'], secrets: [] });
+  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'], secrets: [], browser: false });
   assert.equal(r.workflows[0].steps.length, 5);
   assert.equal(r.workflows[0].steps[3].body, '이 카드의 경로에서 바뀐 파일을 읽고\n위험한 부분만 짧게 알려 줘');
 });

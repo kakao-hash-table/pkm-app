@@ -32,6 +32,7 @@
 // POST …/chats/:room/send {id, text}  말 보내기 · …/cancel  그만두기 · …/reset  새 대화 · …/answer {request_id, allow}  확인 요청에 답하기(server/chats.js)
 // POST …/chats/:room/memo {text}  방 메모 적기(빈 글이면 지운다) · …/read  끝난 답을 읽었다고 적기(카드의 '새 답'을 지운다)
 // POST …/chats/:room/cwd {cwd|null}  카드 세션의 작업 폴더 고르기·비우기 · GET …/chats/_dirs?path=  폴더 고르기 화면의 하위 폴더 목록
+// GET  …/chats/:room/browser  이 방의 브라우저 탭 · GET …/browser/frame  지금 화면(JPEG) · POST …/browser/open {url?} · POST …/browser/input {type, …}  누르기·적기
 // GET  /api/profile/:p/push?endpoint=   휴대폰 알림 서명 키와 이 기기의 구독 · POST …/push {subscription, kinds}  켜기·종류 바꾸기
 // POST …/push/off {endpoint}  끄기 · …/push/test {endpoint}  테스트 알림 · …/push/seen {dev, visible}  이 기기로 앱을 보는 중(그동안은 안 보낸다)(server/push.js)
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
@@ -391,6 +392,12 @@ async function api(req, res, url){
       if (rid && req.method === 'POST' && act === 'read') return send(res, 200, chats.markRead(p, rid));
       if (rid && req.method === 'POST' && act === 'memo'){ const b = await body(req); return send(res, 200, await chats.setMemo(p, rid, b.text)); }
       if (rid && req.method === 'POST' && act === 'cwd'){ const b = await body(req); return send(res, 200, await chats.setCwd(p, rid, b.cwd ? String(b.cwd) : null)); }
+      if (rid && act === 'browser'){   // 이 방의 브라우저 탭 — 화면(JPEG)·열기·누르기·적기(server/chats.js)
+        const ba = parts[5] || '';
+        if (req.method === 'GET' && !ba) return send(res, 200, await chats.browser(p, rid, 'info'));
+        if (req.method === 'GET' && ba === 'frame') return send(res, 200, await chats.browser(p, rid, 'frame', { q:url.searchParams.get('q') }), 'image/jpeg');
+        if (req.method === 'POST' && (ba === 'open' || ba === 'input')) return send(res, 200, await chats.browser(p, rid, ba, await body(req)));
+      }
     }
     if (sub === 'push'){
       const act = parts[3] || '';
@@ -403,7 +410,7 @@ async function api(req, res, url){
     if (sub === 'plugins' && parts[3] && parts[4]){
       const id = parts[3], what = parts[4];
       if (what === 'machine' && req.method === 'GET') return send(res, 200, await runner.machine(p, id));
-      if (what === 'approve' && req.method === 'POST') return send(res, 200, { plugin:await runner.approve(p, id) });
+      if (what === 'approve' && req.method === 'POST'){ const r = await runner.approve(p, id); chats.forget(); return send(res, 200, { plugin:r }); }   // 채팅이 승인(브라우저 권한)을 바로 다시 본다
       if (what === 'secret' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.setSecret(p, id, String(b.name || ''), b.value == null ? null : String(b.value))); }
       if (what === 'local' && req.method === 'POST') return send(res, 200, await runner.setLocal(p, id, await body(req)));
       if (what === 'act' && req.method === 'POST') return send(res, 200, await runner.act(p, id, await body(req)));

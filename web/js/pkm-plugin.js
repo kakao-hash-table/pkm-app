@@ -106,6 +106,9 @@
     const scripts = (Array.isArray(perm.scripts) ? perm.scripts : []).map(String);
     for (const s of scripts) if (!NAME_RE.test(s)) err(`permissions.scripts 이름 형식이 맞지 않아요: ${s}`);
     const bundled = (Array.isArray(perm.bundled) ? perm.bundled : []).map(String);
+    if (perm.browser != null && typeof perm.browser !== 'boolean') err('permissions.browser는 true나 false예요');
+    const browser = perm.browser === true;   // 에이전트가 이 컴퓨터의 브라우저(로그인이 남는 전용 프로필)를 쓴다
+    if (browser && !ai.includes('agent')) err('permissions.browser를 쓰려면 permissions.ai에 agent가 있어야 해요');
     const secretsDecl = (Array.isArray(perm.secrets) ? perm.secrets : []).map(x => typeof x === 'string' ? { name: x } : x && typeof x === 'object' ? x : {});
     for (const x of secretsDecl) if (!SECRET_RE.test(String(x.name || ''))) err(`permissions.secrets 이름은 영문 대문자·숫자·_예요: ${x.name || JSON.stringify(x)}`);
     const secrets = secretsDecl.filter(x => SECRET_RE.test(String(x.name || ''))).map(x => ({ name: String(x.name), label: String(x.label || x.name), hint: x.hint ? String(x.hint) : '', url: /^https:\/\//.test(String(x.url || '')) ? String(x.url) : '' }));
@@ -263,7 +266,7 @@
 
     const manifest = { spec: SPEC, id: String(fm.id || ''), name: String(fm.name || ''), version: String(fm.version || ''), description: String(fm.description || doc.pre || '').slice(0, 500),
       author: fm.author ? String(fm.author) : null, homepage: fm.homepage ? String(fm.homepage) : null, requires: fm.requires || {},
-      collects, permissions: { ai, agent_mode: mode, scripts, bundled, secrets: secrets.map(x => x.name) }, secrets,
+      collects, permissions: { ai, agent_mode: mode, scripts, bundled, secrets: secrets.map(x => x.name), browser }, secrets,
       settings: settings.map(s => ({ key: String(s.key), label: String(s.label), hint: s.hint ? String(s.hint) : '', type: SETTING_TYPES.includes(String(s.type)) ? String(s.type) : 'text',
         default: s.default == null ? (s.type === 'toggle' ? false : '') : s.type === 'toggle' ? s.default === true : String(s.default), placeholder: s.placeholder ? String(s.placeholder) : '',
         ...(s.type === 'pairs' ? { columns: pairColumns(s) } : {}) })) };
