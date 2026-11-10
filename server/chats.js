@@ -3,7 +3,10 @@
 // 대화는 에이전트 세션(--resume)으로 이어 가고, 에이전트가 사람에게 묻는 도구 사용(승인 채널)은 방에 띄워 답을 돌려보낸다.
 // 기록은 이 컴퓨터에만 둔다(~/.pkm-app/chats/<프로필>.json) — 세션이 이 컴퓨터의 Claude Code에 있어서 다른 기기로 동기화해도 쓸 수 없다.
 // 로컬 전용: pkm 서버의 AI 연결이 루프백 주소이고, pkm-ai-server가 알려 준 컴퓨터·사용자 이름이 이 서버와 같을 때만 연다.
+// 브라우저: 플러그인이 permissions.browser를 선언하고 이 컴퓨터에서 그렇게 승인했으면, 방마다 탭 하나를 에이전트에 붙인다.
+// 에이전트가 사람에게 넘긴 일(BrowserHandoff)과 사람이 직접 보는 화면은 이 서버가 pkm-ai-server의 같은 탭으로 중계한다.
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -66,7 +69,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
           const claude = ((await ai(conn, '/v1/providers')).providers || []).find(x => x.id === 'claude');
           if (!claude || !claude.installed || !claude.logged_in) v = { ok: false, reason: 'claude', message: '이 컴퓨터에 Claude Code가 없거나 로그인돼 있지 않아요' };
           else if (!claude.agent || !claude.agent.approvals) v = { ok: false, reason: 'old', message: 'pkm-ai-server가 채팅 승인을 모르는 옛 버전이에요. 업데이트한 뒤 다시 켜 주세요' };
-          else v = { ok: true, full: claude.agent.modes.includes('full'), concurrency: claude.agent.concurrency || 1, blocked: claude.blocked || null };
+          else v = { ok: true, full: claude.agent.modes.includes('full'), concurrency: claude.agent.concurrency || 1, blocked: claude.blocked || null, browser: !!claude.agent.browser };
         }
       }
     } catch (e) { v = { ok: false, reason: 'error', message: e.message }; }
@@ -80,8 +83,25 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     if (!x) return null;
     const c = ((readConf().profiles || {})[p] || {}).plugins || {}, v = (c[x.id] || {}).settings || {};
     const settings = Object.fromEntries(x.manifest.settings.map(s => [s.key, v[s.key] ?? s.default]));
-    return { id: x.id, name: x.manifest.name, path: x.path, chats: x.chats, settings };
+    return { id: x.id, name: x.manifest.name, path: x.path, chats: x.chats, settings, browser: !!x.manifest.permissions.browser };
   }
+  // 브라우저를 쓸 수 있나 — 플러그인 선언 · pkm-ai-server 지원 · 이 컴퓨터의 승인. 승인 목록은 10초 기억한다
+  let apMemo = { at: 0, list: null };
+  async function browserState(pl){
+    if (!pl.browser) return { ok: false, reason: 'off', message: '이 플러그인은 브라우저를 쓰지 않아요' };
+    const l = await locality();
+    if (!l.ok) return { ok: false, reason: 'local', message: l.message };
+    if (!l.browser) return { ok: false, reason: 'old', message: 'pkm-ai-server가 브라우저를 모르는 옛 버전이거나 브라우저를 꺼 두었어요. 업데이트한 뒤 다시 켜 주세요' };
+    if (!apMemo.list || Date.now() - apMemo.at > 10000){
+      try { apMemo = { at: Date.now(), list: (await ai(readConf().ai, '/v1/plugins')).plugins || [] }; }
+      catch (e) { apMemo = { at: 0, list: null }; return { ok: false, reason: 'local', message: e.message }; }   // 못 읽은 것을 '승인 없음'으로 기억하지 않는다
+    }
+    const ap = apMemo.list.find(a => a.id === pl.id && a.root === pl.path);
+    if (!ap || !ap.permissions || ap.permissions.browser !== true) return { ok: false, reason: 'approve', message: `브라우저를 쓰려면 플러그인 › ${pl.name} › 준비와 설정에서 다시 승인해 주세요` };
+    return { ok: true };
+  }
+  // 방마다 탭 하나 — pkm-ai-server의 탭 키(영문·숫자 몇 가지만)로
+  const tabKey = (p, r) => `chat:${crypto.createHash('sha1').update(p).digest('hex').slice(0, 10)}:${r.id.replace(/[^\w-]/g, '_').slice(0, 100)}`;
   // 프로젝트 방은 플러그인에 project 채팅이 없으면 카드 채팅 설정을 빌려 쓴다(옛 ai-chat도 돈다)
   const scopeOf = (pl, kind) => kind === 'project' ? pl.chats.find(c => c.scope === 'project') || pl.chats.find(c => c.scope === 'card') : pl.chats.find(c => c.scope === (kind === 'data' ? 'profile' : 'card'));
   const isWork = r => r.kind === 'card' || r.kind === 'project';   // 작업 폴더를 고르는 방
@@ -148,8 +168,9 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     const pl = await chatPlugin(p);
     if (!pl) return { plugin: null, rev: state(p).rev };
     const l = await locality();
+    const bs = l.ok ? await browserState(pl) : { ok: false, reason: 'local' };
     return { plugin: { id: pl.id, name: pl.name, scopes: pl.chats.map(c => ({ scope: c.scope, name: c.name, label: c.label, description: c.description })) },
-      ...l, home: os.homedir(), card_cwd: defaultCwd(pl), recent: state(p).recent, rev: state(p).rev, rooms: state(p).rooms.map(summary) };
+      ...l, browser: { ok: bs.ok, reason: bs.reason, message: bs.message || '' }, home: os.homedir(), card_cwd: defaultCwd(pl), recent: state(p).recent, rev: state(p).rev, rooms: state(p).rooms.map(summary) };
   }
   function room(p, id){ return roomOf(p, id); }
   // 카드 세션의 기본 작업 폴더(플러그인 설정) — 고를 때 먼저 보일 곳일 뿐, 저절로 정하지 않는다
@@ -279,13 +300,14 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     r.updated = now(); touch(p, true);
     return r;
   }
-  async function answer(p, id, { request_id, allow, input } = {}){
+  async function answer(p, id, { request_id, allow, input, message } = {}){
     const r = roomOf(p, id), t = r.turns.find(t => (t.pending || []).some(q => q.id === request_id));
     if (!t) throw fail(409, '이미 답했거나 끝난 확인 요청이에요');
     const conn = readConf().ai; if (!conn) throw fail(409, '이 pkm 서버에 AI 연결이 없어요');
-    const j = (await ai(conn, `/v1/jobs/${t.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id, allow: allow === true, input: input && typeof input === 'object' ? input : undefined, message: allow ? '' : '사용자가 채팅에서 거절했어요' }) })).job;
-    const q = t.pending.find(q => q.id === request_id);
-    note(t, allow ? `허락함 · ${q.title || q.tool}` : `거절함 · ${q.title || q.tool}`);
+    const q = t.pending.find(q => q.id === request_id), hand = q.tool === 'BrowserHandoff', said = typeof message === 'string' ? message.trim().slice(0, 500) : '';
+    const j = (await ai(conn, `/v1/jobs/${t.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id, allow: allow === true, input: input && typeof input === 'object' ? input : undefined,
+      message: allow ? said : said || (hand ? '사용자가 브라우저에서 하지 못했다고 했어요' : '사용자가 채팅에서 거절했어요') }) })).job;
+    note(t, hand ? (allow ? `다 했어요 · ${q.description || '브라우저'}` : `못 했어요 · ${q.description || '브라우저'}`) : allow ? `허락함 · ${q.title || q.tool}` : `거절함 · ${q.title || q.tool}`);
     applyJob(r, t, j); emit(p, r, t); touch(p, true);
     return t;
   }
@@ -313,6 +335,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       pu.ask = [...(pu.ask || []), ...fresh.map(q => q.id)].slice(-20);
       const q = fresh[0], inp = q.input || {};
       say('ask', `답해 주세요 · ${name}`, q.tool === 'AskUserQuestion' ? `질문이 있어요 — ${(inp.questions && inp.questions[0] && inp.questions[0].question) || '열어서 골라 주세요'}`
+        : q.tool === 'BrowserHandoff' ? `브라우저에서 해 주세요 — ${q.description || '채팅을 열어 브라우저 화면을 봐 주세요'}`
         : `허락이 필요해요 — ${q.description || inp.command || inp.file_path || q.title || q.tool}`);
     }
     if (!pu.run && ['running', 'waiting'].includes(t.status)){ pu.run = true; say('run', `시작했어요 · ${name}`, t.text); }
@@ -367,9 +390,11 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       const mode = ctx.mode === 'full' && !l.full ? 'auto' : ctx.mode;   // full을 허용하지 않은 서버면 자동 권한 모드로(물을 것은 채팅으로 온다)
       const prof = path.join(DATA, p);
       const agent = isWork(r) ? { cwd: r.cwd || prof, add_dirs: r.cwd ? [prof] : [] } : { cwd: r.cwd, add_dirs: [DATA] };
-      Object.assign(agent, { mode, approvals: true, ...(r.session ? { session: r.session } : {}) });
+      const bs = await browserState(pl);
+      Object.assign(agent, { mode, approvals: true, ...(r.session ? { session: r.session } : {}), ...(bs.ok ? { browser: { tab: tabKey(p, r) } } : {}) });
       Object.assign(t, { status: 'running', started: now(), mode });
       if (mode !== ctx.mode) note(t, 'pkm-ai-server가 full 모드를 허용하지 않아 자동 권한 모드로 해요');
+      if (!bs.ok && ['approve', 'old'].includes(bs.reason)) note(t, `브라우저 없이 해요 — ${bs.message}`);
       let prompt = t.text;
       if (r.carry && !r.session){   // 작업 폴더를 바꿔 새 세션 — 앞선 대화를 짧게 붙여 맥락을 잇는다
         const prev = r.turns.filter(x => x !== t && x.status === 'done').slice(-6).map(x => `사용자: ${clip(x.text, 600)}\nAI: ${clip(x.reply, 1200)}`).join('\n\n');
@@ -414,6 +439,19 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       pump(p);
     }
   }
-  const forget = () => { loc = { key: '', at: 0, v: null }; };   // AI 연결을 바꾼 뒤 바로 다시 확인
-  return { status, room, open, remove, reset, send, cancel, answer, setCwd, setMemo, markRead, dirs, start, locality, forget };
+  /* ---------- 브라우저 화면 — 이 방의 탭을 사람이 보고 누르고 적는다. 적은 글은 AI에게 보내지 않는다 ---------- */
+  async function browser(p, id, act, b = {}){
+    const pl = await need(p), r = id === 'data' ? { id } : roomOf(p, id), conn = readConf().ai, l = await locality();   // 데이터 방은 첫 말 전에도 브라우저를 볼 수 있게(탭 키에는 방 이름만 든다)
+    if (!pl.browser) throw fail(400, '이 플러그인은 브라우저를 쓰지 않아요');
+    if (!l.browser) throw fail(409, 'pkm-ai-server가 브라우저를 모르는 옛 버전이거나 브라우저를 꺼 두었어요. 업데이트한 뒤 다시 켜 주세요');
+    const base = `/v1/browser/tabs/${encodeURIComponent(tabKey(p, r))}`, long = { signal: AbortSignal.timeout(45000) };
+    if (act === 'info') return ai(conn, base);
+    if (act === 'open') return ai(conn, `${base}/open`, { method: 'POST', body: JSON.stringify(b.url ? { url: String(b.url).slice(0, 2000) } : {}), ...long });
+    if (act === 'input') return ai(conn, `${base}/input`, { method: 'POST', body: JSON.stringify(b), ...long });
+    if (act === 'frame') return Buffer.from(await (await ai(conn, `${base}/frame?q=${Math.min(80, Math.max(30, +b.q || 55))}`, { raw: true })).arrayBuffer());
+    throw fail(404, '없는 주소예요');
+  }
+
+  const forget = () => { loc = { key: '', at: 0, v: null }; apMemo = { at: 0, list: null }; };   // AI 연결·승인을 바꾼 뒤 바로 다시 확인
+  return { status, room, open, remove, reset, send, cancel, answer, setCwd, setMemo, markRead, dirs, start, locality, forget, browser };
 }

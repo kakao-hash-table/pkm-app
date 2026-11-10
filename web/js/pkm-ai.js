@@ -71,6 +71,20 @@
     }
     throw last;
   }
+  /* 같은 컴퓨터에 켠 pkm-ai-server — pkm 서버가 그 서버가 남긴 이 컴퓨터용 연결을 읽어 붙는다(연결 코드 없이).
+     연결은 pkm 서버에 두고, 이 브라우저는 pkm 서버를 거쳐 쓴다 */
+  async function localInfo(){
+    try { const r = await fetch('/api/ai/local'); return r.ok ? await r.json() : null; } catch (e) { return null; }
+  }
+  async function connectLocal(){
+    let r;
+    try { r = await fetch('/api/ai/local', { method:'POST' }); } catch (e) { throw err('pkm 서버에 닿지 않아요', { code:'offline' }); }
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) throw err(b.error || `연결하지 못했어요(${r.status})`, { status:r.status });
+    LS.set({ prefs:prefs() }); viaServer = false;   // 이 브라우저에 저장한 연결과 '끊음' 표시는 지우고, 고른 AI·한도는 둔다
+    await probe();
+    return { url:b.url, providers:await providers() };
+  }
   const disconnect = () => { LS.set({ no_server:true }); viaServer = false; };   // 끊으면 pkm 서버를 거치는 길도 쓰지 않는다(다시 연결하면 풀린다)
 
   /* 저장된 주소가 안 닿으면 연결 코드의 다른 주소로 옮겨 본다 */
@@ -134,5 +148,5 @@
     return job;
   }
 
-  root.PKMAI = { parseCode, conn, via, probe, prefs, setPrefs, connect, disconnect, providers, usage, windows, guard, run, ratio };
+  root.PKMAI = { parseCode, conn, via, probe, prefs, setPrefs, connect, localInfo, connectLocal, disconnect, providers, usage, windows, guard, run, ratio };
 })(typeof self !== 'undefined' ? self : this);

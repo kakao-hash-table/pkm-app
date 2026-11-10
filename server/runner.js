@@ -6,6 +6,8 @@
 //                           <프로필>/_플러그인/.state/<id>.inbox.<컴퓨터>.json — 다른 기기에서 누른 것(답하기·다시 하기…). 켠 컴퓨터가 읽어서 처리한다
 // 비밀값(토큰)은 어느 쪽에도 두지 않는다 — pkm-ai-server에만 있고, 승인한 플러그인 스크립트의 환경 변수로만 간다.
 // 이 컴퓨터의 플러그인 설정(runner.json)에는 설정값 말고도 every(목록마다 가져오는 주기, 분)와 gates(자동 시작한 작업에서 내 확인을 받을 단계)가 있다.
+// 브라우저 단계(browser(…)): 브라우저 도구만 가진 에이전트. 에이전트가 사람에게 넘긴 일(BrowserHandoff)은 그 단계의 '내 확인'으로 올리고, 답하면 같은 작업을 이어 간다.
+// 사람이 보는 화면(작업 화면의 브라우저 보기·미리 로그인)은 이 서버가 pkm-ai-server의 같은 탭으로 중계한다(browser()).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -54,16 +56,75 @@ export const EVERY_MIN = 5, EVERY_MAX = 1440;
 async function ai(conn, pathname, opt = {}){
   if (!conn || !conn.url || !conn.token) throw fail(409, '이 컴퓨터의 AI 연결이 없어요');
   let r;
-  try { r = await fetch(conn.url + pathname, { ...opt, headers: { authorization: `Bearer ${conn.token}`, 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000) }); }
+  try { r = await fetch(conn.url + pathname, { ...opt, headers: { authorization: `Bearer ${conn.token}`, 'content-type': 'application/json' }, signal: opt.signal || AbortSignal.timeout(15000) }); }
   catch { throw fail(502, `AI 서버(${conn.url})에 닿지 않아요. 이 컴퓨터에서 pkm-ai-server가 켜져 있는지 확인해 주세요`); }
+  if (opt.raw && r.ok) return r;
   const body = await r.json().catch(() => ({}));
   if (r.status === 404 && /^\/v1\/(plugins|secrets)/.test(pathname)) throw fail(409, `AI 서버(${conn.url})가 플러그인을 모르는 옛 버전이에요. pkm-ai-server를 업데이트한 뒤 다시 켜 주세요`);   // 켜 둔 서버가 업데이트 전 코드일 때
   if (!r.ok) throw fail(r.status === 401 ? 409 : r.status, body.error || `AI 서버 오류 ${r.status}`);
   return body;
 }
 
+/* ---------- 브라우저 단계 ----------
+   탭 키는 `<프로필>|<플러그인 id>|<이름>` — 이름은 항목 id(브라우저 단계)나 login(미리 로그인). pkm-ai-server의 키는 영문·숫자 몇 가지만이라 다른 글자가 든 조각은 해시로 바꾼다.
+   채팅 방의 키(chat:…)와 겹치지 않고, 화면이 보낸 키는 앞부분으로 그 플러그인 것인지 가린다 */
+const TAB_RE = /^[\w:.|\-/]{1,160}$/;
+const tabSeg = v => /^[\w.-]{1,48}$/.test(String(v)) ? String(v) : 'h' + crypto.createHash('sha1').update(String(v)).digest('hex').slice(0, 16);
+export const tabKey = (p, id, name) => `${tabSeg(p)}|${id}|${tabSeg(name)}`;
+const LOST = 'AI 서버에서 이 작업을 찾지 못했어요. 이 단계를 다시 해 주세요';
+// 앞 스크립트 단계가 낸 옵션 { vars, allow, files, tab } — 꼴이 틀린 값은 버리지 않고 멈춘다(갈 수 있는 곳이 조용히 넓어지지 않게)
+function browserOpts(v){
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {}, out = {};
+  const vars = o.vars == null ? [] : Object.entries(typeof o.vars === 'object' && !Array.isArray(o.vars) ? o.vars : { '': null });
+  if (vars.length > 60 || vars.some(([k, x]) => !k || k.length > 60 || x == null || typeof x === 'object' || String(x).length > 4000)) throw fail(400, '브라우저 옵션의 vars는 { 이름: 값 } 60개까지예요(이름 60자, 값 4,000자)');
+  if (vars.length) out.vars = Object.fromEntries(vars.map(([k, x]) => [k, String(x)]));
+  if (o.allow != null){
+    const hosts = (Array.isArray(o.allow) ? o.allow : [null]).map(h => String(h ?? '').trim().toLowerCase());
+    if (hosts.length > 40 || hosts.some(h => !/^[a-z0-9*][a-z0-9.*-]{0,252}(:\d{1,5})?$/.test(h))) throw fail(400, '브라우저 옵션의 allow는 호스트 이름 40개까지예요(예: www.example.com)');
+    out.allow = [...new Set(hosts)];
+  }
+  if (o.files != null){
+    const files = Array.isArray(o.files) ? o.files : [null];
+    if (files.length > 10 || files.some(f => !f || typeof f.path !== 'string' || !path.isAbsolute(f.path))) throw fail(400, '브라우저 옵션의 files는 { name, path(절대 경로) } 10개까지예요');
+    if (files.length) out.files = files.map(f => ({ name: clip(f.name || path.basename(f.path), 120), path: f.path }));
+  }
+  return { opts: out, tab: o.tab == null || o.tab === '' ? null : String(o.tab) };
+}
+// 브라우저 단계가 남기는 글에서 내 정보 값을 자리표시로 되돌린다(화면에 찍힌 값을 에이전트가 옮겨 적었더라도 상태 파일에는 남지 않게 — 상태 파일은 동기화된다)
+function scrub(v, vars){
+  const pairs = Object.entries(vars && typeof vars === 'object' ? vars : {}).map(([k, x]) => [k, String(x ?? '')]).filter(([, x]) => x.length >= 2).sort((a, b) => b[1].length - a[1].length);
+  const walk = z => typeof z === 'string' ? pairs.reduce((t, [k, x]) => t.split(x).join(`{{${k}}}`), z) : Array.isArray(z) ? z.map(walk) : z && typeof z === 'object' ? Object.fromEntries(Object.entries(z).map(([k, y]) => [k, walk(y)])) : z;
+  return pairs.length ? walk(v) : v;
+}
+
+/* ---------- 같은 컴퓨터의 pkm-ai-server ----------
+   pkm-ai-server는 켤 때 ~/.pkm-ai-server/local.json(0600)에 주소와 이 컴퓨터용 토큰을 남긴다. 같은 사용자 계정인 이 서버는 그걸 읽어 연결 코드 없이 붙는다 */
+const AI_HOME = process.env.PKM_AI_HOME ? path.resolve(process.env.PKM_AI_HOME) : path.join(os.homedir(), '.pkm-ai-server');
+function localConn(){
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(AI_HOME, 'local.json'), 'utf8')), url = String(j.url || '').replace(/\/+$/, '');
+    return /^https?:\/\/[\w.:\-[\]]+$/.test(url) && /^[\w.~-]{16,200}$/.test(String(j.token || '')) ? { url, token: j.token } : null;
+  } catch { return null; }
+}
+// 화면이 '이 컴퓨터의 AI에 연결하기'를 보여 줄지 — { found, ok, url, connected }. 토큰은 내보내지 않는다
+export async function localAI(){
+  const conn = localConn();
+  if (!conn) return { found: false };
+  let ok = false;
+  try { ok = (await fetch(`${conn.url}/v1/providers`, { headers: { authorization: `Bearer ${conn.token}` }, signal: AbortSignal.timeout(2000) })).ok; } catch {}
+  const cur = readConf().ai;
+  return { found: true, ok, url: conn.url, connected: !!cur && cur.url === conn.url && cur.token === conn.token };
+}
+export async function connectLocalAI(){
+  const conn = localConn();
+  if (!conn) throw fail(404, '이 컴퓨터에서 켠 pkm-ai-server를 찾지 못했어요. pkm-ai-server를 최신으로 받아 켠 뒤 다시 눌러 주세요');
+  await ai(conn, '/v1/plugins');   // 닿는지, 토큰이 맞는지
+  const c = readConf(); c.ai = { ...conn, at: now() }; writeConf(c);
+  return { url: conn.url };
+}
+
 /* ---------- 상태 파일 ---------- */
-export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
+export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = () => {} }){
   const stateDir = p => path.join(DATA, p, P.DIR, '.state');
   const statePath = (p, id) => path.join(stateDir(p), `${id}.json`);
   const readJSON = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
@@ -113,13 +174,15 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
   /* ---------- 자리 채우기: {title} {키.필드} {설정키} ---------- */
   // 채우지 못한 자리는 misses에 모은다(설정값 안의 {key}처럼 채운 값 속 중괄호는 스크립트 몫이라 다시 보지 않는다)
   // blank면 못 채운 자리를 빈 값으로 넘긴다 — 사람이 "빈 값은 두고 이 단계 하기"를 골랐을 때
+  const stepOf = (run, k) => run.steps.find(x => x.key === k.split('.')[0]);
+  const stepValue = (run, k) => { let v = (stepOf(run, k) || {}).output; for (const r of k.split('.').slice(1)) v = v == null ? undefined : v[r]; return v; };   // '단계.필드' → 그 단계 결과의 값(글로 바꾸지 않은 그대로)
   function fill(text, run, settings, misses = [], blank = false){
     const vars = { id: run.item.id, title: run.item.title, url: run.item.url || '', ...run.item.vars, ...settings };
     return String(text).replace(/\{([^{}\s]+)\}/g, (m, k) => {
       let v;
       if (k.includes('.')){
-        const [step, ...rest] = k.split('.'), s = run.steps.find(x => x.key === step);
-        v = s && s.output; for (const r of rest) v = v == null ? undefined : v[r];
+        const s = stepOf(run, k);
+        v = stepValue(run, k);
         if (v == null && s && s.when_skipped) v = '';   // when으로 건너뛴 단계 — 뒤 단계에는 빈 값으로
       } else v = vars[k];
       if (v == null){ misses.push(m); return blank ? '' : m; }
@@ -141,7 +204,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       id: clip(it.id, 200), title: clip(it.title || it.id, 300), url: /^https?:\/\//.test(String(it.url || '')) ? String(it.url) : '',
       meta: strs(it.meta, 6), tags: strs(it.tags, 4, 30), at: it.at ? String(it.at) : null, version: it.version != null ? clip(it.version, 100) : null,
       detail: (Array.isArray(it.detail) ? it.detail : []).slice(0, 8).map(d => ({ who: clip(d.who, 120), at: d.at ? String(d.at) : null, text: clip(d.text, 2000), url: /^https?:\/\//.test(String(d.url || '')) ? String(d.url) : '', kind: d.kind ? clip(d.kind, 30) : '' })),
-      vars: Object.fromEntries(Object.entries(it.vars && typeof it.vars === 'object' ? it.vars : {}).slice(0, 20).map(([k, v]) => [clip(k, 40), clip(v, 6000)]))
+      vars: Object.fromEntries(Object.entries(it.vars && typeof it.vars === 'object' ? it.vars : {}).slice(0, 20).map(([k, v]) => [clip(k, 40), clip(v, 6000)])),
+      // 정렬 칩이 읽는 값 — 숫자나 ISO 날짜 글자. 모르는 값(null·빈 글)은 화면이 늘 맨 뒤로 둔다
+      sort: Object.fromEntries(Object.entries(it.sort && typeof it.sort === 'object' ? it.sort : {}).slice(0, 6).filter(([k]) => /^[a-z_][a-z0-9_]{0,40}$/.test(k))
+        .map(([k, v]) => [k, typeof v === 'number' && Number.isFinite(v) ? v : v == null || v === '' ? null : clip(v, 40)]))
     };
   }
   async function scriptJob(conn, x, ref, args, cwd){
@@ -194,6 +260,14 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     // 새로 들어온 항목 — 자동 시작을 켠 뒤에 처음 본 것만 자동으로
     const pc = conf;
     if (f.ok && feed.start){
+      // reask: yes — 항목 version이 바뀌면(접수 방법을 알아냈다·계정을 넣었다·날이 바뀌었다) 내 확인을 기다리던 스크립트 단계를 다시 돌려 묻는 내용을 새로 만든다
+      if (feed.reask === 'yes') for (const r of st.runs){
+        if (r.feed !== feed.name || r.status !== 'input') continue;
+        const it = f.items.find(i => i.id === r.item.id), s = r.steps.find(z => z.status === 'input');
+        if (!it || !s || s.kind !== 'script' || !s.ask || s.ask.type !== 'choice' || (it.version ?? null) === (r.item.version ?? null)) continue;
+        Object.assign(r.item, { title: it.title, url: it.url, version: it.version ?? null, vars: it.vars || {} });
+        Object.assign(s, { status: 'pending', job: null, ask: null, output: null, error: null, answer: null }); Object.assign(r, { status: 'queued', updated: now() });
+      }
       const live = new Set(f.items.map(it => it.id));
       for (const r of st.runs){
         if (r.feed !== feed.name) continue;
@@ -232,7 +306,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       if (!run) return;
       Object.assign(run, { status: 'running', started: now(), updated: now() });
     }
-    const settings = settingsFor(x, conf), def = x.workflows.find(w => w.name === run.workflow);
+    let settings = settingsFor(x, conf); const def = x.workflows.find(w => w.name === run.workflow);
     if (!def){ Object.assign(run, { status: 'stopped', note: `워크플로우 "${run.workflow}"가 플러그인에서 사라졌어요`, updated: now() }); return; }
     for (const step of run.steps){
       if (['done', 'skipped'].includes(step.status)) continue;
@@ -252,7 +326,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         if (run.by === 'auto' && !step.gate_ok && conf.gates && conf.gates[gateKey(run.workflow, step.key)]){
           Object.assign(step, { status: 'input', ask: { type: 'gate', question: `${step.name}을 할까요?` }, started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
         }
-        try { step.job = await startStep(conn, x, run, step, d, settings); Object.assign(step, { status: 'running', started: now(), error: null }); }
+        try { step.job = await startStep(conn, x, run, step, d, settings, p); Object.assign(step, { status: 'running', started: now(), error: null }); }
         catch (e) { Object.assign(step, { status: 'failed', error: clip(e.message, 500), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         run.status = 'running'; run.updated = now();
         return;   // 다음 차례에 결과를 본다
@@ -260,17 +334,43 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       if (['running', 'waiting'].includes(step.status)){
         let j;
         try { j = (await ai(conn, `/v1/jobs/${step.job}`)).job; }
-        catch (e) { step.note = clip(e.message, 300); return; }
+        catch (e) {
+          if (e.status === 404){ Object.assign(step, { status: 'failed', error: LOST, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }   // 작업이 사라졌다(AI 서버가 기록을 잃었다) — 기다려도 오지 않는다
+          step.note = clip(e.message, 300); return;
+        }
         if (j.status === 'waiting'){ Object.assign(step, { status: 'waiting', reason: j.reason, until: j.until || null }); Object.assign(run, { status: 'waiting', updated: now() }); return; }
+        const web = d.kind === 'browser', my = web && d.browser ? (stepValue(run, d.browser.slice(1, -1)) || {}).vars : null;   // my: 내 정보 — 이 단계가 남기는 글에서 가린다
+        if (web && !['done', 'error', 'canceled'].includes(j.status)){
+          // 브라우저 도구만 쓰는 단계 — 다른 확인 요청은 거절하고, 사람에게 넘긴 일은 내 확인으로 올린다(작업은 답을 기다리며 살아 있다)
+          for (const q of (j.pending || []).filter(q => q.tool !== 'BrowserHandoff')) await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id: q.id, allow: false, message: '이 단계에서는 브라우저 도구만 써요' }) }).catch(() => {});
+          const h = (j.pending || []).find(q => q.tool === 'BrowserHandoff' && !(step.answered || []).includes(q.id));
+          if (h){
+            const inp = h.input || {}, what = scrub(clip(inp.message || h.description || '브라우저에서 할 일이 있어요', 300), my);
+            Object.assign(step, { status: 'input', ask: { type: 'handoff', question: what, request_id: String(h.id), url: /^https?:\/\//.test(String(inp.url || '')) ? clip(inp.url, 500) : '', title: clip(inp.title || '', 120) } });
+            Object.assign(run, { status: 'input', updated: now() });
+            Promise.resolve().then(() => onAsk(p, { plugin: x.id, name: x.manifest.name, run: run.id, step: step.key, title: run.item.title, question: what })).catch(() => {});
+            return;
+          }
+        }
         if (!['done', 'error', 'canceled'].includes(j.status)){ if (step.status !== 'running'){ step.status = 'running'; run.status = 'running'; run.updated = now(); } return; }
-        if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : jobError(j), text: clip(j.result && (j.result.stdout || j.result.text), 4000), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
-        const out = d.kind === 'script' ? parseOut(j.result.stdout) : (j.result.structured || parseOut(j.result.text));
-        const text = clip(d.kind === 'script' ? (out ? out.summary || '' : j.result.stdout) : j.result.text, 6000);
+        if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : scrub(jobError(j), my), text: scrub(clip(j.result && (j.result.stdout || j.result.text), 4000), my), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
+        let out = d.kind === 'script' ? parseOut(j.result.stdout) : (j.result.structured || parseOut(j.result.text));
+        // 브라우저 단계의 결과는 웹 페이지를 읽은 AI의 글이다 — 실행기를 움직이는 필드(묻기·설정 바꾸기·지우기·갈래)는 스크립트 단계만 낸다
+        if (web && out && typeof out === 'object'){ out = scrub(out, my); for (const k of ['ask', 'settings_patch', 'forget', 'lane', 'change', 'fork']) delete out[k]; }
+        const text = scrub(clip(d.kind === 'script' ? (out ? out.summary || '' : j.result.stdout) : j.result.text, 6000), my);
         // JSON을 내려다 중간에 잘린 출력 — 결과 없이 넘기면 다음 단계가 "채우지 못한 값"으로 멈춘다. 여기서 멈춰 다시 하게 한다
         if (d.kind === 'script' && !out && /^\s*\{/.test(j.result.stdout || '')){ Object.assign(step, { status: 'failed', error: '스크립트 결과를 읽지 못했어요. 출력이 중간에 잘렸을 수 있어요', text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (out && out.error){ Object.assign(step, { status: 'failed', error: clip(out.error, 500), output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
-        if (out && out.ask){ Object.assign(step, { status: 'input', ask: normAsk(out.ask), output: out, text, job: null }); Object.assign(run, { status: 'input', updated: now() }); return; }
-        if (out && out.settings_patch) patchSettings(p, x, out.settings_patch);
+        if (out && out.ask){
+          Object.assign(step, { status: 'input', ask: normAsk(out.ask), output: out, text, job: null }); Object.assign(run, { status: 'input', updated: now() });
+          const fd = x.feeds.find(f => f.name === run.feed), fs_ = st.feeds[run.feed];   // 앞 단계가 항목을 바꿨을 수 있다(예: AI 안 저장) — 내 확인을 묻는 동안 목록도 맞게 다시 가져온다
+          if (fd && (fd.starts.length > 1 || fd.start_mode !== 'auto') && fs_) fs_.at = null;
+          return;
+        }
+        if (out && out.settings_patch){   // 같은 차례에 이어 시작하는 다음 단계도 바뀐 설정을 보게. 목록도 바뀐 설정으로 다시 가져온다(설정을 인자로 받는 목록·다시 묻기)
+          patchSettings(p, x, out.settings_patch); settings = settingsFor(x, plugConf(readConf(), p, x.id));
+          for (const fs_ of Object.values(st.feeds)) if (fs_) fs_.at = null;
+        }
         if (out && out.lane){   // 갈래 이름(예: 저장소) — 같은 항목·워크플로우에서 같은 갈래는 하나만 돈다
           const lane = clip(out.lane, 60);
           if (st.runs.some(r => r !== run && r.feed === run.feed && r.item.id === run.item.id && r.workflow === run.workflow && r.lane === lane && !['done', 'canceled'].includes(r.status))){
@@ -299,13 +399,26 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       Object.assign(s, { answer: null, answer_label: null, text: '(지웠어요)', output: { ...(out || {}), forgotten: true } });
     }
   };
-  // 끝난 실행은 다음 단계에 넘기려고 받은 큰 값(이름이 _로 시작하는 필드, 예: diff)을 버린다 — 상태 파일은 동기화된다
-  const slim = run => { for (const s of run.steps) if (s.output && typeof s.output === 'object') for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k]; };
+  // 끝나거나 그만둔 실행은 다음 단계에 넘기려고 받은 큰 값(이름이 _로 시작하는 필드, 예: diff)과 private 짚은 곳(예: 제출용 내 정보)을 버린다 — 상태 파일은 동기화된다
+  const slim = run => { for (const s of run.steps) if (s.output && typeof s.output === 'object'){
+    for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k];
+    if (Array.isArray(s.output.findings)) s.output.findings = s.output.findings.filter(f => !(f && f.private));
+  } };
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true, confirm: c.confirm ? clip(c.confirm, 200) : '' }),
     free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true, value: a.value ? clip(a.value, 2000) : '' });   // value: 적는 칸에 미리 채울 글(고쳐서 보낸다)   // inline: 목록 줄에서 바로 고르는 버튼으로
 
-  async function startStep(conn, x, run, step, d, settings){
+  async function startStep(conn, x, run, step, d, settings, p){
+    let web = null;   // 브라우저 단계 — 이 컴퓨터에서 브라우저까지 승인했을 때만, 앞 스크립트 단계가 낸 옵션으로
+    if (d.kind === 'browser'){
+      const bs = await browserState(p, x.id);
+      if (!bs.ok) throw fail(409, bs.message);
+      const v = d.browser ? stepValue(run, d.browser.slice(1, -1)) : {};
+      if ((v == null || typeof v !== 'object') && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${d.browser}`);
+      const o = browserOpts(v);
+      step.tab = tabKey(p, x.id, o.tab || run.item.id);
+      web = { tab: step.tab, only: true, ...o.opts };
+    }
     const miss = [], cwd = d.cwd ? fill(d.cwd, run, settings, miss) : null;
     if (cwd && (miss.length || !path.isAbsolute(cwd) || !fs.existsSync(cwd))) throw fail(400, `작업 폴더를 찾지 못했어요: ${cwd}`);
     if (d.kind === 'script'){
@@ -324,19 +437,24 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const lost = pm.filter(k => k.includes('.') && run.steps.some(z => z.key === k.slice(1, -1).split('.')[0] && z.status !== 'skipped'));   // JSON 예시 같은 중괄호와 사람이 건너뛴 단계는 두고, 끝난 단계에 빠진 결과만 본다
     if (lost.length && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${lost.join(' ')}`);
     if (step.answer != null) prompt += `\n\n사용자 추가 요청: ${step.answer}`;
-    const provider = settings.provider || 'claude';
+    const provider = web ? 'claude' : settings.provider || 'claude';   // 브라우저 도구는 Claude만
     const body = { plugin: { id: x.id, root: x.path }, provider, prompt, tag: `plugin:${x.id}` };
-    if (schema && d.kind === 'ai'){
+    if (schema){   // ai·agent·browser 모두 — 결과(구조화 출력)가 단계 결과가 된다
       if (provider === 'claude') body.json_schema = schema;   // 지원하는 AI만. 나머지는 글 끝의 JSON을 읽는다
       else body.prompt += `\n\n답은 아래 JSON 스키마에 맞는 JSON 하나로만 써 주세요.\n${JSON.stringify(schema)}`;
     }
     if (d.kind === 'agent') body.agent = { cwd: cwd || x.path, mode: d.mode || 'read', ...(step.session ? { session: step.session } : {}) };
+    if (web) body.agent = { cwd: x.path, mode: 'read', approvals: true, browser: web, ...(step.session ? { session: step.session } : {}) };
     return (await ai(conn, '/v1/jobs', { method: 'POST', body: JSON.stringify(body) })).job.id;
   }
 
   function patchSettings(p, x, patch){
     const c = readConf(), pc = plugConf(c, p, x.id), keys = new Set(x.manifest.settings.map(s => s.key));
-    for (const [k, v] of Object.entries(patch || {})) if (keys.has(k) && typeof v === 'string') pc.settings[k] = v.slice(0, 20000);
+    const toggles = new Set(x.manifest.settings.filter(s => s.type === 'toggle').map(s => s.key));
+    for (const [k, v] of Object.entries(patch || {})){
+      if (toggles.has(k)){ if (typeof v === 'boolean') pc.settings[k] = v; }   // 켜고 끄는 설정은 참·거짓으로만
+      else if (keys.has(k) && typeof v === 'string') pc.settings[k] = v.slice(0, 20000);
+    }
     writeConf(c);
   }
 
@@ -345,7 +463,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const conf = plugConf(readConf(), p, x.id);
     const run = a.run ? st.runs.find(r => r.id === a.run) : null;
     const step = run && a.step ? run.steps.find(s => s.key === a.step) : null;
-    const cancelJob = async s => { if (s && s.job && ['running', 'waiting'].includes(s.status)) await ai(conn, `/v1/jobs/${s.job}`, { method: 'DELETE' }).catch(() => {}); };
+    const handed = s => !!s && s.status === 'input' && !!s.ask && s.ask.type === 'handoff';   // 넘겨받기를 기다리는 단계 — 에이전트 작업이 답을 기다리며 살아 있다
+    const cancelJob = async s => { if (s && s.job && (['running', 'waiting'].includes(s.status) || handed(s))) await ai(conn, `/v1/jobs/${s.job}`, { method: 'DELETE' }).catch(() => {}); };
     switch (a.type){
       case 'refresh': { const feed = x.feeds.find(f => f.name === a.feed); if (!feed) throw fail(404, '없는 목록이에요'); await refreshFeed(p, x, conf, feed, st, conn); return; }
       case 'start': {
@@ -365,6 +484,16 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       }
       case 'answer': case 'confirm': {
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
+        if (handed(step)){   // 넘겨받은 일을 마쳤다·못 했다 — 같은 작업에 답해 이어 가게 한다(단계를 다시 돌리지 않는다)
+          const ok = a.type === 'confirm' || a.value === 'done';
+          try { await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id: step.ask.request_id, allow: ok, message: ok ? '' : '사용자가 브라우저에서 하지 못했다고 했어요' }) }); }
+          catch (e) {
+            if (e.status === 404){ Object.assign(step, { status: 'failed', ask: null, error: LOST, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
+            if (e.status !== 409) throw e;   // 409: 그 사이 작업이 다시 시작됐거나 끝났다 — 다음 차례에 작업 상태대로
+          }
+          Object.assign(step, { status: 'running', answered: [...(step.answered || []), step.ask.request_id].slice(-20), ask: null });
+          Object.assign(run, { status: 'running', updated: now() }); return;
+        }
         if (a.type === 'confirm' && step.ask && step.ask.type === 'gate') Object.assign(step, { status: 'pending', gate_ok: true, ask: null });   // 관문: 확인하면 그 단계를 한다
         else if (a.type === 'confirm') Object.assign(step, { status: 'done', finished: now(), ask: null });
         else { const v = String(a.value ?? '').slice(0, 2000), ch = ((step.ask && step.ask.choices) || []).find(c => c.value === v);   // 고른 것이면 사람이 본 이름도 남긴다
@@ -377,12 +506,14 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         // 그만뒀거나 멈춘 실행은 어느 단계에서든 다시(처음부터 다시 등)
         if (!['failed', 'input', 'done'].includes(step.status) && !['canceled', 'stopped'].includes(run.status)) throw fail(409, '다시 할 수 있는 단계가 아니에요');
         const i = run.steps.indexOf(step);
+        for (const s of run.steps.slice(i)) await cancelJob(s);
         // lenient: 못 채운 값은 빈 값으로 두고 이 단계를 한다(앞 단계 결과가 비었을 때 처음부터 다시 말고 이어 가는 길)
-        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
+        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, answered: undefined, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
         Object.assign(run, { status: 'queued', note: null, finished: null, updated: now() }); return;
       }
       case 'skip': {
         if (!step || !['failed', 'input'].includes(step.status)) throw fail(409, '건너뛸 수 있는 단계가 아니에요');
+        await cancelJob(step);
         Object.assign(step, { status: 'skipped', finished: now(), ask: null });
         Object.assign(run, { status: 'running', updated: now() }); return;
       }
@@ -401,6 +532,20 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         return;
       }
       default: throw fail(400, '모르는 동작이에요');
+    }
+  }
+
+  /* 넘겨받기를 기다리는 단계 — 그 사이 작업이 사라졌으면(AI 서버 기록이 없어졌다) 멈춘 것으로 두어 다시 하게 하고,
+     답할 것이 사라졌으면(AI 서버를 다시 켜 작업이 처음부터 다시 돈다·시간이 넘어 끝났다) 기다림을 풀어 다음 차례에 작업 상태대로 한다 */
+  async function handoffs(st, conn){
+    for (const run of st.runs){
+      const step = run.status === 'input' && run.steps.find(s => s.status === 'input' && s.ask && s.ask.type === 'handoff' && s.job);
+      if (!step) continue;
+      let j;
+      try { j = (await ai(conn, `/v1/jobs/${step.job}`)).job; }
+      catch (e) { if (e.status === 404){ Object.assign(step, { status: 'failed', ask: null, error: LOST, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); } continue; }
+      if ((j.pending || []).some(q => q.id === step.ask.request_id)) continue;
+      Object.assign(step, { status: 'running', ask: null }); Object.assign(run, { status: 'running', updated: now() });
     }
   }
 
@@ -437,6 +582,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
             if (!force && (!inWindow(feed) || (f && f.at && Date.now() - Date.parse(f.at) < everyOf(pc, feed) * 60000))) continue;
             await refreshFeed(p, x, pc, feed, st, conf.ai);
           }
+          await handoffs(st, conf.ai);
           await advance(p, x, pc, st, conf.ai);
           st.auto = !!pc.auto;   // 다른 기기도 돌리는 컴퓨터의 자동 시작 상태를 보게
           writeState(p, x.id, st);
@@ -479,7 +625,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       else if (runnerHost(p) === HOST) fs.rmSync(runnerFile(p), { force: true });
       onWrite(p);
     }
-    writeConf(c);
+    writeConf(c); brMemo.clear();
     if (on) setTimeout(() => tick(p).catch(() => {}), 50);
     return here(p);
   }
@@ -575,6 +721,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const files = Object.fromEntries(x.scripts.map(s => [s.path, s.sha256]));
     const r = (await ai(conn, '/v1/plugins', { method: 'POST', body: JSON.stringify({ id: x.id, root: x.path, version: x.manifest.version, permissions: x.manifest.permissions, files }) })).plugin;
     kick(p, id, 'failed');   // 승인 전에 실패한 목록을 바로 다시 가져온다
+    brMemo.delete(`${p}|${id}`);
     return r;
   }
   async function machine(p, id){
@@ -583,8 +730,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     try {
       const [ap, sec] = await Promise.all([ai(conn, '/v1/plugins'), ai(conn, '/v1/secrets').catch(() => ({ secrets: [] }))]);
       const mine = ap.plugins.find(a => a.id === x.id && a.root === x.path);
-      const same = !!mine && x.scripts.every(s => mine.files[s.path] === s.sha256) && x.manifest.permissions.secrets.every(n => (mine.permissions.secrets || []).includes(n));
-      return { connected: true, approved: same, approved_before: !!mine && !same, secrets: x.manifest.secrets.map(s => ({ ...s, set_at: (sec.secrets.find(z => z.name === s.name) || {}).set_at || null })) };
+      const same = !!mine && x.scripts.every(s => mine.files[s.path] === s.sha256) && x.manifest.permissions.secrets.every(n => (mine.permissions.secrets || []).includes(n)) && (x.manifest.permissions.plain || []).every(n => (mine.permissions.plain || []).includes(n))
+        && (!x.manifest.permissions.browser || mine.permissions.browser === true);   // 브라우저를 새로 쓰게 됐으면 다시 승인
+      return { connected: true, approved: same, approved_before: !!mine && !same, browser_new: !!mine && x.manifest.permissions.browser && mine.permissions.browser !== true, secrets: x.manifest.secrets.map(s => ({ ...s, set_at: (sec.secrets.find(z => z.name === s.name) || {}).set_at || null })) };
     } catch (e) { return { connected: false, error: e.message, approved: false, secrets: [] }; }
   }
   async function setSecret(p, id, name, value){
@@ -597,5 +745,41 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     return r;
   }
 
-  return { tick, start, status, setRunner, setLocal, act, approve, machine, setSecret, here, search };
+  /* ---------- 브라우저 — 플러그인의 탭을 사람이 보고 누르고 적는다(작업 화면의 브라우저 보기·미리 로그인). 적은 글은 AI에게 가지 않는다 ---------- */
+  // 쓸 수 있나 — 플러그인 선언 · 이 컴퓨터가 돌리는지 · pkm-ai-server 지원 · 이 컴퓨터의 승인(채팅의 browserState와 같은 판단). 화면이 1초에도 여러 번 물어 10초 기억한다
+  const brMemo = new Map();
+  async function browserState(p, id){
+    const k = `${p}|${id}`, hit = brMemo.get(k);
+    if (hit && Date.now() - hit.at < 10000) return hit.v;
+    const x = await pluginOf(p, id), host = runnerHost(p), conn = readConf().ai;
+    let v = { ok: true };
+    if (!x.manifest.permissions.browser) v = { ok: false, reason: 'off', message: '이 플러그인은 브라우저를 쓰지 않아요' };
+    else if (host && host !== HOST && (x.feeds.length || x.workflows.length)) v = { ok: false, reason: 'elsewhere', message: `브라우저는 돌리는 컴퓨터(${host})에 있어요. 그 컴퓨터에서 pkm을 열어 주세요` };
+    else if (!conn) v = { ok: false, reason: 'none', message: '이 컴퓨터의 AI 연결이 없어요. 준비와 설정에서 먼저 연결해 주세요' };
+    else try {
+      const claude = ((await ai(conn, '/v1/providers')).providers || []).find(z => z.id === 'claude');
+      if (!claude || !claude.agent || !claude.agent.browser) v = { ok: false, reason: 'old', message: 'pkm-ai-server가 브라우저를 모르는 옛 버전이거나 브라우저를 꺼 두었어요. 업데이트한 뒤 다시 켜 주세요' };
+      else {
+        const ap = ((await ai(conn, '/v1/plugins')).plugins || []).find(a => a.id === x.id && a.root === x.path);
+        if (!ap || !ap.permissions || ap.permissions.browser !== true) v = { ok: false, reason: 'approve', message: `브라우저를 쓰려면 플러그인 › ${x.manifest.name} › 준비와 설정에서 다시 승인해 주세요` };
+      }
+    } catch (e) { return { ok: false, reason: 'local', message: e.message }; }   // 못 읽은 것은 기억하지 않는다
+    brMemo.set(k, { at: Date.now(), v });
+    return v;
+  }
+  // tab은 이 플러그인의 탭 키만(다른 플러그인·채팅 방의 탭을 건드리지 못하게 앞부분을 본다). tab 없이 물으면 상태와 로그인 탭 키만 돌려준다
+  async function browser(p, id, act, tab, b = {}){
+    const st = await browserState(p, id), login = tabKey(p, id, 'login');
+    if (act === 'info' && !tab) return { ok: st.ok, reason: st.reason, message: st.message || '', login };
+    if (!TAB_RE.test(String(tab || '')) || !String(tab).startsWith(`${tabSeg(p)}|${id}|`)) throw fail(400, '이 플러그인의 브라우저 탭이 아니에요');
+    if (!st.ok){ if (act === 'info') return { ok: false, reason: st.reason, message: st.message, login, info: null }; throw fail(409, st.message); }
+    const conn = readConf().ai, base = `/v1/browser/tabs/${encodeURIComponent(tab)}`, long = { signal: AbortSignal.timeout(45000) };
+    if (act === 'info') return { ok: true, login, info: await ai(conn, base) };
+    if (act === 'open') return ai(conn, `${base}/open`, { method: 'POST', body: JSON.stringify(b.url ? { url: String(b.url).slice(0, 2000) } : {}), ...long });
+    if (act === 'input'){ const { tab: _t, ...input } = b; return ai(conn, `${base}/input`, { method: 'POST', body: JSON.stringify(input), ...long }); }
+    if (act === 'frame') return Buffer.from(await (await ai(conn, `${base}/frame?q=${Math.min(80, Math.max(30, +b.q || 55))}`, { raw: true })).arrayBuffer());
+    throw fail(404, '없는 주소예요');
+  }
+
+  return { tick, start, status, setRunner, setLocal, act, approve, machine, setSecret, here, search, browser };
 }

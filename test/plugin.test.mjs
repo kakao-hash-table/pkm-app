@@ -17,7 +17,7 @@ test('예시 플러그인을 받는다', () => {
   const r = P.validate(base());
   assert.equal(r.ok, true, r.errors.join('\n'));
   assert.equal(r.manifest.id, 'deploy-loop');
-  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'], secrets: [] });
+  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'], secrets: [], browser: false });
   assert.equal(r.workflows[0].steps.length, 5);
   assert.equal(r.workflows[0].steps[3].body, '이 카드의 경로에서 바뀐 파일을 읽고\n위험한 부분만 짧게 알려 줘');
 });
@@ -207,6 +207,7 @@ test('누른 항목의 진행 — 누른 뒤에 만든 실행을 찾고, 상태�
   assert.equal(P.runFeedback(run({}, [agent]), at + 185000).text, 'AI가 하는 중 · 3분째');
   assert.match(P.runFeedback(run({ status: 'waiting' }, [{ ...agent, status: 'waiting', reason: 'limit' }])).text, /풀리면 이어서/);
   assert.deepEqual(P.runFeedback(run({ status: 'input' }, [{ key: 'done1', status: 'done' }, { key: 'res', kind: 'script', status: 'input' }])), { phase: 'input', text: '내 확인이 필요해요', step: 'res' });
+  assert.equal(P.runFeedback(run({ status: 'input' }, [{ key: 'res', kind: 'script', status: 'input', ask: { type: 'choice', question: '냈나요? · 마감 D-8' } }])).text, '내 확인이 필요해요 · 냈나요? · 마감 D-8');
   assert.deepEqual(P.runFeedback(run({ status: 'stopped' }, [{ key: 'end', kind: 'script', status: 'failed', error: '카드를 찾지 못했어요\n자세한 내용' }])), { phase: 'failed', text: '멈췄어요 · 카드를 찾지 못했어요', step: 'end' });
   assert.equal(P.runFeedback(run({ status: 'stopped', note: '워크플로우가 사라졌어요' }, [{ key: 'a', status: 'pending' }])).text, '멈췄어요 · 워크플로우가 사라졌어요');
   assert.deepEqual(P.runFeedback(run({ status: 'done' }, [{ key: 'end', status: 'done', output: { verdict: { tone: 'ok', title: '했어요', text: '예시 할 일' }, outcome: { title: '했어요' } } }])), { phase: 'done', tone: 'ok', text: '했어요 · 예시 할 일' });

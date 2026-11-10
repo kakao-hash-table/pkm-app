@@ -1,0 +1,1 @@
+{ "type": "object", "properties": { "_result": { "type": "object", "properties": { "sent": { "type": "string", "enum": ["yes", "no", "unknown"] }, "proof": { "type": "string" } }, "required": ["sent", "proof"] } }, "required": ["_result"] }

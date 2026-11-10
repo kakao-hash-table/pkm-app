@@ -488,6 +488,16 @@ mark{background:var(--primary-weak);color:inherit;font-weight:700;border-radius:
 .wrap-note{border-left:3px solid var(--kc,#E0531F)}
 .wrap-note p{margin:0}
 .chips{display:flex;flex-wrap:wrap;gap:8px;border:0;padding:0;margin:8px 0 0}
+.chips.pl-sort{margin:0 0 12px}
+.pl-file{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:8px}
+@media (min-width:600px){.dlg-file{width:min(960px,calc(100vw - 32px));max-width:none}}
+.pl-file-view{height:min(70vh,900px);overflow:auto;margin-top:8px;border:1px solid var(--line);border-radius:var(--r-md);background:#fff}
+.pl-hwpx{max-width:720px;margin:0 auto;padding:24px 20px;color:#111;font-size:.875rem;line-height:1.6}
+.pl-hwpx p{margin:0 0 2px;white-space:pre-wrap;overflow-wrap:anywhere}
+.pl-hwpx table{border-collapse:collapse;width:100%;margin:6px 0;table-layout:fixed}
+.pl-hwpx td{border:1px solid #888;padding:4px 6px;vertical-align:top}
+.pl-hwpx-box{border:1px solid #bbb;padding:6px 8px;margin:6px 0}
+.pl-hwpx img{max-width:100%;height:auto;vertical-align:middle}
 .chip,.choice .chip,.choice .chip:has(input:checked){position:relative;display:inline-flex;padding:0;border:0;background:none}
 .chip input{position:absolute;opacity:0;width:1px;height:1px}
 .chip>span{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 14px;border:1px solid var(--line-strong);border-radius:999px;font-weight:600;font-size:.9375rem;cursor:pointer;background:var(--surface);color:var(--text-2)}
@@ -869,6 +879,67 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .ch-ask .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .ch-ask fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .ch-ask legend{font-weight:700;margin-bottom:4px}
+.ch-ask .faint{font-size:.8125rem}
+/* 브라우저 — 이 방의 탭을 실시간으로 보고 누르고 적는다 */
+.chat-web{border-bottom:1px solid var(--line);padding:8px 12px 10px;display:flex;flex-direction:column;gap:6px;background:var(--fill);flex:0 1 auto;min-height:0;max-height:60%;overflow-y:auto;overscroll-behavior:contain}
+.chat-web > *{flex-shrink:0}
+.chat-web > .cw-frame{flex-shrink:1}
+.chat-web[hidden]{display:none}
+.chat-web ~ .chat-log{min-height:96px}
+.cw-bar{display:flex;gap:6px;align-items:center}
+.cw-ask{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;border:1px solid var(--s-review);background:var(--s-review-bg);border-radius:var(--r-md);padding:8px 10px;position:sticky;top:0;z-index:1;box-shadow:0 -8px 0 var(--fill)}
+.cw-ask .m{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cw-ask .m b{font-size:.875rem}
+.cw-ask .m span{font-size:.8125rem;color:var(--text-2);overflow-wrap:anywhere}
+.cw-ask .acts{display:flex;gap:6px;margin-left:auto}
+.cw-addr{display:flex;gap:6px;flex:1;min-width:0}
+.cw-addr input,.cw-type input{flex:1;min-width:0;min-height:36px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font:inherit;font-size:.875rem;padding:0 10px}
+.cw-frame{position:relative;flex:1 1 auto;height:46vh;min-height:96px;overflow:hidden;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);cursor:pointer}
+.cw-frame:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.cw-frame img{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none}
+.cw-frame img[hidden]{display:none}
+.cw-frame.big{overflow:auto;overscroll-behavior:contain}
+.cw-frame.big img{position:static;margin:0;width:1280px;max-width:none;max-height:none}
+.cw-frame.stale img{opacity:.45}
+.cw-frame.mob{flex-shrink:0;height:auto;aspect-ratio:390/520;min-height:0}
+.cw-frame.mob img{position:static;width:100%;max-height:none}
+.cw-empty{position:absolute;inset:0;margin:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;text-align:center;padding:12px;color:var(--text-2);font-size:.875rem;cursor:default}
+.cw-note{margin:0;font-size:.8125rem;color:var(--text-2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cw-note.wait{color:var(--s-review)}
+.cw-note.bad{color:var(--danger)}
+.cw-type{display:flex;gap:6px}
+.cw-keys{display:flex;gap:4px;flex-wrap:wrap}
+.cw-keys .btn{min-width:44px}
+@media (max-width:599px){.cw-keys .btn{min-height:44px}.chat-web{max-height:78%}.cw-ask .m span{display:none}.cw-ask .acts{margin-left:0;flex:1 1 auto;justify-content:flex-end}}
+/* 넓은 화면 — 브라우저를 보는 동안은 창을 넓혀 대화 옆 칸에 크게(로그인할 수 있는 크기로). 끄면 원래 크기로 */
+@media (min-width:1000px){
+  .chat.web-side{width:calc(100vw - 48px);height:calc(100vh - 48px);max-width:1600px}
+  .chat.web-side .chat-main{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr) auto;grid-template-areas:"head head" "tools tools" "memo web" "log web" "form web"}
+  .chat.web-side .chat-head{grid-area:head}
+  .chat.web-side .chat-tools{grid-area:tools}
+  .chat.web-side .chat-memo{grid-area:memo}
+  .chat.web-side .chat-log{grid-area:log;min-height:0}
+  .chat.web-side .chat-form{grid-area:form}
+  .chat.web-side .chat-web{grid-area:web;max-height:none;border-bottom:0;border-left:1px solid var(--line);padding:10px 14px 12px}
+  .chat.web-side .cw-frame{height:auto;min-height:200px}
+  .chat.web-side .chat-grip{display:none}
+}
+/* 플러그인의 브라우저 보기 — 작업 화면(지켜보기·넘겨받기)과 로그인 창. 채팅 창과 같은 화면 조각(cw-*)을 쓴다 */
+.pl-web{display:flex;flex-direction:column;gap:6px;margin:16px 0 0;padding:10px 12px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--fill)}
+.pl-web .cw-frame{flex:none;height:auto;aspect-ratio:16/10;min-height:0}
+.pl-web .cw-frame.mob{aspect-ratio:390/520}
+.pl-web .cw-frame.big{aspect-ratio:auto;height:70vh}
+.pl-web .cw-frame.off{aspect-ratio:auto;min-height:96px}
+.pl-web .cw-frame.off .cw-empty{position:static}
+.pl-web.watch .cw-frame{cursor:default}
+.pl-web .cw-ask{position:static;box-shadow:none}
+.pl-login-row{align-items:center;flex-wrap:wrap}
+.dlg-web-in{padding:28px 24px 24px;display:flex;flex-direction:column;gap:14px}
+.dlg-web .pl-web{margin:0}
+.dlg-web .cw-frame{max-height:calc(100vh - 440px);min-height:200px}
+dialog .cw-addr,dialog .cw-type{padding:0;flex-direction:row;gap:6px}
+@media (min-width:600px){.dlg-web{width:min(1100px,calc(100vw - 32px));max-width:none}}
+@media (max-width:599px){.dlg-web-in{padding:24px 16px 20px}.dlg-web .dlg-actions{margin:4px -16px -20px;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}.dlg-web .cw-frame{max-height:none}.pl-web{padding:8px 8px 10px}.pl-login-row .btn{min-height:44px}}
 .ch-empty{color:var(--text-2);font-size:.9375rem;margin:auto 8px;text-align:center}
 .ch-sums{display:flex;flex-direction:column;gap:6px}
 .ch-sums h3{font-size:.8125rem;color:var(--text-2);margin:8px 4px 0}
@@ -965,7 +1036,7 @@ body.has-chat-fab main{padding-bottom:120px}
 .pl-finds>li{padding:10px 12px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
 .pl-find-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pl-where{font-weight:700;overflow-wrap:anywhere}.pl-where code{font-size:.8125rem;overflow-wrap:anywhere}
 .pl-find-title{display:block;margin-top:6px}.pl-find-text{margin:4px 0 0;color:var(--text-2);overflow-wrap:anywhere;white-space:pre-wrap}
-.pl-say{margin-top:8px;padding:8px 10px;border-left:3px solid var(--danger);background:var(--danger-bg);border-radius:0 var(--r-md) var(--r-md) 0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.pl-say{margin-top:8px;padding:8px 10px;border-left:3px solid var(--line-strong);background:var(--surface-2);border-radius:0 var(--r-md) var(--r-md) 0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .pl-hide-row{display:flex;align-items:stretch}.pl-hide-row>.row{flex:1;min-width:0}
 .pl-x{flex:none;width:48px;border:0;background:none;color:var(--text-2);font-size:1.375rem;line-height:1;cursor:pointer;border-radius:var(--r-md)}.pl-x:hover{color:var(--text);background:var(--s-wait-bg)}
 .pl-every{display:flex;flex-direction:column;gap:12px}.pl-every-all{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;padding-bottom:12px;border-bottom:1px solid var(--line)}.pl-every-all .field{margin:0}.pl-every select{max-width:260px}
@@ -1091,6 +1162,7 @@ body.has-chat-fab main{padding-bottom:120px}
     <button class="btn btn-text btn-sm" type="button" data-ch="push" aria-haspopup="dialog">알림 설정</button><button class="btn btn-text btn-sm" type="button" data-ch="close">닫기</button></div>
   <div class="chat-tools" id="chat-tools"></div>
   <section class="chat-memo" id="chat-memo" aria-label="메모" hidden></section>
+  <section class="chat-web" id="chat-web" aria-label="브라우저" hidden></section>
   <div class="chat-log" id="chat-log" tabindex="0" aria-label="대화 기록"></div>
   <p class="sr-only" role="status" id="chat-say"></p>
   <form class="chat-form" id="chat-form" novalidate>
@@ -1216,6 +1288,18 @@ body.has-chat-fab main{padding-bottom:120px}
 </dialog>
 
 <!-- 플러그인 확인창 — 제목·본문·버튼은 plAsk()가 채운다 -->
+<dialog id="dlg-file" class="dlg-file" aria-labelledby="file-title">
+  <form novalidate onsubmit="return false"><div><h2 id="file-title"></h2><p class="faint" id="file-note" role="status"></p><p class="faint" id="file-name" style="font-size:.8125rem;margin:0"></p><div id="file-view" class="pl-file-view"></div></div>
+  <div class="dlg-actions"><a class="btn btn-text" id="file-down" href="#">내려받기</a><button class="btn btn-primary" type="button" data-act="close-dlg">닫기</button></div></form>
+</dialog>
+<!-- 플러그인의 가상 브라우저 — 미리 로그인해 두는 창. 브라우저 보기 조각(webView)을 #plw-slot으로 옮겨 쓴다 -->
+<dialog id="dlg-plweb" class="dlg-web" aria-labelledby="plw-title">
+  <div class="dlg-web-in">
+    <div><h2 id="plw-title" tabindex="-1">브라우저 로그인</h2><p class="faint" style="margin:4px 0 0">여기서 한 로그인은 이 컴퓨터의 pkm 전용 브라우저에 남아요. 비밀번호는 AI에게 가지 않아요. 주소 줄에 다른 사이트 주소를 적어 거기서 로그인해도 돼요.</p></div>
+    <div id="plw-slot"></div>
+    <div class="dlg-actions"><button class="btn btn-primary" type="button" data-act="close-dlg">닫기</button></div>
+  </div>
+</dialog>
 <dialog id="dlg-plc" aria-labelledby="plc-title">
   <form data-pl-form="plc" novalidate>
     <div><h2 id="plc-title"></h2><div id="plc-body" class="pl-dlg-body"></div></div>
@@ -2338,7 +2422,7 @@ function openProfiles(){
 /* ---------------- AI 연결 ----------------
    내 컴퓨터의 pkm-ai-server에 붙고(js/pkm-ai.js), 쓸 AI·모델·한도를 고른다. 연결과 설정은 이 브라우저에만 둔다(기기마다 서버 주소·토큰이 다르다).
    고르면 바로 저장한다 — 가볍고 언제든 다시 고를 수 있는 설정이라 저장 버튼을 두지 않는다. */
-const AI = { list:null, error:null, loading:false, slow:false, busy:false, recode:false, test:null, just:false, auto:false };
+const AI = { list:null, error:null, loading:false, slow:false, busy:false, recode:false, test:null, just:false, auto:false, local:null };   // local: 같은 컴퓨터의 pkm-ai-server { found, ok, url }
 const AI_WIN = { five_hour:'5시간', seven_day:'주간' };
 const AI_EFF = { minimal:'최소', low:'낮게', medium:'보통', high:'높게', xhigh:'아주 높게', max:'최대' };
 const AI_NAME = { claude:'Claude', codex:'GPT', gemini:'Gemini' };
@@ -2394,19 +2478,28 @@ function aiTestHTML(p){
   if (t.state === 'ok') return `<div class="ai-test" role="status"><b>답이 왔어요</b> <span class="faint num">${t.sec}초${t.model ? ` · ${esc(t.model)}` : ''}</span><p class="ai-reply">${t.text ? esc(t.text) : '빈 답이 왔어요'}</p></div>`;
   return `<p class="ai-test bad" role="alert">${esc(t.msg)}</p>`;
 }
+const aiNear = () => !!(AI.local && AI.local.found && AI.local.ok);   // 같은 컴퓨터에 켜진 pkm-ai-server — 연결 코드 없이 붙는다
 function aiFormHTML(){
-  const local = ['http://127.0.0.1:5270', 'http://localhost:5270'].includes(location.origin);   // 서버가 처음부터 허용하는 주소
-  return `${AI.recode && AI.error ? `<div class="ai-state bad"><b>${esc(AI.error.message)}</b></div>` : ''}
-    <label class="field"><span>연결 코드<span class="hint">pkmai1.로 시작하는 한 줄이에요</span></span><input name="code" id="ai-code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-describedby="ai-err"></label>
-    <p class="err" id="ai-err" role="alert" hidden></p>
-    <details class="more"><summary>연결 코드는 어디서 받나요?</summary>
-      <ol class="ai-steps">
-        <li>AI를 쓸 컴퓨터에서 <a href="https://github.com/kakao-hash-table/pkm-ai-server#readme" target="_blank" rel="noopener">pkm-ai-server</a>를 받아 켜요<br><code>node bin/pkm-ai-server.js serve</code></li>
-        ${local ? '' : `<li>이 웹 주소를 허용하고 서버를 다시 켜요<br><code>node bin/pkm-ai-server.js origin add ${esc(location.origin)}</code></li>`}
+  const own = ['http://127.0.0.1:5270', 'http://localhost:5270'].includes(location.origin), L = AI.local, near = aiNear();   // own: 서버가 처음부터 허용하는 주소
+  const err = AI.recode && AI.error ? `<div class="ai-state bad"><b>${esc(AI.error.message)}</b></div>` : '';
+  const code = `<label class="field"><span>연결 코드<span class="hint">pkmai1.로 시작하는 한 줄이에요</span></span><input name="code" id="ai-code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-describedby="ai-err"></label>
+    <p class="err" id="ai-err" role="alert" hidden></p>`;
+  const steps = `<ol class="ai-steps">
+        <li>AI를 쓸 컴퓨터에서 <a href="https://github.com/kakao-hash-table/pkm-ai-server#readme" target="_blank" rel="noopener">pkm-ai-server</a>를 받아 켜요<br><code>node bin/pkm-ai-server.js serve</code>${L && !L.found ? '<br><span class="faint">이 pkm과 같은 컴퓨터라면 여기까지 하고 다시 찾으면 연결 코드 없이 연결돼요</span> <button class="btn btn-text btn-sm" type="button" data-act="ai-find">다시 찾기</button>' : ''}</li>
+        ${own ? '' : `<li>이 웹 주소를 허용하고 서버를 다시 켜요<br><code>node bin/pkm-ai-server.js origin add ${esc(location.origin)}</code></li>`}
         <li>이 기기의 연결 코드를 만들어요. 휴대폰 자리에는 기기 이름을 적어요<br><code>node bin/pkm-ai-server.js token create 휴대폰</code></li>
         <li>나온 연결 코드를 위 칸에 붙여 넣어요. 코드는 이때 한 번만 보여요</li>
       </ol>
-      <p class="faint">휴대폰에서 쓰려면 코드를 만들기 전에 <code>url add</code>로 Tailscale 주소를 넣어 두세요.</p>
+      <p class="faint">휴대폰에서 쓰려면 코드를 만들기 전에 <code>url add</code>로 Tailscale 주소를 넣어 두세요.</p>`;
+  if (near) return `${err}<div class="ai-state ok"><b>이 컴퓨터에 켜진 pkm-ai-server를 찾았어요</b>연결 코드 없이 바로 연결할 수 있어요 <span class="num faint">${esc(L.url)}</span></div>
+    <p class="err" id="ai-local-err" role="alert" hidden></p>
+    <details class="more"><summary>다른 컴퓨터의 AI 서버에 연결하기</summary>${code}
+      <div class="t-acts" style="justify-content:flex-start"><button class="btn btn-ghost btn-sm" type="submit" id="ai-submit">연결 코드로 연결하기</button></div>${steps}</details>`;
+  return `${err}${L && L.found ? `<div class="ai-state wait"><b>이 컴퓨터의 pkm-ai-server가 꺼져 있어요</b>켜면 연결 코드 없이 바로 연결할 수 있어요<br><code>node bin/pkm-ai-server.js serve</code>
+      <div><button class="btn btn-ghost btn-sm" type="button" data-act="ai-find">다시 찾기</button></div></div>` : ''}
+    ${code}
+    <details class="more"><summary>연결 코드는 어디서 받나요?</summary>
+      ${steps}
     </details>`;
 }
 function aiMainHTML(){
@@ -2448,7 +2541,7 @@ function renderAI(){
   $('#ai-title').textContent = !c ? 'AI 연결하기' : AI.recode ? '연결 코드 다시 넣기' : 'AI 연결';
   $('#ai-sub').innerHTML = !c ? '내 컴퓨터에 띄운 pkm-ai-server에 연결하면, 그 컴퓨터에 로그인해 둔 Claude·GPT·Gemini를 pkm이 쓸 수 있어요.' : c.via === 'server' ? 'pkm 서버를 거쳐 <b>이 컴퓨터의 AI 연결</b>(플러그인·채팅과 같은 것)을 써요' : `연결한 서버 <span class="num">${esc(c.url)}</span>`;
   $('#ai-body').innerHTML = form ? aiFormHTML() : aiMainHTML();
-  $('#ai-actions').innerHTML = form ? '<button class="btn btn-text" type="button" data-act="close-dlg">닫기</button><button class="btn btn-primary" type="submit" id="ai-submit">연결하기</button>'
+  $('#ai-actions').innerHTML = form ? `<button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>${aiNear() ? '<button class="btn btn-primary" type="button" data-act="ai-local" id="ai-local">이 컴퓨터의 AI에 연결하기</button>' : '<button class="btn btn-primary" type="submit" id="ai-submit">연결하기</button>'}`
     : '<button class="btn btn-text btn-danger" type="button" data-act="ai-off" style="margin-right:auto">연결 끊기</button><button class="btn btn-text" type="button" data-act="close-dlg">닫기</button>';
   if (key){ const n = d.querySelector(key); (n && !n.disabled ? n : $('#ai-title')).focus({ preventScroll:true }); }
 }
@@ -2480,7 +2573,35 @@ function openAI(){
   Object.assign(AI, { recode:false, test:null, just:false, auto:false });
   if (!PKMAI.conn()){ AI.list = null; AI.error = null; }
   renderAI(); openDlg('dlg-ai');
-  if (PKMAI.conn()){ $('#ai-title').focus(); loadAI(false); } else $('#ai-code').focus();
+  if (PKMAI.conn()){ $('#ai-title').focus(); loadAI(false); } else { (aiNear() ? $('#ai-local') : $('#ai-code')).focus(); aiFind(false); }
+}
+/* 같은 컴퓨터의 pkm-ai-server 찾기 — 창을 열 때(달라졌을 때만, 입력 중이면 그대로 둔다)와 '다시 찾기'를 누를 때 */
+async function aiFind(user){
+  const b = user && $('[data-act="ai-find"]'); if (b){ b.textContent = '찾는 중…'; b.setAttribute('aria-disabled', 'true'); }
+  const before = JSON.stringify(AI.local); AI.local = await PKMAI.localInfo();
+  if (!$('#dlg-ai').open || (PKMAI.conn() && !AI.recode)) return;
+  const typed = ($('#ai-code') || {}).value || '';
+  if (!user && (typed || JSON.stringify(AI.local) === before)) return;
+  renderAI(); if (typed && $('#ai-code')) $('#ai-code').value = typed;
+  if (aiNear()){ $('#ai-local').focus(); aiSay('이 컴퓨터에 켜진 pkm-ai-server를 찾았어요'); }
+  else if (user){ ($('[data-act="ai-find"]') || $('#ai-code')).focus(); aiSay(AI.local && AI.local.found ? '아직 꺼져 있어요' : '이 컴퓨터에서 켠 pkm-ai-server를 찾지 못했어요'); }
+}
+async function aiLocal(){
+  const bt = $('#ai-local'), er = $('#ai-local-err');
+  if (AI.busy || !bt) return;
+  AI.busy = true; bt.textContent = '연결하는 중…'; bt.setAttribute('aria-disabled', 'true'); er.hidden = true;
+  try {
+    const r = await PKMAI.connectLocal();
+    Object.assign(AI, { list:r.providers, error:null, recode:false, just:true, auto:false, test:null, local:{ ...AI.local, connected:true } });
+    aiAutoPick(); renderAI(); syncAiLine(); $('#ai-title').focus();
+    const st = $('#ai-body .ai-state'); aiSay(st ? st.innerText.replace(/\s*\n\s*/g, ' ').trim() : '연결했어요');
+    if (PL.st) plLoad(true); if (JOBS.st) jobsLoad(true);   // 플러그인·예약 작업 화면의 'pkm 서버의 AI 연결'도 바로 바뀌게
+  } catch (e) {
+    if (PKMAI.conn()){ AI.error = e; renderAI(); syncAiLine(); }   // 연결은 됐는데 AI 목록을 못 받았다
+    else { er.textContent = e.message; er.hidden = false; }
+  } finally {
+    AI.busy = false; if (bt.isConnected){ bt.textContent = '이 컴퓨터의 AI에 연결하기'; bt.removeAttribute('aria-disabled'); }
+  }
 }
 async function aiTest(){
   const p = aiCur();
@@ -2511,7 +2632,9 @@ document.addEventListener('click', e => {
     case 'ai': $('#dlg-profile').close(); openAI(); break;
     case 'ai-refresh': case 'ai-retry': loadAI(true); break;
     case 'ai-test': aiTest(); break;
-    case 'ai-recode': AI.recode = true; renderAI(); $('#ai-code').focus(); break;
+    case 'ai-recode': AI.recode = true; renderAI(); (aiNear() ? $('#ai-local') : $('#ai-code')).focus(); aiFind(false); break;
+    case 'ai-local': aiLocal(); break;
+    case 'ai-find': if (b.getAttribute('aria-disabled') !== 'true') aiFind(true); break;
     case 'ai-off': aiOff(); break;
   }
 });
@@ -2531,7 +2654,7 @@ document.addEventListener('submit', async e => {
   const f = e.target; if (f.dataset.form !== 'ai') return;
   e.preventDefault();
   if (!f.elements.code || AI.busy) return;
-  const v = f.elements.code.value.trim(), er = $('#ai-err'), bt = $('#ai-submit');
+  const v = f.elements.code.value.trim(), er = $('#ai-err'), bt = $('#ai-submit'), label = bt.textContent;
   er.hidden = true; f.elements.code.removeAttribute('aria-invalid');
   try { PKMAI.parseCode(v); } catch (err) { er.textContent = err.message; return invalid(f.elements.code, 'ai-err'); }
   AI.busy = true; bt.textContent = '연결하는 중…'; bt.setAttribute('aria-disabled', 'true');
@@ -2544,7 +2667,7 @@ document.addEventListener('submit', async e => {
     er.innerHTML = esc(err.message) + (err.code === 'origin' ? aiOrigin() : '');
     if (err.code === 'token') invalid(f.elements.code, 'ai-err'); else { er.hidden = false; f.elements.code.focus(); }
   } finally {
-    AI.busy = false; if (bt.isConnected){ bt.textContent = '연결하기'; bt.removeAttribute('aria-disabled'); }
+    AI.busy = false; if (bt.isConnected){ bt.textContent = label; bt.removeAttribute('aria-disabled'); }
   }
 });
 syncAiLine();
@@ -4088,7 +4211,7 @@ function vNotFound(){
 /* ---------------- 플러그인 (SPEC §0-3 · 설계 prototype/plugins-ux.md) ----------------
    설치·승인·비밀값·실행은 로컬 서버(server/runner.js)가 맡는다. 화면은 상태를 읽고, 누른 것을 보낸다.
    돌리는 컴퓨터가 아닌 기기에서 누른 것은 서버가 받은편지함 파일로 남겨 동기화로 보낸다. */
-const PL = { p:null, st:null, list:null, machine:{}, scripts:{}, bundled:null, at:0, loading:false, error:null, inspect:null, inspecting:false, busy:'', sent:{}, confirm:null, live:'', keep:{}, keepTab:null, picked:{}, track:{}, trackN:0, trackTimer:0, reveal:{}, revealN:0 };
+const PL = { p:null, st:null, list:null, machine:{}, scripts:{}, bundled:null, at:0, loading:false, error:null, inspect:null, inspecting:false, busy:'', sent:{}, confirm:null, live:'', keep:{}, keepTab:null, picked:{}, track:{}, trackN:0, trackTimer:0, reveal:{}, revealN:0, web:{} };
 const plOK = () => !!STORE && STORE.kind === 'server';
 const papi = (sub, body, method) => STORE.json(`/api/profile/${encodeURIComponent(S.profile)}${sub}`,
   body !== undefined || method ? { method:method || 'POST', headers:{ 'content-type':'application/json' }, body:body !== undefined ? JSON.stringify(body) : undefined } : undefined);
@@ -4153,7 +4276,7 @@ function plPairCollect(fs){
 }
 async function plLoad(force){
   if (!plOK() || PL.loading) return;
-  if (PL.p !== S.profile) Object.assign(PL, { p:S.profile, st:null, list:null, machine:{}, scripts:{}, at:0, inspect:null, sent:{}, keep:{}, picked:{}, track:{}, reveal:{} });
+  if (PL.p !== S.profile) Object.assign(PL, { p:S.profile, st:null, list:null, machine:{}, scripts:{}, at:0, inspect:null, sent:{}, keep:{}, picked:{}, track:{}, reveal:{}, web:{} });
   if (!force && PL.at && Date.now() - PL.at < 10000) return;
   PL.loading = true;
   try {
@@ -4351,14 +4474,89 @@ function plKept(id, f, items){
 }
 // 단계 결과의 판정(verdict: {tone, title, text})과 짚은 곳(findings: [{where, url, tag, title, text, copy, note}]) — 플러그인이 정한 말을 그대로 그린다
 const plVerdictOf = r => { for (let i = r.steps.length - 1; i >= 0; i--){ const o = r.steps[i].output; if (o && o.verdict && typeof o.verdict === 'object') return { v:o.verdict, findings:Array.isArray(o.findings) ? o.findings : [], step:r.steps[i] }; } return null; };
-function plFinds(list){
+function plFinds(list, id){
   if (!list.length) return '';
   return `<ol class="pl-finds">${list.map((f, k) => `<li>
     <div class="pl-find-head">${plUrl(f.url) ? `<a class="pl-where" href="${esc(plUrl(f.url))}" target="_blank" rel="noopener"><code>${esc(f.where || '')}</code> <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<code class="pl-where">${esc(f.where || '')}</code>`}${f.tag ? plBadge(f.tag, 'bad') : ''}${f.note ? plBadge(f.note, 'wait') : ''}</div>
     ${f.title ? `<b class="pl-find-title">${esc(f.title)}</b>` : ''}
     ${f.text ? `<p class="pl-find-text">${esc(f.text)}</p>` : ''}
+    ${f.file && id ? plFileRow(id, f.file, [f.where, f.title].filter(Boolean).join(' · ')) : ''}
     ${f.copy ? `<div class="pl-say">${f.rich ? `<div class="pl-text pl-rich md">${plRich(f.copy)}</div>` : `<p class="pl-text">${esc(f.copy)}</p>`}<button class="btn btn-text btn-sm" type="button" data-pl="copy" data-text="${esc(f.copy)}"${f.rich ? ' data-rich="1"' : ''} data-msg="${f.title ? `‘${esc(f.title)}’ 문구를 복사했어요` : `${k + 1}번째 문구를 복사했어요`}" aria-label="${f.title ? `‘${esc(f.title)}’ 문구 복사` : `${k + 1}번째 문구 복사`}">문구 복사</button></div>` : ''}
   </li>`).join('')}</ol>`;
+}
+/* 짚은 곳의 file — 플러그인이 이 컴퓨터에 만든 파일(예: 채운 신청서). .hwp·.hwpx는 화면 안에서 미리 보고, 모두 내려받을 수 있다 */
+const plFileUrl = (id, name, down) => `/api/profile/${encodeURIComponent(S.profile)}/plugins/${id}/file?name=${encodeURIComponent(name)}${down ? '&download=1' : ''}`;
+const plFileRow = (id, name, title) => `<div class="pl-file">${/\.hwpx?$/i.test(name) ? `<button class="btn btn-tonal btn-sm" type="button" data-pl="view-file" data-id="${esc(id)}" data-name="${esc(name)}" data-title="${esc(title || name)}" aria-label="${esc(name)} 미리 보기">미리 보기</button>` : ''}<a class="btn btn-text btn-sm" href="${esc(plFileUrl(id, name, true))}" download aria-label="${esc(name)} 내려받기">내려받기</a><span class="faint">${esc(name)}</span></div>`;
+async function plViewFile(id, name, title){
+  const view = $('#file-view'), note = $('#file-note');
+  $('#file-title').textContent = title || name; $('#file-name').textContent = name; $('#file-down').href = plFileUrl(id, name, true);
+  view.replaceChildren(); note.textContent = '문서를 여는 중이에요'; openDlg('dlg-file');
+  try {
+    const r = await fetch(plFileUrl(id, name));
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `문서를 받지 못했어요(${r.status})`);
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (/\.hwpx$/i.test(name)){ hwpxRender(view, await hwpxParts(bytes)); note.textContent = '글·표·그림만 보여 주는 미리 보기예요. 글꼴과 배치는 한글과 달라요. 낼 때는 내려받은 파일을 써요'; return; }
+    const { Viewer } = await import('./vendor/hwpjs/hwp.esm.js');
+    new Viewer(view, bytes, { type:'array' });
+    note.textContent = '화면 미리 보기라 글꼴·표 간격이 한글과 조금 다를 수 있어요. 낼 때는 내려받은 파일을 써요';
+  } catch (e) { view.replaceChildren(); note.textContent = `미리 보지 못했어요 · ${e.message}. 내려받아 한글에서 열어 주세요`; }
+}
+/* .hwpx(zip 안의 XML) 미리 보기 — 문단·표·글상자의 글과 문서 안 그림(도장 등)만 그린다. 글은 textContent로만 넣는다(문서 안의 글을 HTML로 풀지 않는다) */
+async function hwpxParts(bytes){
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), dec = new TextDecoder();
+  let e = bytes.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('hwpx 문서가 아니에요');
+  const xmls = [], images = {}; let p = dv.getUint32(e + 16, true);
+  for (let i = dv.getUint16(e + 10, true); i > 0 && dv.getUint32(p, true) === 0x02014b50; i--){
+    const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const name = dec.decode(bytes.subarray(p + 46, p + 46 + nlen)), img = name.match(/^BinData\/([^/]+)\.(png|jpe?g|gif|bmp)$/i);
+    if (/^Contents\/section\d+\.xml$/.test(name) || (img && size < 3e6)){
+      const at = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true), data = bytes.subarray(at, at + size);
+      const raw = method === 0 ? data : new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+      if (img){ let b = ''; for (let k = 0; k < raw.length; k += 0x8000) b += String.fromCharCode.apply(null, raw.subarray(k, k + 0x8000)); images[img[1]] = `data:image/${img[2].toLowerCase().replace('jpg', 'jpeg')};base64,${btoa(b)}`; }
+      else xmls.push([name, dec.decode(raw)]);
+    }
+    p += 46 + nlen + xlen + clen;
+  }
+  return { xmls: xmls.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric:true })).map(x => x[1]), images };
+}
+function hwpxRender(view, { xmls, images }){
+  const page = document.createElement('div'); page.className = 'pl-hwpx';
+  const kids = (el, name) => [...el.children].filter(c => c.localName === name);
+  const text = t => [...t.childNodes].map(n => n.nodeType === 3 ? n.nodeValue : n.localName === 'lineBreak' ? '\n' : n.localName === 'tab' ? '\t' : /space$/i.test(n.localName || '') ? ' ' : '').join('');
+  const pic = c => {   // 문서 안 그림 — 크기는 문서 단위(1mm ≈ 283.5)에서
+    const ref = [...c.getElementsByTagName('*')].find(n => n.localName === 'img'), src = ref && images[ref.getAttribute('binaryItemIDRef')];
+    if (!src) return null;
+    const sz = [...c.children].find(n => n.localName === 'sz' || n.localName === 'curSz'), w = sz && Number(sz.getAttribute('width')) / 283.5 * 3.78;
+    const el = document.createElement('img'); el.src = src; el.alt = '문서 안 그림'; if (w > 4) el.style.width = `${Math.min(w, 640)}px`; return el;
+  };
+  const table = t => {
+    const el = document.createElement('table');
+    for (const tr of kids(t, 'tr')){ const row = el.insertRow();
+      for (const tc of kids(tr, 'tc')){ const td = row.insertCell(), span = kids(tc, 'cellSpan')[0];
+        if (span){ td.colSpan = Number(span.getAttribute('colSpan')) || 1; td.rowSpan = Number(span.getAttribute('rowSpan')) || 1; }
+        for (const sub of kids(tc, 'subList')) for (const p of kids(sub, 'p')) para(p, td); } }
+    return el;
+  };
+  const box = (el, into) => {   // 글상자·묶음 개체 안의 글
+    for (const c of el.children){
+      if (c.localName === 'subList'){ const d = document.createElement('div'); d.className = 'pl-hwpx-box'; for (const p of kids(c, 'p')) para(p, d); into.append(d); }
+      else if (c.localName === 'tbl') into.append(table(c)); else box(c, into);
+    }
+  };
+  function para(p, into){
+    const el = document.createElement('p'), after = [];
+    for (const run of kids(p, 'run')) for (const c of run.children){
+      if (c.localName === 't') el.append(text(c));
+      else if (c.localName === 'pic'){ const im = pic(c); if (im) el.append(im); }
+      else if (c.localName === 'tbl') after.push(() => into.append(table(c)));
+      else if (c.localName !== 'secPr' && c.localName !== 'ctrl') after.push(() => box(c, into));
+    }
+    if (el.textContent.trim() || el.querySelector('img') || !after.length){ if (!el.childNodes.length) el.textContent = ' '; into.append(el); }
+    for (const f of after) f();
+  }
+  for (const xml of xmls){ const doc = new DOMParser().parseFromString(xml, 'application/xml'); if (doc.querySelector('parsererror')) throw new Error('문서 내용을 읽지 못했어요'); for (const p of kids(doc.documentElement, 'p')) para(p, page); }
+  view.append(page);
 }
 // 묻는 단계의 선택지를 버튼으로(ask.inline). 누른 뒤에는 같은 자리에 '하는 중'을 둔다
 // 앞 단계 결과가 비어 이 단계의 값을 못 채워 멈춘 것
@@ -4391,7 +4589,7 @@ function plInlineFeed(id, x, f){
     else if (['queued', 'running', 'waiting'].includes(r.status)){ tone = 'wait'; head = esc(PL.picked[r.id] ? `${PL.picked[r.id]} 하는 중…` : r.status === 'queued' ? '차례를 기다려요' : r.status === 'waiting' ? plRunLine(x, r) : `${s.name} 하는 중`);
       body = PL.picked[r.id] || r.status === 'waiting' ? '' : `<span>${r.status === 'queued' ? esc(plRunLine(x, r)) : `${r.steps.indexOf(s) + 1}/${r.steps.length} · ${plMin(s.started || r.updated)}분째`}</span>`; }
     else if (['input', 'done'].includes(r.status) && vd){
-      tone = vd.v.tone === 'bad' ? 'bad' : 'ok'; head = esc(vd.v.title || ''); body = `${vd.v.text ? `<span>${esc(vd.v.text)}</span>` : ''}${plFinds(vd.findings)}`;
+      tone = vd.v.tone === 'bad' ? 'bad' : 'ok'; head = esc(vd.v.title || ''); body = `${vd.v.text ? `<span>${esc(vd.v.text)}</span>` : ''}${plFinds(vd.findings, id)}`;
       const oc = vd.step.output.outcome;
       acts = r.status === 'done' ? `<span class="pl-outcome">✓ ${esc((oc && oc.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>${multi}`
         : s.ask && s.ask.inline ? plChoices(id, r, s) : `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`;
@@ -4477,7 +4675,7 @@ function vPlugins(id){
     ${tabs}
     <div class="pl-fresh" ${feeds.length ? '' : 'hidden'}>${fresh ? `<span class="num">${fresh}</span>` : ''}${plIsRunner() ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="refresh" data-id="${id}" ${busy ? 'aria-disabled="true"' : ''}>${busy ? '가져오는 중' : '지금 가져오기'}</button>` : ''}<a class="btn btn-text btn-sm" href="#/plugins/${id}/setup">설정</a></div>
     ${stale ? `<p class="faint">${esc(plRunner())}에서 한동안 소식이 없어요. 컴퓨터가 잠들었거나 pkm 서버가 꺼졌을 수 있어요.</p>` : ''}
-    ${plUpdBanner(id)}${gate}${autoLine}${body}
+    ${plUpdBanner(id)}${gate}${autoLine}${body}${plLoginBox(id)}
   </div>`;
 }
 /* 검색·편집기만 있는 플러그인 — 돌리는 컴퓨터 없이 지금 이 컴퓨터에서 쓴다 */
@@ -4498,8 +4696,79 @@ function plMissing(id){
   if (!here.ai) left.push('pkm 서버의 AI 연결');
   if (!local && !plIsRunner()) left.push('돌리는 컴퓨터');
   if (m.connected && !m.approved) left.push(plApLabel(id));
-  if (!local) for (const s of m.secrets || []) if (!s.set_at) left.push(s.label);   // 검색 플러그인의 토큰은 쓰는 곳 것만 넣으면 된다 — 빠진 곳은 찾을 때 알려 준다
+  if (!local) for (const s of m.secrets || []) if (!s.set_at && !s.optional) left.push(s.label);   // 검색 플러그인의 토큰은 쓰는 곳 것만 넣으면 된다 — 빠진 곳은 찾을 때 알려 준다
   return left;
+}
+
+/* 플러그인의 브라우저 — 작업 화면(브라우저 단계가 돌거나 넘겨받기를 기다리는 동안)과 로그인 창이 브라우저 보기 한 조각(webView)을 번갈아 쓴다.
+   탭은 그 플러그인의 것만: 단계가 적어 둔 탭(step.tab)과 서버가 알려 준 로그인 탭(PL.web[id].login). 조각은 화면을 다시 그려도 남게 자리(#pl-web-slot · #plw-slot)로 옮겨 붙인다 */
+const PW = { el:null, view:null, login:null, state:null };
+function pwOf(id, r){
+  const s = r && plStepNow(r), hand = !!s && r.status === 'input' && !!s.ask && s.ask.type === 'handoff';
+  return s && s.kind === 'browser' && s.tab && (hand || ['running', 'waiting'].includes(r.status)) ? { id, r, s, hand } : null;
+}
+function pwRun(){
+  const m = (location.hash || '').match(/^#\/plugins\/([^/]+)\/run\/([^/]+)$/), x = m && PL.st && PL.st.plugins[m[1]];
+  return x ? pwOf(m[1], (x.state.runs || []).find(z => z.id === m[2])) : null;
+}
+const plHandActs = (id, r, s) => [['fail', '못 했어요', 'btn-ghost'], ['done', '다 했어요 — 이어서 하기', 'btn-primary']].map(([v, label, cls]) =>
+  `<button class="btn ${cls} btn-sm" type="button" data-pl="hand" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" data-value="${v}">${label}</button>`).join('');
+function pwMount(){
+  const run = PW.login ? null : pwRun(), to = PW.login ? $('#plw-slot') : run && $('#pl-web-slot');
+  if (!to){ if (PW.el){ PW.el.remove(); PW.view.paint(); } return; }
+  if (!PW.el){
+    PW.el = document.createElement('section'); PW.el.className = 'pl-web'; PW.el.setAttribute('aria-label', '브라우저');
+    const now = () => PW.login ? null : pwRun(), pid = () => PW.login ? PW.login.id : (pwRun() || {}).id;
+    PW.view = webView(PW.el, 'pw', {
+      key:() => PW.login ? PW.login.tab : (pwRun() || { s:{} }).s.tab, want:() => PW.el.isConnected && !!(PW.login || pwRun()), idle:'아직 브라우저를 열지 않았어요',
+      api:async (tab, sub, body) => {
+        const id = tab.split('|')[1], r = await papi(`/plugins/${id}/browser${sub}?tab=${encodeURIComponent(tab)}`, body);
+        if (sub) return r;
+        PW.state = { id, ok:r.ok, reason:r.reason, message:r.message }; return r.info;
+      },
+      frameUrl:tab => `/api/profile/${encodeURIComponent(S.profile)}/plugins/${tab.split('|')[1]}/browser/frame?tab=${encodeURIComponent(tab)}&t=${Date.now()}`,
+      block:() => { const st = PW.state, id = pid();
+        return st && st.id === id && !st.ok ? { empty:`<span>${esc(st.message)}</span>${!PW.login && ['approve', 'none'].includes(st.reason) ? `<a class="btn btn-ghost btn-sm" href="#/plugins/${esc(id)}/setup">준비와 설정 열기</a>` : ''}` } : null; },
+      hand:() => { const run = now();
+        return run && run.hand && !PL.sent[run.r.id] ? { message:run.s.ask.question, acts:plHandActs(run.id, run.r, run.s),
+          sub:PW.state && PW.state.id === run.id && !PW.state.ok ? '돌리는 컴퓨터에 뜬 Chrome 창에서 하고 눌러 주세요.' : '아래 화면에서 하고 눌러 주세요. 여기 적은 글은 AI에게 보내지 않아요.' } : null; },
+      watch:() => { const run = now(); return !!run && !run.hand; }
+    });
+  }
+  if (PW.el.parentElement !== to) to.appendChild(PW.el);
+  PW.view.paint();
+}
+// 미리 로그인해 두기 — 로그인 탭을 창으로 연다. 로그인됐는지는 보지 않는다(쿠키를 읽지 않는다)
+function pwLogin(id, url, name){
+  const st = PL.web[id]; if (!st || !st.ok || !st.login) return;
+  PW.login = { id, tab:st.login };
+  $('#plw-title').textContent = name ? `브라우저 로그인 · ${name}` : '브라우저 로그인';
+  openDlg('dlg-plweb'); pwMount(); $('#plw-title').focus();
+  if (url) PW.view.open(url);
+}
+$('#dlg-plweb').addEventListener('close', () => { PW.login = null; pwMount(); });
+// 이 컴퓨터에서 이 플러그인이 브라우저를 쓸 수 있는지와 로그인 탭 — 20초 기억한다
+async function pwState(id, force){
+  const c = PL.web[id];
+  if (!plOK() || (c && c.loading) || (!force && c && Date.now() - c.at < 20000)) return;
+  PL.web[id] = { ...(c || {}), loading:true };
+  try { PL.web[id] = { ...await papi(`/plugins/${id}/browser`), at:Date.now() }; }
+  catch (e) { PL.web[id] = { ok:false, reason:'local', message:e.message, at:Date.now() }; }
+  plRepaint();
+}
+function plLoginBox(id, onSetup){
+  const li = (PL.list || []).find(z => z.id === id), mf = li && li.manifest;
+  if (!mf || !mf.permissions.browser) return '';
+  pwState(id);
+  const st = PL.web[id] || {}, logins = mf.logins || [], setup = onSetup ? '' : `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">준비와 설정 열기</a>`;
+  const btn = (label, cls, l) => `<button class="btn ${cls} btn-sm" type="button" data-pl="login" data-id="${id}" aria-haspopup="dialog"${l ? ` data-url="${esc(l.url)}" data-name="${esc(l.name)}" aria-label="${esc(l.name)} 로그인하러 가기"` : ''}>${label}</button>`;
+  const why = { approve:['이 컴퓨터에서 다시 승인해 주세요', setup], none:['AI 연결이 먼저 필요해요', setup], old:['pkm-ai-server를 업데이트해 주세요', ''], elsewhere:['돌리는 컴퓨터에서 로그인해 주세요', ''] }[st.reason]
+    || ['브라우저를 확인하지 못했어요', `<button class="btn btn-ghost btn-sm" type="button" data-pl="web-check" data-id="${id}">다시 확인하기</button>`];
+  const body = !st.at ? '<p class="faint" role="status">브라우저를 쓸 수 있는지 확인하는 중이에요</p>'
+    : !st.ok ? `<div class="ai-state wait"><b>${why[0]}</b><span>${esc(st.message)}</span>${why[1] ? `<div>${why[1]}</div>` : ''}</div>`
+    : `${logins.length ? `<ul class="list">${logins.map(l => `<li><div class="row pl-login-row"><span class="body"><span class="title">${esc(l.name)}</span><span class="meta"><span>${esc(l.url.replace(/^https:\/\//, '').split('/')[0])}</span></span></span>${btn('로그인하러 가기', 'btn-tonal', l)}</div></li>`).join('')}</ul>` : ''}
+      <p style="margin:12px 0 0">${btn(logins.length ? '다른 사이트 열기' : '브라우저 열기', logins.length ? 'btn-text' : 'btn-tonal')}</p>`;
+  return section('브라우저 로그인', `<p class="faint" style="margin:-4px 0 12px">여기서 한 로그인은 이 컴퓨터의 pkm 전용 브라우저에 남아, AI가 이 플러그인 일을 할 때 이어 써요. 비밀번호는 AI에게 가지 않아요.</p>${body}`);
 }
 
 /* 작업 화면 — 지금 내가 할 일 하나 → 판단 재료 → 단계 → 원문 */
@@ -4528,6 +4797,7 @@ function vPluginRun(id, rid){
   const chk = r.steps.find(z => z.output && Array.isArray(z.output.commits)), co = chk ? chk.output : null;
   const wt = r.steps.map(z => z.output || {}).find(o => o.path && o.branch) || {};
   const here = plIsRunner(), sent = PL.sent[r.id], key = (r.item.vars && r.item.vars.key) || '', vd = plVerdictOf(r);
+  const hand = !sent && r.status === 'input' && !!s.ask && s.ask.type === 'handoff';   // 브라우저 단계에서 AI가 사람에게 넘긴 일
   const btn = (act, label, cls = 'btn-ghost', extra = '') => `<button class="btn ${cls} btn-sm" type="button" data-pl="${act}" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" ${extra}>${label}</button>`;
   const cancel = ['done', 'canceled'].includes(r.status) ? '' : btn('cancel', '그만두기', 'btn-text');
   const restart = (cls = 'btn-ghost') => `<button class="btn ${cls} btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>`;
@@ -4535,7 +4805,7 @@ function vPluginRun(id, rid){
   if (!sent && r.gone && plMine(r)) card = ['bad', `${esc(key || r.item.title)}이 내 목록에서 빠졌어요`, '할당이 풀렸거나 지라에서 끝났을 수 있어요. 이어 해도 지라 상태를 바꾸기 전에 담당자와 상태를 다시 확인하고, 다르면 바꾸지 않아요.', `${btn('cancel', '그만두기', 'btn-primary')}`];
   else if (sent) card = ['wait', '답을 보냈어요', `${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요. 동기화에 몇 분 걸릴 수 있어요.`, ''];
   else if (r.status === 'queued') card = ['wait', '차례를 기다려요', esc(plRunLine(x, r)), cancel];
-  else if (r.status === 'running') card = ['wait', `${i}/${n} ${esc(s.name)} 하는 중이에요`, `${plMin(s.started || r.updated)}분째 · 브라우저를 닫아도 ${esc(plWho())}에서 계속해요`, cancel];
+  else if (r.status === 'running') card = ['wait', `${i}/${n} ${esc(s.name)} 하는 중이에요`, `${plMin(s.started || r.updated)}분째 · ${s.kind === 'browser' ? '이 창' : '브라우저'}을 닫아도 ${esc(plWho())}에서 계속해요`, cancel];
   else if (r.status === 'waiting') card = ['wait', s.reason === 'limit' ? 'AI 사용 한도로 기다려요' : s.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중이에요', s.until ? `${plTime(new Date(s.until).toISOString())}에 이어서 해요` : '풀리면 이어서 해요', cancel];
   else if (r.status === 'input' && s.ask && s.ask.type === 'gate') card = ['wait', `${i}/${n} ${esc(s.name)} 차례예요`, '자동 시작에서 이 단계는 하기 전에 내 확인을 받게 해 뒀어요. 확인하면 이 단계부터 이어서 해요.',
     `${btn('confirm', '이 단계 하기', 'btn-primary', 'data-msg="이어서 해요"')}${btn('skip', '건너뛰고 이어 하기')}${cancel}`];
@@ -4545,6 +4815,7 @@ function vPluginRun(id, rid){
      ${rep && rep.pr ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="copy" data-text="${esc(rep.pr)}" data-msg="PR 설명을 복사했어요">PR 설명 복사</button>` : ''}
      ${agent ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="redo" data-id="${id}" data-run="${r.id}" data-step="${esc(agent.key)}">AI에게 다시 시키기</button>` : ''}
      <span class="pl-quiet">${btn('confirm', '끝난 것으로 옮기기', 'btn-text')}${cancel}</span>`];
+  else if (hand) card = ['wait', `${i}/${n} ${esc(s.name)} — 내 차례예요`, 'AI가 브라우저에서 할 일을 넘겼어요. 끝내고 [다 했어요]를 누르면 AI가 이어서 해요.', cancel];   // 부탁한 일과 [다 했어요]는 브라우저 화면 바로 위에(하는 곳 옆, 주요 버튼은 한 곳에만)
   else if (r.status === 'input' && vd && s.ask && s.ask.inline) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), `${plChoices(id, r, s)}${cancel}`];
   else if (r.status === 'input' && vd && s.ask) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), ''];   // 판정을 먼저 보이고, 묻는 말은 아래 폼에서
   else if (r.status === 'input') card = ['wait', esc(s.ask.question || '답이 필요해요'), esc(s.ask.hint || ''), ''];
@@ -4553,11 +4824,11 @@ function vPluginRun(id, rid){
       `${btn('cancel', '그만두기', 'btn-primary')}${btn('skip', '지라는 두고 이어 하기')}`];
   }
   else if (r.status === 'stopped'){
-    const token = /토큰/.test(s.error || '');
+    const token = /토큰/.test(s.error || ''), ap = /준비와 설정에서 다시 승인/.test(s.error || '');
     card = ['bad', token ? '토큰을 다시 넣어 주세요' : `${i}단계 ${esc(s.name)}에서 멈췄어요`, esc(String(s.error || '').split('\n')[0]),
       // 앞 단계 결과가 빈 것(채우지 못한 값) — 이 단계만 다시 하면 또 멈춘다. 처음부터 다시가 먼저, 빈 값은 두고 이어 가는 길도 준다
       plUnfilled(s) ? `${restart('btn-primary')}${btn('lenient', '빈 값은 두고 이어 하기')}${btn('skip', '건너뛰기')}${cancel}`
-      : `${token ? (here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">토큰 넣기</a>` : `<span class="faint">${esc(plRunner() || '돌리는 컴퓨터')}에서 넣어 주세요</span>`) : btn('retry', '이 단계 다시 하기', 'btn-primary')}
+      : `${token ? (here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">토큰 넣기</a>` : `<span class="faint">${esc(plRunner() || '돌리는 컴퓨터')}에서 넣어 주세요</span>`) : ap && here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">준비와 설정 열기</a>${btn('retry', '이 단계 다시 하기')}` : btn('retry', '이 단계 다시 하기', 'btn-primary')}
        ${i > 1 ? restart() : ''}${btn('skip', '건너뛰고 이어 하기')}${cancel}`];
   }
   else if (r.status === 'done' && vd) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || '끝났어요'), esc(vd.v.text || ''), `<span class="pl-outcome">✓ ${esc((vd.step.output.outcome && vd.step.output.outcome.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>`];
@@ -4569,27 +4840,27 @@ function vPluginRun(id, rid){
   const chg = r.steps.find(z => z.status === 'done' && z.output && z.output.change && z.output.change.label), frk = r.steps.find(z => z.output && z.output.fork && z.output.fork.label);
   const busy = ['queued', 'running', 'waiting'].includes(r.status);
   const tools = sent || !(plIsRunner() || plRunner()) ? '' : [
-    chg && !busy ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="change" data-id="${id}" data-run="${r.id}" data-step="${esc(chg.key)}" data-value="${esc(chg.output.change.value ?? '')}" data-label="${esc(chg.output.change.label)}">${esc(chg.output.change.label)}</button>` : '',
+    chg && !busy && r.status !== 'done' ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="change" data-id="${id}" data-run="${r.id}" data-step="${esc(chg.key)}" data-value="${esc(chg.output.change.value ?? '')}" data-label="${esc(chg.output.change.label)}"${chg.output.change.note ? ` data-note="${esc(chg.output.change.note)}"` : ''}>${esc(chg.output.change.label)}</button>` : '',
     frk ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="fork" data-id="${id}" data-feed="${esc(r.feed)}" data-item="${esc(r.item.id)}" data-wf="${esc(r.workflow)}" data-step="${esc(frk.key)}" data-value="${esc(frk.output.fork.value ?? '')}" data-label="${esc(frk.output.fork.label)}">${esc(frk.output.fork.label)}</button>` : ''
   ].join('');
   // 답하는 폼(고르기·적기)
   let form = '';
-  if (!sent && r.status === 'input' && s.ask && !['confirm', 'gate'].includes(s.ask.type) && !s.ask.inline){
+  if (!sent && r.status === 'input' && s.ask && !['confirm', 'gate', 'handoff'].includes(s.ask.type) && !s.ask.inline){
     const a = s.ask, choices = a.choices || [], quick = !a.free && choices.length && choices.length <= 3;   // 고를 것이 셋 이하면 버튼 하나로 바로
     form = quick ? `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
       ${vd ? `<h2 class="pl-ask-q">${esc(a.question)}</h2>${a.hint ? `<p class="faint" style="white-space:pre-line;margin:0">${esc(a.hint)}</p>` : ''}` : ''}
-      <div class="pl-quick" role="group" aria-label="${esc(a.question)}">${choices.map((c, k) => `<button class="btn ${c.recommended || (!choices.some(x => x.recommended) && !k) ? 'btn-primary' : 'btn-ghost'}" type="submit" name="v" value="${esc(c.value)}">${esc(c.label)}</button>`).join('')}</div>
+      <div class="pl-quick" role="group" aria-label="${esc(a.question)}">${choices.map((c, k) => `<button class="btn ${c.recommended || (!choices.some(x => x.recommended) && !k) ? 'btn-primary' : 'btn-ghost'}" type="submit" name="v" value="${esc(c.value)}"${c.confirm ? ` data-confirm="${esc(c.confirm)}" data-label="${esc(c.label)}"` : ''}>${esc(c.label)}</button>`).join('')}</div>
       <div class="dlg-actions" style="justify-content:flex-start">${cancel}</div></form>`
     : `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
       ${vd ? `<h2 class="pl-ask-q">${esc(a.question)}</h2>${a.hint ? `<p class="faint" style="white-space:pre-line;margin:0 0 8px">${esc(a.hint)}</p>` : ''}` : ''}
-      ${choices.length ? `<fieldset class="choice"><legend class="sr-only">${esc(a.question)}</legend>${choices.map(c => `<label><input type="radio" name="v" value="${esc(c.value)}" ${c.recommended ? 'checked' : ''}><span><b>${esc(c.label)}${c.recommended ? ' (추천)' : ''}</b>${c.hint ? `<small>${esc(c.hint)}</small>` : ''}</span></label>`).join('')}</fieldset>` : ''}
+      ${choices.length ? `<fieldset class="choice"><legend class="sr-only">${esc(a.question)}</legend>${choices.map(c => `<label><input type="radio" name="v" value="${esc(c.value)}" ${c.recommended ? 'checked' : ''}${c.confirm ? ` data-confirm="${esc(c.confirm)}" data-label="${esc(c.label)}"` : ''}><span><b>${esc(c.label)}${c.recommended ? ' (추천)' : ''}</b>${c.hint ? `<small>${esc(c.hint)}</small>` : ''}</span></label>`).join('')}</fieldset>` : ''}
       ${a.free || !choices.length ? `<label class="field"><span>${choices.length ? '목록에 없으면 적어 주세요' : esc(a.question)}</span><textarea name="t" rows="${a.value ? 4 : 3}" placeholder="${esc(a.placeholder || '')}" aria-describedby="pl-ans-err">${esc(a.value || '')}</textarea></label>` : ''}
       <p class="err" id="pl-ans-err" hidden>${choices.length ? '하나를 골라 주세요' : '내용을 적어 주세요'}</p>
       <div class="dlg-actions" style="justify-content:flex-start"><button class="btn btn-primary" type="submit">${choices.length ? '이걸로 이어 하기' : '이 내용으로 이어 하기'}</button>${cancel}</div></form>`;
   }
   const steps = `<ol class="run-steps" aria-label="단계, ${n}개 중 ${i}번째 ${RUN_WORD[r.status] ? RUN_WORD[r.status][0] : ''}">${r.steps.map((z, k) => {
     const [sym, word] = { pending:['○', '대기'], running:['●', '하는 중'], waiting:['‖', '기다림'], input:['!', '내 차례'], failed:['!', '멈춤'], done:['✓', '완료'], skipped:['–', '건너뜀'] }[z.status] || ['○', '대기'];
-    const note = z.status === 'failed' ? String(z.error || '').split('\n')[0] : z.status === 'done' ? (z.output && (z.output.summary || z.output.how) ? z.output.summary || z.output.how : '') : z.status === 'running' ? `${plMin(z.started || r.updated)}분째` : z.status === 'input' ? (sent ? '답을 보냄' : z.ask && z.ask.type === 'gate' ? '내 확인을 기다려요' : z.ask && z.ask.type === 'confirm' ? '확인할 차례' : '답이 필요해요') : '';
+    const note = z.status === 'failed' ? String(z.error || '').split('\n')[0] : z.status === 'done' ? (z.output && (z.output.summary || z.output.how) ? z.output.summary || z.output.how : '') : z.status === 'running' ? `${plMin(z.started || r.updated)}분째` : z.status === 'input' ? (sent ? '답을 보냄' : z.ask && z.ask.type === 'gate' ? '내 확인을 기다려요' : z.ask && z.ask.type === 'confirm' ? '확인할 차례' : z.ask && z.ask.type === 'handoff' ? '브라우저에서 내가 할 일이 있어요' : '답이 필요해요') : '';
     return `<li class="rs-${z.status}" ${z === s && !['done', 'canceled'].includes(r.status) ? 'aria-current="step"' : ''}><span class="rs-sym" aria-hidden="true">${sym}</span><span><b>${k + 1} ${esc(z.name)}</b> <span class="sr-only">${word}</span>${note ? `<small>${esc(note)}</small>` : ''}${z.answer ? `<small>내 답: ${esc(z.answer_label || z.answer)}</small>` : ''}</span></li>`;
   }).join('')}</ol>`;
   const files = co && co.files && co.files.length ? section(`바뀐 파일 <span class="count">${co.files.length + (co.more_files || 0)}</span>`, plList(co.files.map(f => `<li><div class="row pl-file"><code>${esc(f.file)}</code><span class="num">+${f.add} −${f.del}</span></div></li>`), 15)) : '';
@@ -4599,7 +4870,8 @@ function vPluginRun(id, rid){
     <h1 tabindex="-1">${esc(r.item.title)}</h1>
     <div class="ai-state ${card[0]} pl-card" role="status"><b id="pl-card-h" tabindex="-1">${card[1]}</b>${card[2] ? `<span>${card[2]}</span>` : ''}${card[3] && card[3].trim() ? `<div class="pl-card-acts">${card[3]}</div>` : ''}</div>
     ${tools.trim() ? `<div class="pl-card-acts" style="margin:12px 0 0">${tools}</div>` : ''}
-    ${vd && vd.findings.length ? section(`짚은 곳 <span class="count">${vd.findings.length}</span>`, plFinds(vd.findings)) : ''}
+    ${pwOf(id, r) ? '<div id="pl-web-slot"></div>' : ''}
+    ${vd && vd.findings.length ? section(`짚은 곳 <span class="count">${vd.findings.length}</span>`, plFinds(vd.findings, id)) : ''}
     ${form}
     ${co && co.warnings && co.warnings.length ? `<ul class="pl-warn">${co.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
     ${rep && rep.summary ? section('AI 요약', plMd(rep.summary)) : ''}
@@ -4634,7 +4906,7 @@ function vPluginSetup(id){
     : kv('돌리는 컴퓨터', '아직 없어요', `<button class="btn ${here.ai ? 'btn-primary' : 'btn-ghost'} btn-sm" type="button" data-pl="runner-on" ${here.ai ? '' : 'disabled aria-describedby="pl-need-ai"'}>이 컴퓨터에서 돌리기</button>${here.ai ? '' : '<small id="pl-need-ai" class="faint">AI 연결이 먼저 필요해요</small>'}`);
   const apL = plApLabel(id);
   const apRow = !here.ai ? '' : !m.at ? kv(apL, '확인하는 중…') : m.error ? kv(apL, esc(m.error)) : m.approved ? kv(apL, '승인했어요')
-    : kv(apL, m.approved_before ? '설치 뒤 바뀐 파일이 있어 멈췄어요' : '아직 승인하지 않았어요', `<button class="btn btn-primary btn-sm" type="button" data-pl="approve" data-id="${id}">${m.approved_before ? '바뀐 내용 보고 승인하기' : '승인하기'}</button>`);
+    : kv(apL, m.browser_new ? '브라우저를 쓰는 권한이 새로 생겨 다시 승인해야 해요' : m.approved_before ? '설치 뒤 바뀐 파일이 있어 멈췄어요' : '아직 승인하지 않았어요', `<button class="btn btn-primary btn-sm" type="button" data-pl="approve" data-id="${id}">${m.approved_before ? '바뀐 내용 보고 승인하기' : '승인하기'}</button>`);
   const scripts = PL.scripts[id];
   if (!scripts && !PL.busy.startsWith('scripts:')){ PL.busy = `scripts:${id}`; papi(`/plugins/${id}/scripts`).then(r => { PL.scripts[id] = r.scripts; }).catch(() => { PL.scripts[id] = []; }).finally(() => { PL.busy = ''; plRepaint(); }); }
   const scriptList = scripts && scripts.length ? `<details class="more"><summary>실행할 스크립트 ${scripts.length}개 내용 보기</summary>${scripts.map(sc => `<details class="pl-script"><summary><code>${esc(sc.path)}</code> <span class="faint num">${esc((sc.sha256 || '').slice(0, 6))}</span></summary><pre tabindex="0">${esc(sc.text)}</pre></details>`).join('')}</details>` : '';
@@ -4663,7 +4935,7 @@ function vPluginSetup(id){
         ${x.feeds.length > 1 ? `<div class="pl-every-all"><label class="field"><span>모든 목록을 한 번에</span>${plEverySel(common, 'id="pl-ev-all"')}</label><button class="btn btn-ghost btn-sm" type="button" data-pl="every-all" data-id="${id}">모두 맞추기</button></div>` : ''}
         ${x.feeds.map(f => `<label class="field pl-every-row"><span>${esc(f.name)} <span class="hint">${esc(when(f))}${f.every !== f.every_default ? ` · 기본 ${plEvery(f.every_default)}` : ''}</span></span>${plEverySel(f.every, `data-feed="${esc(f.name)}" data-default="${f.every_default}"`)}</label>`).join('')}
         <div><button class="btn btn-ghost" type="submit">주기 저장하기</button></div><p class="faint">정해 둔 시간 밖에서는 자동으로 가져오지 않아요. [지금 가져오기]는 언제든 돼요.</p></form>`;
-  const autoWf = autoFeed && x.workflows.find(w => w.name === autoFeed.start), KIND = { script:'스크립트', ai:'AI', agent:'AI 에이전트' };
+  const autoWf = autoFeed && x.workflows.find(w => w.name === autoFeed.start), KIND = { script:'스크립트', ai:'AI', agent:'AI 에이전트', browser:'AI 브라우저' };
   const gatesBody = !autoWf || elsewhere ? '' : `<form data-pl-form="gates" data-id="${id}" data-wf="${esc(autoWf.name)}" novalidate class="pl-gates">
       <p class="faint">자동으로 시작한 작업에서 체크한 단계는 <b>하기 전에 내 차례로 멈춰요</b>. 나머지는 자동으로 해요. [시작하기]로 직접 시작한 작업은 멈추지 않아요.</p>
       <ol class="pl-gate-list">${autoWf.steps.map((s, k) => s.kind === 'manual'
@@ -4689,6 +4961,7 @@ function vPluginSetup(id){
     ${card}
     <section class="section"><h2>이 컴퓨터 · ${esc(here.host || '')}</h2><p class="faint" style="margin:-4px 0 12px">여기 값은 이 컴퓨터에만 있어요. 다른 컴퓨터에서 돌리려면 거기서 다시 넣어요.</p>
       <dl class="pl-kvs">${elsewhere ? runRow : plLocalOnly(id) && plNoScripts(id) && !plChat(id) ? kv('준비', '따로 준비할 것이 없어요') : aiRow + (plLocalOnly(id) ? '' : runRow) + apRow + chatRows + secretRows}</dl>${elsewhere ? '' : scriptList + secretForms}</section>
+    ${plLoginBox(id, true)}
     ${settings && !elsewhere ? `<section class="section"><h2>설정 · 이 컴퓨터</h2><form data-pl-form="settings" data-id="${id}" novalidate class="pl-settings">${settings}<div><button class="btn btn-ghost" type="submit">설정 저장하기</button></div></form></section>` : ''}
     ${autoFeed && !elsewhere ? section('자동 시작', `<p class="pl-auto">${esc(autoFeed.name)}에 새로 들어오면 자동 시작 · <b>${x.local.auto ? '켜짐' : '꺼짐'}</b> <button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${x.local.auto ? '' : '1'}" ${plIsRunner() ? '' : 'disabled'}>${x.local.auto ? '끄기' : '켜기'}</button></p>${plIsRunner() ? '' : '<p class="faint">이 컴퓨터에서 돌리기를 켠 뒤에 켤 수 있어요</p>'}${gatesBody}`) : ''}
     ${everyBody ? section('가져오는 주기', everyBody) : ''}
@@ -4736,7 +5009,8 @@ function vPluginAdd(){
       <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${(ins.checkins || []).map(c => `<li>체크인 「${esc(c.name)}」 — 주요 업무·과제를 한 화면에서 고치고, 제출 미리보기·점검${c.prompts && c.prompts.score ? '·점수' : ''}${c.card ? `, 단기 카드에 [${esc(c.card)}]` : ''}</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}${(ins.chats || []).map(c => `<li>${c.scope === 'card' ? `단기 카드마다 「${esc(c.label || c.name)}」 세션 — 이 컴퓨터의 작업 폴더에서, 카드끼리 동시에` : `오른쪽 아래 AI 챗봇 버튼 — 「${esc(c.name)}」, 이 프로필 데이터를 말로 고쳐요`}</li>`).join('')}</ul>
       <h3>쓰는 권한</h3><ul>
         ${mf.permissions.ai.includes('agent') ? `<li class="pl-danger"><b>AI가 파일을 고치고 명령을 실행해요</b> (에이전트 · 상한 ${esc(mf.permissions.agent_mode)})</li>` : mf.permissions.ai.includes('chat') ? '<li>AI와 대화만 해요</li>' : ''}
-        ${(mf.secrets || []).map(sv => `<li>비밀값 ${esc(sv.label)}(<code>${esc(sv.name)}</code>)을 써요</li>`).join('')}
+        ${mf.permissions.browser ? '<li class="pl-danger"><b>AI가 이 컴퓨터의 브라우저를 다뤄요</b> — pkm 전용 Chrome 프로필이라 거기서 한 로그인이 남아요. 로그인·결제 정보는 사람이 직접 넣어요</li>' : ''}
+        ${(mf.secrets || []).map(sv => `<li>비밀값 ${esc(sv.label)}(<code>${esc(sv.name)}</code>)을 써요${sv.plain ? ' — 계정 이름이라 화면에서 가리지 않아요' : ''}</li>`).join('')}
         ${ins.scripts.length ? `<li>이 컴퓨터에서 스크립트 ${ins.scripts.length}개를 실행해요</li>` : ''}
         ${mf.permissions.scripts.length ? `<li>이 컴퓨터에 등록해야 해요: ${esc(mf.permissions.scripts.join(', '))}</li>` : ''}</ul>
       ${ins.scripts.length ? `<details class="more"><summary>스크립트 내용 보기</summary>${ins.scripts.map(sc => `<details class="pl-script"><summary><code>${esc(sc.path)}</code> <span class="faint num">${esc((sc.sha256 || '').slice(0, 6))}</span></summary><pre tabindex="0">${esc(sc.text)}</pre></details>`).join('')}</details>` : ''}
@@ -4793,27 +5067,53 @@ function plCardsFeed(id, x, f){
   return section(`${esc(f.name)}${shown.length ? ` <span class="count">${shown.length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${err}${list}`);
 }
 /* 워크플로우를 여럿 고를 수 있는 목록(프로젝트마다 실행·멈추기·고치기 같은) — 항목은 늘 남고, 버튼이 워크플로우마다 하나씩 */
+/* 정렬 칩(피드의 sort: 이름=키, 이름=-키) — 항목의 sort 값으로 이 브라우저에서 바로 다시 정렬하고, 고른 것은 이 브라우저에 기억한다.
+   둘 다 숫자면 수로, 아니면 글자로(ISO 날짜). 빈 값은 방향과 상관없이 늘 맨 뒤, 같으면 스크립트 순서 */
+const plSortKey = (id, f) => `pkm:v1:pl-sort:${S.profile}:${id}:${f.name}`;
+function plSorted(id, f, items){
+  const opts = PKMPlugin.sortsOf(f.sort).filter(o => !o.bad);
+  if (!opts.length) return { items, chips:'' };
+  const want = LS.get(plSortKey(id, f), ''), cur = opts.find(o => o.label === want) || opts[0];
+  const val = it => { const v = it.sort && it.sort[cur.key]; return v == null || v === '' ? null : v; };
+  const cmp = (a, b) => typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b));
+  const out = items.map((it, i) => [it, i, val(it)])
+    .sort((p, q) => (p[2] == null) - (q[2] == null) || (p[2] == null ? 0 : (cur.desc ? -1 : 1) * cmp(p[2], q[2])) || p[1] - q[1]).map(z => z[0]);
+  const chips = items.length < 2 ? '' : `<fieldset class="chips pl-sort"><legend class="sr-only">${esc(f.name)} 정렬</legend>${opts.map(o =>
+    `<label class="chip"><input type="radio" name="pl-sort-${esc(id)}-${esc(f.name)}" value="${esc(o.label)}" data-pl-sort="${esc(plSortKey(id, f))}" ${o === cur ? 'checked' : ''}><span>${esc(o.label)}</span></label>`).join('')}</fieldset>`;
+  return { items:out, chips };
+}
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (!t.matches || !t.matches('input[data-pl-sort]')) return;
+  LS.set(t.dataset.plSort, t.value); render();
+  const el = document.querySelector(`input[name="${CSS.escape(t.name)}"]:checked`); if (el) el.focus();
+});
 function plMultiFeed(id, x, f){
   const fs_ = x.state.feeds[f.name] || {}, items = fs_.items || [], runs = (x.state.runs || []).filter(r => r.feed === f.name);
   const err = fs_.ok === false ? plFeedError(id, fs_) : '';
   const live = (it, w) => runs.some(r => r.item.id === it.id && r.workflow === w && !['done', 'canceled'].includes(r.status));
-  const shown = items.filter(it => !plTrackHidden(id, f, it));
+  const { items:shown, chips } = plSorted(id, f, items.filter(it => !plTrackHidden(id, f, it)));
   const row = it => {
-    const tk = plTrackOf(id, x, f, it), locked = tk && plTrackBusy(tk), leaving = tk && tk.fb.phase === 'done' && plDoneLeaves(f);
+    // 이 브라우저에서 누르지 않은 실행(자동 시작·다른 기기)도 아직 안 끝났으면 그 줄에 진행을 보인다 — 내 확인이 필요하면 그 자리에서 [확인하기]
+    const open = runs.find(r => r.item.id === it.id && !['done', 'canceled'].includes(r.status));
+    const tk = plTrackOf(id, x, f, it) || (open ? { t:{ n:`r${String(open.id).replace(/[^\w-]/g, '')}` }, run:open, fb:PKMPlugin.runFeedback(open) } : null), locked = tk && plTrackBusy(tk), leaving = tk && tk.fb.phase === 'done' && plDoneLeaves(f);
     const ttl = plUrl(it.url) ? `<a class="title" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${esc(it.title)} <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<span class="title">${esc(it.title)}</span>`;
-    const btns = f.starts.map((w, i) => `<button class="btn ${i ? 'btn-text' : 'btn-tonal'} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-wf="${esc(w)}" data-title="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(w)}" ${locked || live(it, w) || PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(w)}${live(it, w) ? ' 중' : ''}</button>`).join('');
+    const ask = tk && tk.fb.phase === 'input';   // 내 확인을 기다리는 워크플로우는 [확인하기]가 대신한다 — 잠긴 버튼을 겹쳐 두지 않는다
+    const btns = f.starts.map((w, i) => ask && live(it, w) ? '' : `<button class="btn ${i ? 'btn-text' : 'btn-tonal'} btn-sm" type="button" data-pl="start" data-id="${id}" data-feed="${esc(f.name)}" data-item="${esc(it.id)}" data-wf="${esc(w)}" data-title="${esc(it.title)}" aria-label="${esc(it.title)} ${esc(w)}" ${locked || live(it, w) || PL.sent[`item:${it.id}`] ? 'disabled' : ''}>${esc(w)}${live(it, w) ? ' 중' : ''}</button>`).join('');
     // 항목에 붙은 내용(예: 볼 파일)은 제목과 버튼 사이에 — 보고 나서 누르게
     const see = (it.detail || []).map((d, k) => { const key = `pl-see-${id}-${it.id}-${k}`;   // 목록을 다시 가져와도 펼친 칸은 그대로
       const mdText = d.kind === 'file' && /\.md$/i.test(d.who) && d.text.replace(/^#{1,6}\s+(.+)$/gm, '**$1**');   // 목록 항목 안이라 파일의 제목은 강조 글자로
       return `<div class="pl-see">${d.who ? `<p class="pl-see-path">${esc(d.who)}</p>` : ''}${mdText ? plMd(mdText, 300, key, it.title) : plText(d.text, 300, key, it.title)}</div>`; }).join('');
-    return `<li data-pl-row="${esc(plTrackKey(id, f.name, it.id))}"><div class="row pl-multi-row"><span class="body">${ttl}${(it.tags || []).map(t => plBadge(t, 'ok')).join('')}<span class="meta">${(it.meta || []).slice(0, 4).map(mm => `<span>${esc(mm)}</span>`).join('')}</span></span>${see}${tk ? plTrackLine(id, f, it, tk) : ''}${leaving ? '' : `<span class="pl-btns">${btns}</span>`}</div></li>`;
+    return `<li data-pl-row="${esc(plTrackKey(id, f.name, it.id))}"><div class="row pl-multi-row"><span class="body">${ttl}${(it.tags || []).map(t => plBadge(t, 'ok')).join(' ')}<span class="meta">${(it.meta || []).slice(0, 4).map(mm => `<span>${esc(mm)}</span>`).join('')}</span></span>${see}${tk ? plTrackLine(id, f, it, tk) : ''}${leaving ? '' : `<span class="pl-btns">${btns}</span>`}</div></li>`;
   };
-  const mineR = runs.filter(plMine), going = runs.filter(r => ['queued', 'running', 'waiting'].includes(r.status) || (PL.sent[r.id] && ['input', 'stopped'].includes(r.status)));
+  // 목록에 있는 항목의 실행은 그 줄에 보이므로 '내 차례'·'진행 중'에 다시 올리지 않는다(목록에서 빠진 항목의 실행만)
+  const listed = new Set(items.map(it => it.id)), apart = r => !listed.has(r.item.id);
+  const mineR = runs.filter(r => plMine(r) && apart(r)), going = runs.filter(r => apart(r) && (['queued', 'running', 'waiting'].includes(r.status) || (PL.sent[r.id] && ['input', 'stopped'].includes(r.status))));
   const ended = runs.filter(r => ['done', 'canceled'].includes(r.status) && Date.now() - Date.parse(r.updated) < 14 * 86400000);
   return `${err}
     ${mineR.length ? section(`내 차례 <span class="count">${mineR.length}</span>`, plList(mineR.map(r => plRunRow(id, x, r)))) : ''}
     ${going.length ? section(`진행 중 <span class="count">${going.length}</span>`, plList(going.map(r => plRunRow(id, x, r)))) : ''}
-    ${section(`${esc(f.name)}${shown.length ? ` <span class="count">${shown.length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${shown.length ? plList(shown.map(row)) : items.length ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p>` : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p><a class="btn btn-tonal btn-sm" href="#/plugins/${id}/setup">설정 열기</a>` : ''}`)}
+    ${section(`${esc(f.name)}${shown.length ? ` <span class="count">${shown.length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${chips}${shown.length ? plList(shown.map(row)) : items.length ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p>` : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p><a class="btn btn-tonal btn-sm" href="#/plugins/${id}/setup">설정 열기</a>` : ''}`)}
     ${ended.length ? `<details class="more" data-key="pl-ended-${id}-${esc(f.name)}"><summary>끝난 작업 ${ended.length}</summary>${plList(ended.map(r => plRunRow(id, x, r)))}</details>` : ''}`;
 }
 async function plAct(id, a, okMsg){
@@ -4876,7 +5176,7 @@ document.addEventListener('click', async e => {
       const a = { type:'start', feed:b.dataset.feed, item:b.dataset.item, ...(b.dataset.wf ? { workflow:b.dataset.wf } : {}) }, ttl = b.dataset.title || b.dataset.label || b.dataset.item;
       const wf = b.dataset.wf && (PL.st.plugins[id].workflows || []).find(w => w.name === b.dataset.wf), first = wf && wf.steps[0], inRow = !!b.closest('.pl-multi-row, .pl-ccard');
       if (first && first.kind === 'ask'){   // 첫 단계가 묻는 단계면 누르는 자리에서 바로 묻는다
-        const ai = wf.steps.some(s => ['ai', 'agent'].includes(s.kind)), note = wf.note;   // 워크플로우 설명 줄이 먼저
+        const ai = wf.steps.some(s => ['ai', 'agent', 'browser'].includes(s.kind)), note = wf.note;   // 워크플로우 설명 줄이 먼저
         plAsk({ title:`${ttl} — ${first.name}`, body:note ? `<p class="faint">${esc(note)}</p>` : ai ? '<p class="faint">AI가 고친 뒤 커밋하지 않고 둬요. 바뀐 것은 내가 확인해요.</p>' : '', ok:wf.ok || (ai ? 'AI에게 맡기기' : '시작하기'), field:{ label:'적을 것', placeholder:first.placeholder || '' } },
           v => { if (!v.trim()) return false; inRow ? plStart(id, { ...a, answer:v.trim() }, ttl) : plAct(id, { ...a, answer:v.trim() }, `${ttl} · ${wf.name} 시작했어요`); });
         break;
@@ -4890,6 +5190,9 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'confirm': plAct(id, { type:'confirm', run, step }, b.dataset.msg || '끝난 것으로 옮겼어요'); break;
+    case 'hand': b.disabled = true; plAct(id, { type:'answer', run, step, value:b.dataset.value }, b.dataset.value === 'done' ? 'AI가 이어서 해요' : 'AI에게 못 했다고 알렸어요'); break;   // 브라우저에서 넘겨받은 일
+    case 'login': pwLogin(id, b.dataset.url, b.dataset.name); break;
+    case 'web-check': pwState(id, true); break;
     case 'reveal': { const k = b.dataset.key; PL.reveal[k] = ++PL.revealN; render(); focusEl($(`#pla-${PL.reveal[k]}`)); break; }   // 카드 안에서 정답을 펼친다
     case 'retry': { const line = b.closest('.pl-track'); await plAct(id, { type:'retry', run, step }, line ? '' : '이 단계를 다시 해요'); if (line) focusEl($(`#${line.id}`)); break; }   // 상태 줄의 다시 하기 — 새 상태 줄로
     case 'skip': plAct(id, { type:'skip', run, step }, '건너뛰고 이어서 해요'); break;
@@ -4898,7 +5201,7 @@ document.addEventListener('click', async e => {
     case 'lenient': plAct(id, { type:'retry', run, step, lenient:true }, '빈 값은 두고 이 단계를 다시 해요'); break;
     case 'unstart': plAsk({ title:'시작 전으로 되돌릴까요?', body:'<p>이 실행 기록을 지우고 목록의 \'시작 전\'으로 돌려요. 만든 브랜치·작업 폴더·커밋은 그대로 남아요.</p>', ok:'되돌리기' },
       async () => { await plAct(id, { type:'dismiss', run }, '시작 전으로 되돌렸어요'); go(`#/plugins/${id}`); }); break;
-    case 'change': plAsk({ title:`${b.dataset.label}`, body:'<p>이 단계부터 다시 해요. 뒤 단계도 새로 하고, 이미 만든 브랜치·작업 폴더·커밋은 그대로 남아요.</p>', ok:b.dataset.label },
+    case 'change': plAsk({ title:`${b.dataset.label}`, body:`<p>${b.dataset.note ? esc(b.dataset.note) : '이 단계부터 다시 해요. 뒤 단계도 새로 하고, 이미 만든 브랜치·작업 폴더·커밋은 그대로 남아요.'}</p>`, ok:b.dataset.label },
       () => plAct(id, { type:'retry', run, step, value:b.dataset.value }, `${b.dataset.label} — 다시 골라 주세요`)); break;
     case 'fork': plAsk({ title:`${b.dataset.label}`, body:'<p>같은 항목으로 작업을 하나 더 만들어요. 지금 작업은 그대로 두고, 새 작업은 따로 진행해요.</p>', ok:b.dataset.label },
       () => plAct(id, { type:'start', feed:b.dataset.feed, item:b.dataset.item, workflow:b.dataset.wf, fork:{ step, value:b.dataset.value } }, `${b.dataset.label}을 시작했어요`)); break;
@@ -4919,11 +5222,12 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'copy': plCopy(b.dataset.text, b.dataset.msg || '복사했어요', !!b.dataset.rich); break;
+    case 'view-file': plViewFile(id, b.dataset.name, b.dataset.title); break;
     case 'use-ai': { const c = PKMAI.conn(); if (!c){ toast('이 브라우저에 AI 연결이 없어요'); break; } if (await plRunnerSet(null, { url:c.url, token:c.token })) toast('이 컴퓨터의 AI 연결을 넣었어요'); break; }
     case 'runner-on': if (await plRunnerSet(true)) toast(`이 컴퓨터에서 돌려요`); break;
     case 'runner-off': plAsk({ title:'이 컴퓨터에서 그만 돌릴까요?', body:'<p>목록 가져오기와 자동 시작을 멈춰요. 하던 작업은 멈춘 자리에 남아요. 다시 켜면 이어서 해요.</p>', ok:'멈추기' }, () => plRunnerSet(false).then(ok => ok && toast('이 컴퓨터에서 돌리기를 멈췄어요'))); break;
     case 'runner-move': plAsk({ title:'이 컴퓨터에서 돌릴까요?', body:`<p>지금은 ${esc(plRunner())}에서 돌리고 있어요. 옮기면 ${esc(plRunner())}는 다음 동기화 때 가져오기와 자동 시작을 멈춰요.</p><p class="faint">이 컴퓨터에서도 GitHub·Jira에 닿아야 하고, 토큰과 설정을 여기에 다시 넣어야 해요.</p>`, ok:'이 컴퓨터로 옮기기' }, () => plRunnerSet(true).then(ok => ok && toast('이 컴퓨터로 옮겼어요'))); break;
-    case 'approve': try { await papi(`/plugins/${id}/approve`, {}); await plMachine(id, true); toast('이 컴퓨터에서 승인했어요'); } catch (er) { toast(er.message); } break;
+    case 'approve': try { await papi(`/plugins/${id}/approve`, {}); delete PL.web[id]; await plMachine(id, true); toast('이 컴퓨터에서 승인했어요'); } catch (er) { toast(er.message); } break;
     case 'secret-edit': PL.busy = `secret-edit:${b.dataset.name}`; render(); focusEl($(`#pl-sec-${b.dataset.name}`)); break;
     case 'secret-del': plAsk({ title:`${b.dataset.label}을 지울까요?`, body:'<p>이 값을 쓰는 목록과 작업이 다시 넣을 때까지 멈춰요. 지운 값은 되살릴 수 없어서, 다시 넣으려면 토큰을 새로 붙여 넣어야 해요.</p>', ok:'토큰 지우기', danger:true },
       async () => { try { await papi(`/plugins/${id}/secret`, { name:b.dataset.name, value:null }); await plMachine(id, true); toast(`${b.dataset.label}을 지웠어요`); } catch (er) { toast(er.message); } }); break;
@@ -4990,7 +5294,10 @@ document.addEventListener('submit', async e => {
   if (kind === 'answer'){
     const v = (e.submitter && e.submitter.name === 'v' && e.submitter.value) || (f.t && f.t.value.trim()) || (f.querySelector('input[name="v"]:checked') || {}).value || '';
     if (!v){ $('#pl-ans-err').hidden = false; focusEl(f.t || f.querySelector('input')); return; }
-    plAct(id, { type:'answer', run:f.dataset.run, step:f.dataset.step, value:v });
+    // 선택지에 confirm 말이 있으면(되돌릴 수 없는 일, 예: 메일 보내기) 한 번 더 묻는다 — 목록 줄의 선택지 버튼과 같게
+    const picked = (e.submitter && e.submitter.name === 'v' && e.submitter) || f.querySelector('input[name="v"]:checked'), say = picked && picked.value === v && picked.dataset.confirm;
+    const send = () => plAct(id, { type:'answer', run:f.dataset.run, step:f.dataset.step, value:v });
+    if (say) plAsk({ title:picked.dataset.label, body:`<p>${esc(say)}</p>`, ok:picked.dataset.label }, send); else send();
   } else if (kind === 'secret'){
     const v = f.v.value.trim(), err = f.querySelector('.err');
     if (!v){ err.hidden = false; f.v.setAttribute('aria-invalid', 'true'); f.v.focus(); return; }
@@ -5282,6 +5589,13 @@ function chPickHtml(r){
 // 확인 요청 한 장 — 무엇을 하려는지 보이고 허락·거절. AskUserQuestion은 고르는 칸으로
 function chAsk(room, q){
   const inp = q.input || {}, what = inp.command || inp.file_path || inp.path || inp.url || '';
+  if (q.tool === 'BrowserHandoff'){   // 에이전트가 사람에게 넘긴 브라우저 일 — 위 브라우저 화면에서 하고 [다 했어요]
+    // 브라우저 화면이 열려 있으면 [다 했어요]는 화면 바로 위(webView의 띠)에만 — 하는 곳 옆에 두고, 주요 버튼은 한 곳에만
+    const mac = !chCoarse() && !(CWV.W.info && CWV.W.info.headless) ? ' 이 맥에 뜬 Chrome 창에서 해도 돼요.' : '';
+    return `<div class="ch-ask" role="group" aria-label="브라우저에서 해 주세요"><b>브라우저에서 해 주세요</b><span>${esc(inp.message || q.description || '브라우저에서 할 일이 있어요')}</span>
+      <span class="faint">${cwWant() ? '위 브라우저 화면에서 직접 하고, 끝나면 화면 위의 [다 했어요]를 눌러 주세요.' : '브라우저 화면을 열어 직접 해 주세요.'} 거기 적은 글은 AI에게 보내지 않아요.${mac}</span>
+      ${cwWant() ? '' : `<div class="acts"><button class="btn btn-text btn-sm" type="button" data-ch="web">브라우저 보기</button><button class="btn btn-ghost btn-sm" type="button" data-ch="deny" data-room="${esc(room)}" data-req="${esc(q.id)}">못 했어요</button><button class="btn btn-primary btn-sm" type="button" data-ch="allow" data-room="${esc(room)}" data-req="${esc(q.id)}">다 했어요 — 이어서 하기</button></div>`}</div>`;
+  }
   if (q.tool === 'AskUserQuestion' && Array.isArray(inp.questions)){
     return `<form class="ch-ask" data-ch-form="askq" data-room="${esc(room)}" data-req="${esc(q.id)}" novalidate><b>AI가 물어봐요</b>
       ${inp.questions.map((x, i) => `<fieldset><legend>${esc(x.question || '')}</legend>${(x.options || []).map(o => `<label class="check"><input type="${x.multiSelect ? 'checkbox' : 'radio'}" name="q${i}" value="${esc(o.label)}"><span>${esc(o.label)}${o.description ? ` <span class="faint">${esc(o.description)}</span>` : ''}</span></label>`).join('')}</fieldset>`).join('')}
@@ -5397,6 +5711,7 @@ function chPaint(force){
   const otherHtml = other.length ? `<span class="ch-st wait" style="width:100%">다른 대화에서 답을 기다려요 ${other.length}개 <button class="btn btn-text btn-sm" type="button" data-ch="goto" data-room="${esc(other[0].id)}">보기</button></span>` : '';
   const toolHtml = otherHtml + (CH.pick ? ''
     : `<span class="faint" title="${esc(r && r.cwd ? r.cwd : '')}">${CH.room === 'data' ? `${esc(S.profile)} 프로필 데이터` : r && r.cwd ? `작업 폴더 ${esc(chTail(r.cwd))}` : '작업 폴더 없음'}</span>
+      ${cwAvail() ? `<button class="btn btn-text btn-sm" type="button" data-ch="web" aria-controls="chat-web" aria-expanded="${cwWant()}">${cwWant() ? '브라우저 숨기기' : '브라우저 보기'}</button>` : ''}
       ${card ? `<button class="btn btn-text btn-sm" type="button" data-ch="pick" ${busy ? 'disabled title="하는 중에는 바꿀 수 없어요"' : ''}>${r && r.cwd ? '폴더 바꾸기' : '작업 폴더 고르기'}</button>` : ''}
       ${card ? (sum.kind === 'project' ? '<a class="btn btn-text btn-sm" href="#/action/short">단기 보드 보기</a>' : `<a class="btn btn-text btn-sm" href="#/action/short/${esc(card.id)}">카드 보기</a>`) : ''}
       ${r && r.turns.length && !chPend(r) ? `<button class="btn btn-text btn-sm" type="button" data-ch="view">${CH.view === 'sum' ? '대화 보기' : '요약 보기'}</button>` : ''}
@@ -5407,6 +5722,7 @@ function chPaint(force){
   $('#chat-hint').hidden = chCoarse();
   if (tools.dataset.sig !== toolHtml){ tools.innerHTML = toolHtml; tools.dataset.sig = toolHtml; }
   chMemoPaint(sum);
+  cwPaint();
   $('#chat-stop').hidden = !busy;
   $('#chat-form').hidden = !!CH.pick;
   const log = $('#chat-log');
@@ -5429,7 +5745,7 @@ function chPaint(force){
 /* 메모 — 방마다 마지막으로 하려던 일을 적어 둔다(돌아오면 첫 동작). AI에게는 보내지 않는다 */
 function chMemoPaint(sum){
   const box = $('#chat-memo'), m = sum && sum.memo;
-  const show = chOn() && !CH.pick;
+  const show = chOn() && !CH.pick && !cwWant();   // 브라우저를 보는 동안은 메모 줄을 접어 화면·대화에 자리를 준다
   box.hidden = !show; if (!show) return;
   if (CH.memoEdit === CH.room){
     if (box.dataset.sig === 'edit:' + CH.room) return;   // 쓰는 중에는 다시 그리지 않는다
@@ -5488,6 +5804,185 @@ async function chSend(){
   } catch (e) { CH.err = e.message; chPaint(true); }
   finally { CH.sending = false; }
 }
+/* 브라우저 보기 — pkm-ai-server의 탭 하나(Chrome)를 실시간으로 보고 누르고 적는다. 적은 글은 AI에게 가지 않는다.
+   채팅 창(방마다 탭 — server/chats.js browser)과 플러그인(작업 화면·로그인 창 — server/runner.js browser)이 같이 쓴다. 쓰는 곳이 o로 주는 것:
+   key() 지금 볼 탭 · want() 보일 때인가 · api(key, sub, body) · frameUrl(key) · block() 못 쓰는 이유({ note } 화면 위 한 줄 | { empty } 화면 자리에, stop이면 묻지도 않는다)
+   · hand() AI가 넘긴 일({ message, sub, acts }) · watch() AI가 하는 중이라 보기만 할 때인가(사람이 [직접 하기]를 눌러야 누르고 적는다) · idle 아직 열지 않은 탭의 안내 */
+function webView(box, pre, o){
+  box.innerHTML = `<div class="cw-ask" role="group" aria-label="AI가 부탁한 일" hidden></div>
+    <div class="cw-bar">
+      <form class="cw-addr" data-wv-form="go" novalidate><label class="sr-only" for="${pre}-url">주소</label><input class="cw-url" id="${pre}-url" name="url" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="열 주소"><button class="btn btn-ghost btn-sm" type="submit">열기</button></form>
+      <button class="btn btn-text btn-sm" type="button" data-wv="big" aria-pressed="false">크게 보기</button>
+    </div>
+    <p class="cw-note" role="status" hidden></p>
+    <div class="cw-frame" id="${pre}-frame" tabindex="0" role="application" aria-roledescription="브라우저 화면">
+      <img class="cw-img" alt="" draggable="false" hidden>
+      <div class="cw-empty"></div>
+    </div>
+    <form class="cw-type" data-wv-form="type" novalidate><label class="sr-only cw-in-l" for="${pre}-in">고른 칸에 넣을 글</label><input class="cw-in" id="${pre}-in" name="text" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="화면에서 칸을 누른 뒤 여기에 적어요"><button class="btn btn-ghost btn-sm" type="submit">넣기</button></form>
+    <div class="cw-keys" role="group" aria-label="브라우저에서 누를 키">
+      <button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Enter">Enter</button><button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Tab" aria-label="Tab — 다음 칸으로">Tab</button><button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Backspace" aria-label="한 글자 지우기">지우기</button><button class="btn btn-text btn-sm" type="button" data-wv="scroll" data-dy="-500">위로</button><button class="btn btn-text btn-sm" type="button" data-wv="scroll" data-dy="500">아래로</button><button class="btn btn-text btn-sm" type="button" data-wv="act" data-type="back">뒤로</button><button class="btn btn-text btn-sm" type="button" data-wv="act" data-type="reload">새로고침</button>
+    </div>`;
+  const q = sel => box.querySelector(sel), frame = q('.cw-frame'), img = q('.cw-img'), inp = q('.cw-in');
+  const W = { key:null, big:false, timer:null, info:null, infoAt:0, loaded:false, err:'', act:'', fails:0, focus:null, ticking:false, touch:false, wheel:0, dy:0 };
+  const seeing = () => !!o.watch && o.watch() && !o.hand() && !W.touch;
+  const offline = e => e instanceof TypeError ? 'pkm 서버에 닿지 않아요. 연결을 확인하고 다시 해 주세요' : e.message;
+  const again = () => { clearTimeout(W.timer); W.timer = null; tick(); };
+  function paint(){
+    const want = o.want(), key = want ? o.key() : W.key;
+    if (W.key !== key){ Object.assign(W, { key, info:null, infoAt:0, loaded:false, err:'', act:'', fails:0, focus:null, touch:false }); img.hidden = true; img.removeAttribute('src'); focusPaint(); }
+    box.hidden = !want;
+    if (!want){ clearTimeout(W.timer); W.timer = null; return; }
+    show();
+    if (!W.timer && !W.ticking) tick();
+  }
+  // 같은 출처 주소로 미리 받아 두고 바꿔 끼운다(깜빡이지 않게). 못 받으면 그때만 이유를 다시 묻는다
+  function frameLoad(key){
+    return new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => { if (key === o.key()){ img.src = im.src; img.hidden = false; W.loaded = true; } res(); };
+      im.onerror = async () => { let m = ''; try { m = (await (await fetch(o.frameUrl(key))).json()).error; } catch {} rej(new Error(m || '화면을 받지 못했어요')); };
+      im.src = o.frameUrl(key);
+    });
+  }
+  async function tick(){
+    clearTimeout(W.timer); W.timer = null;
+    if (!o.want() || document.visibilityState !== 'visible' || W.ticking) return;
+    W.ticking = true;
+    const key = o.key(), cur = () => key === o.key(), set = i => { if (cur()){ W.info = i; W.infoAt = Date.now(); } };
+    try {
+      if (!(o.block() || {}).stop){
+        if (!W.info || Date.now() - W.infoAt > 2500) set(await o.api(key, ''));
+        // 휴대폰에서 보면 그 탭을 휴대폰 폭으로, 넓은 화면에서 보면 원래 폭으로 — 사이트가 보는 기기에 맞는 배치로 뜬다. AI가 하는 중에 보기만 할 때는 바꾸지 않는다
+        const narrow = innerWidth < 600;
+        if (cur() && W.info && W.info.open && !!W.info.mobile !== narrow && !seeing()) set(await o.api(key, '/input', { type:'viewport', mobile:narrow }));
+        if (cur() && W.info && W.info.open) await frameLoad(key);
+      }
+      if (cur()){ W.err = ''; W.fails = 0; }
+    } catch (e) {   // 페이지를 옮기는 순간에는 잠깐 실패한다 — 연달아 실패할 때만 알린다
+      if (cur() && ++W.fails >= 3) W.err = e instanceof TypeError ? 'pkm 서버에 닿지 않아요' : e.message;
+    }
+    finally { W.ticking = false; }
+    if (!cur() || !o.want()) return paint();
+    show();
+    W.timer = setTimeout(tick, W.err ? 4000 : W.fails ? 1000 : W.info && W.info.open ? 700 : 3000);
+  }
+  function show(){
+    const i = W.info, b = o.block() || {}, h = o.hand(), see = seeing(), note = q('.cw-note'), empty = q('.cw-empty'), url = q('.cw-url'), ask = q('.cw-ask');
+    const ah = h ? `<div class="m"><b>AI가 부탁해요 — ${esc(h.message)}</b><span>${esc(h.sub)}</span></div><div class="acts">${h.acts}</div>` : '';
+    if (ask.dataset.sig !== ah){ ask.innerHTML = ah; ask.hidden = !ah; ask.dataset.sig = ah; }
+    if (i && document.activeElement !== url) url.value = i.url && i.url !== 'about:blank' ? i.url : '';
+    let n = '', cls = '';
+    if (b.note){ n = b.note; cls = 'wait'; }
+    else if (i && i.dialog){ n = `페이지가 물어봐요 — ${esc(i.dialog.message)} <button class="btn btn-ghost btn-sm" type="button" data-wv="dialog" data-accept="1">확인</button><button class="btn btn-text btn-sm" type="button" data-wv="dialog" data-accept="0">취소</button>`; cls = 'wait'; }
+    else if (W.act){ n = esc(W.act); cls = 'bad'; }
+    else if (W.err && W.loaded){ n = `화면을 받아 오지 못했어요 — ${esc(W.err)} <button class="btn btn-text btn-sm" type="button" data-wv="retry">다시 받기</button>`; cls = 'bad'; }
+    else if (i && i.popup) n = '새로 뜬 로그인 창을 보고 있어요. 그 창이 닫히면 원래 화면으로 돌아와요.';
+    else if (o.watch && o.watch() && !h && !b.empty) n = W.touch ? 'AI가 하고 있어요. 지금 누르거나 적으면 AI가 하는 일과 섞일 수 있어요. <button class="btn btn-text btn-sm" type="button" data-wv="touch">보기만 하기</button>'
+      : 'AI가 하고 있어요. 지켜보기만 해도 돼요. <button class="btn btn-text btn-sm" type="button" data-wv="touch">직접 하기</button>';
+    if (note.dataset.sig !== cls + n){ note.innerHTML = n; note.className = `cw-note ${cls}`; note.hidden = !n; note.dataset.sig = cls + n; }
+    let e = '';
+    if (b.empty){ e = b.empty; img.hidden = true; W.loaded = false; }
+    else if (W.err && !W.loaded) e = `<span>화면을 받아 오지 못했어요 — ${esc(W.err)}</span><button class="btn btn-ghost btn-sm" type="button" data-wv="retry">다시 받기</button>`;
+    else if (!i) e = '<span>브라우저를 확인하는 중이에요</span>';
+    else if (!i.open) e = i.chrome === null ? '<span>이 맥에서 Chrome을 찾지 못했어요. Chrome을 설치한 뒤 다시 열어 주세요</span><button class="btn btn-ghost btn-sm" type="button" data-wv="open">브라우저 열기</button>'
+      : see ? '<span>AI가 브라우저를 여는 중이에요</span>' : `<span>${esc(o.idle)}</span><button class="btn btn-ghost btn-sm" type="button" data-wv="open">브라우저 열기</button>`;
+    else if (!W.loaded) e = '<span>화면을 불러오는 중이에요</span>';
+    if (empty.dataset.sig !== e){ empty.innerHTML = e; empty.hidden = !e; empty.dataset.sig = e; }
+    const open = !!(i && i.open);   // 탭이 열리기 전에는 누를 게 없다
+    frame.classList.toggle('stale', !!W.err && W.loaded);
+    frame.classList.toggle('big', W.big && !(i && i.mobile));
+    frame.classList.toggle('mob', !!(i && i.mobile));
+    frame.classList.toggle('off', !!b.empty);
+    frame.setAttribute('aria-label', see ? '브라우저 화면 — AI가 하는 일을 보여 줘요' : '브라우저 화면 — 누른 자리를 브라우저에서 눌러요. 글은 아래 입력 줄에 적어 넣어요');
+    img.alt = open && i.title ? `${i.title} 화면` : '';
+    box.classList.toggle('watch', see);
+    q('.cw-type').hidden = !open || see; q('.cw-keys').hidden = !open || see; q('.cw-addr button').hidden = see; url.readOnly = see;
+    const bb = q('[data-wv="big"]'); bb.hidden = !open || !!i.mobile; bb.setAttribute('aria-pressed', String(W.big)); bb.textContent = W.big ? '맞춰 보기' : '크게 보기';   // 휴대폰 폭이면 이미 폭에 맞춰 보인다
+  }
+  // 지금 고른 칸 — 비밀번호 칸이면 입력 줄을 가려서 받는다
+  function focusPaint(){
+    const f = W.focus || {};
+    inp.type = f.password ? 'password' : 'text';
+    inp.placeholder = f.password ? '비밀번호 — AI에게 보내지 않아요' : f.editable ? `${f.name ? `「${f.name}」 칸에` : '고른 칸에'} 넣을 글` : '화면에서 칸을 누른 뒤 여기에 적어요';
+    q('.cw-in-l').textContent = f.password ? '고른 비밀번호 칸에 넣을 글' : '고른 칸에 넣을 글';
+  }
+  async function input(body){
+    const key = o.key();
+    try {
+      const r = await o.api(key, '/input', body);
+      if (key !== o.key()) return null;
+      W.info = r; W.infoAt = Date.now(); W.focus = r.focus || null; W.act = ''; focusPaint();
+    } catch (e) { W.act = offline(e); }
+    show(); again();
+    return W.focus;
+  }
+  async function open(url){
+    const key = o.key();
+    try { const r = await o.api(key, '/open', url ? { url } : {}); if (key === o.key()){ W.info = r; W.infoAt = Date.now(); W.act = ''; } }
+    catch (e) { W.act = offline(e); W.info = null; }
+    show(); again();
+  }
+  box.addEventListener('click', async e => {
+    const b = e.target.closest('[data-wv]');
+    if (b) switch (b.dataset.wv){
+      case 'open': return open();
+      case 'retry': W.err = ''; W.info = null; show(); return again();
+      case 'big': W.big = !W.big; return show();
+      case 'touch': W.touch = !W.touch; show(); return (W.touch ? frame : q('[data-wv="touch"]') || frame).focus({ preventScroll:true });
+      case 'key': return input({ type:'key', key:b.dataset.key });
+      case 'scroll': return input({ type:'scroll', dy:+b.dataset.dy });
+      case 'act': return input({ type:b.dataset.type });
+      case 'dialog': return input({ type:'dialog', accept:b.dataset.accept === '1' });
+    }
+    // 화면을 누른 자리 → 브라우저 화면의 CSS 픽셀. 입력 칸을 눌렀으면 아래 입력 줄로
+    if (e.target !== img || img.hidden || !W.info || !W.info.open || seeing()) return;
+    const r = img.getBoundingClientRect(), f = await input({ type:'click', x:Math.round((e.clientX - r.left) / r.width * W.info.width), y:Math.round((e.clientY - r.top) / r.height * W.info.height) });
+    if (f && f.editable) inp.focus();
+  });
+  box.addEventListener('submit', e => {
+    const f = e.target, k = f.dataset.wvForm; if (!k) return;
+    e.preventDefault();
+    if (k === 'go'){ const v = f.url.value.trim(); if (v && !seeing()){ f.url.blur(); open(v); } }
+    else if (k === 'type'){ const v = f.text.value; if (!v) return f.text.focus(); f.text.value = ''; input({ type:'text', text:v }).then(() => f.text.focus()); }
+  });
+  frame.addEventListener('wheel', e => {
+    if (W.big || !W.info || !W.info.open || seeing()) return;
+    e.preventDefault(); clearTimeout(W.wheel);
+    W.dy += e.deltaY; W.wheel = setTimeout(() => { const dy = W.dy; W.dy = 0; input({ type:'scroll', dy }); }, 120);
+  }, { passive:false });
+  // 화면에 포커스가 있을 때 — 글자·Enter·지우기·화살표를 브라우저로. Tab과 Esc는 이 창의 키로 둔다(키보드가 갇히지 않게). 한글은 입력 줄로
+  frame.addEventListener('keydown', e => {
+    if (!W.info || !W.info.open || seeing() || e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.keyCode === 229) return;
+    if (WV_KEYS.includes(e.key)){ e.preventDefault(); input({ type:'key', key:e.key }); }
+    else if (e.key.length === 1){ e.preventDefault(); input({ type:'text', text:e.key }); }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') paint(); });
+  focusPaint();
+  return { W, paint, open };
+}
+const WV_KEYS = ['Enter', 'Backspace', 'Delete', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'];
+/* 채팅의 브라우저 — 방마다 탭 하나. 보이는 때: 사람이 [브라우저 보기]를 눌렀거나, AI가 브라우저 일을 넘겼을 때(BrowserHandoff) — 새로 넘기면 숨겨 둔 방도 다시 연다 */
+const CW = { on:{}, seen:{} };
+const cwAvail = () => !!(chOn() && CH.st.browser && ['ok', 'approve', 'old'].includes(CH.st.browser.reason || (CH.st.browser.ok ? 'ok' : '')));
+const cwHand = r => ((r && r.turns) || []).flatMap(t => t.pending || []).find(q => q.tool === 'BrowserHandoff') || null;
+function cwWant(){
+  if (!CH.open || CH.pick || !cwAvail()) return false;
+  const h = cwHand(CH.rooms[CH.room]);
+  if (h && CW.seen[CH.room] !== h.id){ CW.seen[CH.room] = h.id; delete CW.on[CH.room]; }
+  return CH.room in CW.on ? CW.on[CH.room] : !!h;
+}
+const CWV = webView($('#chat-web'), 'cw', {
+  key:() => CH.room, want:cwWant, idle:'이 대화의 브라우저는 아직 열지 않았어요',
+  api:(room, sub, body) => capi(`/${encodeURIComponent(room)}/browser${sub}`, body),
+  frameUrl:room => `/api/profile/${encodeURIComponent(S.profile)}/chats/${encodeURIComponent(room)}/browser/frame?t=${Date.now()}`,
+  block:() => { const b = CH.st.browser || {};
+    return b.reason === 'approve' ? { note:`${esc(b.message)} <a class="btn btn-text btn-sm" href="#/plugins/${esc(CH.st.plugin.id)}/setup">준비와 설정 열기</a>` } : b.reason === 'old' ? { empty:`<span>${esc(b.message)}</span>`, stop:true } : null; },
+  hand:() => { const h = cwHand(CH.rooms[CH.room]);
+    return h && { message:(h.input && h.input.message) || h.description || '브라우저에서 할 일이 있어요', sub:'아래 화면에서 하고 눌러 주세요. 여기 적은 글은 AI에게 보내지 않아요.',
+      acts:`<button class="btn btn-ghost btn-sm" type="button" data-ch="deny" data-room="${esc(CH.room)}" data-req="${esc(h.id)}">못 했어요</button><button class="btn btn-primary btn-sm" type="button" data-ch="allow" data-room="${esc(CH.room)}" data-req="${esc(h.id)}">다 했어요 — 이어서 하기</button>` }; }
+});
+function cwPaint(){ $('#chat').classList.toggle('web-side', cwWant()); CWV.paint(); }
 async function chAnswer(room, req, allow, input){
   try { await capi(`/${encodeURIComponent(room)}/answer`, { request_id:req, allow, input }); CH.err = ''; await chLoad(); $('#chat-in').focus(); }
   catch (e) { CH.err = e.message; chPaint(true); }
@@ -5513,7 +6008,12 @@ document.addEventListener('click', async e => {
   if (act === 'memo-close') return chMemoOpen(false);
   if (act === 'memo-clear') return chMemoSave('');
   if (act === 'again'){ $('#chat-in').value = b.dataset.text || ''; return chSend(); }
-  if (act === 'allow' || act === 'deny'){ b.disabled = true; return chAnswer(b.dataset.room, b.dataset.req, act === 'allow'); }
+  if (act === 'allow' || act === 'deny'){
+    b.disabled = true;
+    if (cwHand(CH.rooms[b.dataset.room]) && cwHand(CH.rooms[b.dataset.room]).id === b.dataset.req) CW.on[b.dataset.room] = true;   // 답한 뒤에도 AI가 이어서 쓰는 브라우저를 지켜볼 수 있게
+    return chAnswer(b.dataset.room, b.dataset.req, act === 'allow');
+  }
+  if (act === 'web'){ CW.on[CH.room] = !cwWant(); chPaint(true); const t = $('[data-ch="web"]'); if (t) t.focus(); if (CW.on[CH.room]) setTimeout(() => $('#cw-frame').focus({ preventScroll:true }), 0); return; }
   if (act === 'cancel'){ try { await capi(`/${encodeURIComponent(CH.room)}/cancel`, {}); await chLoad(); } catch (er) { toast(er.message); } return; }
   if (act === 'reset') return plAsk({ title:'새 대화를 시작할까요?', body:'<p>이 채팅의 기록과 AI 세션을 비워요. 고친 파일은 그대로예요.</p>', ok:'새 대화 시작하기' }, async () => {
     try { CH.rooms[CH.room] = await capi(`/${encodeURIComponent(CH.room)}/reset`, {}); await chLoad(); chPaint(true); $('#chat-in').focus(); } catch (er) { toast(er.message); } });
@@ -5562,12 +6062,14 @@ function render(){
   document.querySelectorAll('.store-line').forEach(x => x.textContent = storeText(S.profile));
   document.querySelectorAll('.profile-btn').forEach(x => x.setAttribute('aria-label', `프로필 바꾸기, 지금 ${S.profile}`));
   const openKeys = navChanged ? [] : [...main.querySelectorAll('details[data-key][open]')].map(d => d.dataset.key);
+  const pwAt = !navChanged && PW.el && PW.el.contains(document.activeElement) ? document.activeElement : null;   // 브라우저 보기 조각은 옮겨 붙여도 같은 요소다 — 쓰던 자리로 포커스를 돌려준다
   mdKey = 0; mdShift = 2; WL_BOOK = '';
   main.innerHTML = S.mode === 'connect' ? vConnect() : S.mode === 'loading' ? vLoading() : S.mode === 'error' ? vError() : route(p);
   if (S.mode === 'connect' && PKMStore.github.auth() && !GH.repos.length && !GH.loading){
     GH.loading = true; PKMStore.github.repos().then(r => { GH.repos = r; GH.loading = false; render(); }).catch(e => { GH.loading = false; toast(e.message); });
   }
   openKeys.forEach(k => { const d = main.querySelector(`details[data-key="${CSS.escape(k)}"]`); if (d) d.open = true; });
+  pwMount(); if (pwAt && pwAt.isConnected) pwAt.focus({ preventScroll:true });
   const cur = main.querySelector('.seg-scroll a[aria-current]'); if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - 48;   // 왼쪽 탭이 반쯤 보이게 — 옆에 탭이 더 있다는 단서
   const wd0 = main.querySelector('.week a.day[aria-current]'); if (wd0){ const ol = wd0.closest('ol'); if (ol.scrollWidth > ol.clientWidth) ol.scrollLeft = wd0.parentElement.offsetLeft - ol.clientWidth / 2; }   // 큰 글씨에서도 고른 날이 보이게   // 기록 종류가 많아도 지금 탭이 보이게
   const h1 = main.querySelector('h1');
@@ -6462,11 +6964,19 @@ async function puGo(room, profile){
   const d = document.querySelector('dialog[open]'); if (d) d.close();   // 열린 대화상자가 채팅을 가리지 않게
   if (chOn() && chSum(room)) chOpen(room); else { PU.go = { room }; chLoad(); }   // 목록에 아직 없는 새 방이면 다시 읽은 뒤에 연다
 }
+// 채팅이 아닌 알림(플러그인 브라우저 단계의 넘겨받기) — 알림에 적힌 화면(#/plugins/…)으로
+async function puAt(url, profile){
+  const h = String(url || '').split('#')[1]; if (!h) return;
+  if (profile && profile !== S.profile && (PLIST || []).some(x => x.name === profile)) await openProfile(profile);
+  const d = document.querySelector('dialog[open]'); if (d) d.close();
+  go('#' + h); plLoad(true);
+}
 {
   const q = new URLSearchParams(location.search);
   if (q.get('chat')){ PU.go = { room:q.get('chat'), profile:q.get('profile') }; history.replaceState(null, '', location.pathname + location.hash); }
+  else if (q.get('profile') && location.hash){ PU.at = { url:location.hash, profile:q.get('profile') }; history.replaceState(null, '', location.pathname + location.hash); }
   if ('serviceWorker' in navigator){
-    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'pkm-open-chat') puGo(e.data.room, e.data.profile); });
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'pkm-open-chat') e.data.room ? puGo(e.data.room, e.data.profile) : puAt(e.data.url, e.data.profile); });
     navigator.serviceWorker.startMessages();   // 붙이자마자 받는다(서비스 워커가 보낸 메시지를 쌓아 두지 않게)
   }
 }
@@ -6521,7 +7031,7 @@ if (matchMedia('(pointer:coarse)').matches){
   addEventListener('touchcancel', () => { PTR.y0 = null; PTR.d = 0; if (!PTR.busy) ptrShow(0, 'idle'); }, { passive:true });
 }
 window.addEventListener('hashchange', render);
-boot().then(() => { PKMAI.probe().then(ok => { if (!ok) return; syncAiLine(); if (PKMAI.conn() && !PKMAI.prefs().provider) loadAI(false); }); puRegister(); if (PU.go && PU.go.profile && PU.go.profile !== S.profile){ const g = PU.go; PU.go = null; puGo(g.room, g.profile); } });
+boot().then(() => { PKMAI.probe().then(ok => { if (!ok) return; syncAiLine(); if (PKMAI.conn() && !PKMAI.prefs().provider) loadAI(false); }); puRegister(); if (PU.go && PU.go.profile && PU.go.profile !== S.profile){ const g = PU.go; PU.go = null; puGo(g.room, g.profile); } if (PU.at && PU.at.profile !== S.profile) puAt(PU.at.url, PU.at.profile); });
 /* 체크인 노트(마이노트) 화면 — 플러그인 checkins/*.md. 규격: docs/PLUGIN.md › 체크인
    편집기 두 개(주요 업무·과제)를 한 화면에 묶고 제출 미리보기·점검(AI 티)·점수·카드에서 넣기를 더한다.
    편집기(ped*)·AI(aiAsk)·플러그인 상태(PL)를 그대로 쓴다. */
