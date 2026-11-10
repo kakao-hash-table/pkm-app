@@ -60,7 +60,8 @@ test('피드·비밀값·단계 폴더 — 선언한 스크립트로만 가져�
   assert.equal(ok.ok, true, ok.errors.join('\n'));
   assert.deepEqual(ok.manifest.permissions.secrets, ['DEMO_TOKEN', 'OTHER_TOKEN']);
   assert.deepEqual(ok.manifest.secrets[0], { name: 'DEMO_TOKEN', label: '데모 토큰', hint: '', url: 'https://example.com/tokens' });
-  assert.deepEqual(ok.feeds[0], { name: '내 할 일', file: 'feeds/목록.md', description: '바뀐 것만 가져와요.', run: 'scripts/pr-body.mjs list {jira_project}', every: 30, days: 'weekdays', hours: '08:30-18:00', start: '배포', starts: ['배포'], start_mode: 'auto', empty: '', count: null });
+  assert.deepEqual(ok.feeds[0], { name: '내 할 일', file: 'feeds/목록.md', description: '바뀐 것만 가져와요.', run: 'scripts/pr-body.mjs list {jira_project}', every: 30, days: 'weekdays', hours: '08:30-18:00', start: '배포', starts: ['배포'], start_mode: 'auto', empty: '', count: null, notify: false });
+  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- notify: maybe\n')).errors.join(), /notify는 yes 또는 no/);
   assert.match(P.validate(feed('## a\n- run: scripts/none.mjs\n')).errors.join(), /선언하지 않은 스크립트 "scripts\/none.mjs"/);
   assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- every: 1\n- start: 없는것\n')).errors.join(), /every는 5~1440분[\s\S]*워크플로우 "없는것"가 없어요/);
   assert.match(P.validate(manifest(t => t.replace('bundled: [scripts/pr-body.mjs]', 'bundled: [scripts/pr-body.mjs]\n  secrets: [token]'))).errors.join(), /영문 대문자/);

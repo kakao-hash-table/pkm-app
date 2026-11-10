@@ -88,6 +88,24 @@ test('묻는 단계는 답을 기다리고, 답하면 --answer로 다시 돌린 
   assert.equal(r.status, 'input'); assert.equal(r.steps[1].ask.type, 'confirm');
 });
 
+test('알림(notify: yes): 새 항목과 내 차례를 한 번씩, 처음 목록은 알리지 않고, 읽음은 플러그인 상태에 남는다', async () => {
+  let r = await runner.notes(P);
+  const kinds = r.notes.map(n => [n.kind, n.item, n.plugin]);
+  assert.ok(kinds.some(k => k[0] === 'new' && k[1] === 'A-2' && k[2] === ID), JSON.stringify(kinds));
+  assert.ok(!kinds.some(k => k[0] === 'new' && k[1] === 'A-1'), '처음 가져온 목록은 알리지 않는다');
+  const turns = r.notes.filter(n => n.kind === 'input');
+  assert.equal(turns.length, 2, '묻기·사람 확인 두 번, 같은 단계에서는 한 번만');
+  assert.match(turns[0].text, /내 차례예요/);
+  assert.equal(turns[0].run, (await state()).runs[0].id);
+  await runner.tick();
+  assert.equal((await runner.notes(P)).notes.length, r.notes.length, '같은 차례를 또 알리지 않는다');
+  r = await runner.readNotes(P, [turns[0].id]);
+  assert.equal(r.notes.find(n => n.id === turns[0].id).read, true);
+  assert.equal(r.unread, r.notes.length - 1);
+  r = await runner.readNotes(P, null);
+  assert.equal(r.unread, 0);
+});
+
 test('다른 기기에서 누른 것은 받은편지함 파일로 오고, 켠 컴퓨터가 한 번만 처리한다', async () => {
   const r = (await state()).runs[0];
   fs.writeFileSync(path.join(DATA, P, '_플러그인/.state/flow-demo.inbox.휴대폰.json'), JSON.stringify([{ id: 'phone-1', at: new Date().toISOString(), type: 'confirm', run: r.id, step: '확인' }]));
@@ -161,6 +179,23 @@ test('주기는 이 컴퓨터에서 바꾸고, 자동 시작한 작업은 내 �
   for (const z of (await state()).runs.filter(x => !['done', 'canceled'].includes(x.status))) await runner.act(P, ID, { type: 'cancel', run: z.id });
   await runner.setLocal(P, ID, { every: { '할 일': null } });
   assert.equal((await runner.status(P)).plugins[ID].feeds[0].every, 5);
+});
+
+test('카드의 명령·포트를 실행까지 전달하고, 선언하지 않은 경로·잘못된 포트는 거절한다', async () => {
+  const plugins = await import('../server/plugins.js');
+  const root = path.join(T, 'input-demo'); fs.mkdirSync(path.join(root, 'scripts'), { recursive: true }); fs.mkdirSync(path.join(root, 'feeds')); fs.mkdirSync(path.join(root, 'workflows'));
+  fs.writeFileSync(path.join(root, 'plugin.md'), '---\npkm_plugin: 1\nid: input-demo\nname: 입력 검증\nversion: 1.0.0\npermissions:\n  bundled: [scripts/list.mjs, scripts/run.mjs]\n---\n');
+  fs.writeFileSync(path.join(root, 'feeds/items.md'), '## 프로젝트\n- run: scripts/list.mjs\n- every: 5\n- view: inline\n- inputs: command, port\n- start: 실행\n');
+  fs.writeFileSync(path.join(root, 'workflows/run.md'), '## 실행\n- [실행] 실행 · script: scripts/run.mjs --path={path} --port={port} --command={command}\n');
+  fs.writeFileSync(path.join(root, 'scripts/list.mjs'), 'console.log(JSON.stringify({items:[{id:"a",title:"프로젝트",vars:{path:"/server-only",port:"3000",command:"old"}}]}));');
+  fs.writeFileSync(path.join(root, 'scripts/run.mjs'), 'console.log(JSON.stringify({args:process.argv.slice(2)}));');
+  const ins = await plugins.inspect({ local: root }); assert.equal(ins.ok, true, ins.errors.join()); await plugins.install(path.join(DATA, P), ins.stage); await runner.approve(P, 'input-demo');
+  await runner.act(P, 'input-demo', { type:'refresh', feed:'프로젝트' });
+  for (const values of [{path:'/elsewhere'}, {avoid:''}, {port:'65536'}, {port:'1.5'}, {command:42}]) await assert.rejects(runner.act(P, 'input-demo', { type:'start', feed:'프로젝트', item:'a', values }), /바꿀 수 없는 입력|번호를 확인/);
+  await runner.act(P, 'input-demo', { type:'start', feed:'프로젝트', item:'a', values:{command:'npm run dev',port:'4567'} }); await runner.tick();
+  const st = (await runner.status(P)).plugins['input-demo'].state, r = st.runs[0];
+  assert.equal(r.item.vars.path, '/server-only'); assert.equal(r.status, 'done');
+  assert.deepEqual(r.steps[0].output.args, ['--path=/server-only', '--port=4567', '--command=npm run dev']);
 });
 
 test('돌리는 컴퓨터가 다른 컴퓨터로 옮겨지면 이 컴퓨터는 멈추고, 누른 것은 받은편지함으로 보낸다', async () => {

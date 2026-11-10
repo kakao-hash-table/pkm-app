@@ -1,13 +1,14 @@
 // AI 챗봇 — chats/를 선언한 플러그인(ai-chat)을 설치한 프로필에서, 이 pkm 서버가 같은 컴퓨터의 pkm-ai-server로 대화형 에이전트를 돌린다.
 // 방(room): 프로필 데이터 방 하나(scope: profile) + 단기 카드마다 하나(scope: card). 방 안의 말은 차례로, 방끼리는 동시에 돈다.
 // 대화는 에이전트 세션(--resume)으로 이어 가고, 에이전트가 사람에게 묻는 도구 사용(승인 채널)은 방에 띄워 답을 돌려보낸다.
-// 기록은 이 컴퓨터에만 둔다(~/.pkm-app/chats/<프로필>.json) — 세션이 이 컴퓨터의 Claude Code에 있어서 다른 기기로 동기화해도 쓸 수 없다.
+// 기록은 이 컴퓨터에만 둔다(~/.pkm-app/chats/<프로필>.json) — 세션이 이 컴퓨터의 AI CLI에 있어서 다른 기기로 동기화해도 쓸 수 없다.
 // 로컬 전용: pkm 서버의 AI 연결이 루프백 주소이고, pkm-ai-server가 알려 준 컴퓨터·사용자 이름이 이 서버와 같을 때만 연다.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import * as plugins from './plugins.js';
+import { createChatMedia } from './chat-media.js';
 
 const P = createRequire(import.meta.url)('../web/js/pkm-plugin.js');
 const HOME = process.env.PKM_HOME ? path.resolve(process.env.PKM_HOME) : path.join(os.homedir(), '.pkm-app');
@@ -38,6 +39,9 @@ export function splitSummary(text){
 }
 
 export function createChats({ DATA, readConf, findCard, findProject = async () => null, onPush = null }){
+  const media = createChatMedia(path.join(DIR, 'media'));
+  async function upload(p, id, req, name){ await need(p); roomOf(p, id); return media.upload(p, id, req, name); }
+  function attachment(p, id, aid, req, res){ roomOf(p, id); return media.serve(p, id, aid, req, res); }
   /* ---------- pkm-ai-server ---------- */
   async function ai(conn, pathname, opt = {}){
     let r;
@@ -63,15 +67,24 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
         const me = await ai(conn, '/v1/me').catch(e => { if (e.status === 404) throw fail(409, 'pkm-ai-server가 채팅을 모르는 옛 버전이에요. 업데이트한 뒤 다시 켜 주세요'); throw e; });
         if (me.host !== os.hostname() || me.user !== os.userInfo().username) v = { ok: false, reason: 'other', message: `AI 연결이 다른 컴퓨터(${me.host})의 pkm-ai-server예요` };
         else {
-          const claude = ((await ai(conn, '/v1/providers')).providers || []).find(x => x.id === 'claude');
-          if (!claude || !claude.installed || !claude.logged_in) v = { ok: false, reason: 'claude', message: '이 컴퓨터에 Claude Code가 없거나 로그인돼 있지 않아요' };
-          else if (!claude.agent || !claude.agent.approvals) v = { ok: false, reason: 'old', message: 'pkm-ai-server가 채팅 승인을 모르는 옛 버전이에요. 업데이트한 뒤 다시 켜 주세요' };
-          else v = { ok: true, full: claude.agent.modes.includes('full'), concurrency: claude.agent.concurrency || 1, blocked: claude.blocked || null };
+          const providers = ((await ai(conn, '/v1/providers')).providers || []).filter(x => x.enabled !== false && x.installed && x.logged_in && x.agent);
+          if (!providers.length) v = { ok: false, reason: 'provider', message: '이 컴퓨터에 로그인된 AI 에이전트가 없어요. AI 연결에서 상태를 확인해 주세요' };
+          else v = { ok: true, providers, full: providers.some(x => x.agent.modes.includes('full')), concurrency: Math.max(...providers.map(x => x.agent.concurrency || 1)) };
         }
       }
     } catch (e) { v = { ok: false, reason: 'error', message: e.message }; }
     loc = { key, at: Date.now(), v };
     return v;
+  }
+
+  async function selection(provider, model, effort){
+    const l = await locality();
+    if (!l.ok) throw fail(409, l.message);
+    const p = l.providers.find(x => x.id === provider);
+    if (!p) throw fail(409, '선택한 AI를 쓸 수 없어요. AI 연결에서 설치·로그인 상태를 확인해 주세요');
+    if (model !== 'default' && (!/^[\w.\-:@/]{1,80}$/.test(model) || (p.models && !p.models.some(x => x.id === model)))) throw fail(400, '선택한 AI의 모델이 아니에요. AI 연결에서 다시 골라 주세요');
+    if (effort != null && !(p.efforts || []).includes(effort)) throw fail(400, '선택한 AI의 생각하는 정도를 다시 골라 주세요');
+    return p;
   }
 
   /* ---------- 플러그인: chats/를 선언한 것 ---------- */
@@ -109,7 +122,12 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     if (soon) write(); else timers[p] = setTimeout(write, 400);
   }
   const roomOf = (p, id) => { const r = state(p).rooms.find(r => r.id === id); if (!r) throw fail(404, '없는 채팅이에요'); return r; };
-  const lastTurn = r => r.turns[r.turns.length - 1] || null;
+  const lastTurn = r => {
+    const active = r.turns.filter(t => !FINAL.has(t.status));
+    // 우선 실행으로 완료 순서가 달라져도 방 목록에는 지금 하는 일·가장 최근 답을 보여 준다.
+    return active.find(t => t.job) || active[active.length - 1] || r.turns.filter(t => t.cancel_kind !== 'send')
+      .sort((a, b) => String(b.finished || b.created).localeCompare(String(a.finished || a.created)))[0] || r.turns[r.turns.length - 1] || null;
+  };
   // 방 상태 — idle(대화 없음·그만둠) · run(하는 중) · ask(확인 요청) · new(새 답, 안 읽음) · reply(답을 읽음, 내 차례) · bad(멈춤)
   const unreadOf = r => { const t = lastTurn(r); return !!t && ['done', 'error'].includes(t.status) && !!t.finished && (!r.read || t.finished > r.read); };
   const stateOf = r => {
@@ -149,7 +167,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     if (!pl) return { plugin: null, rev: state(p).rev };
     const l = await locality();
     return { plugin: { id: pl.id, name: pl.name, scopes: pl.chats.map(c => ({ scope: c.scope, name: c.name, label: c.label, description: c.description })) },
-      ...l, home: os.homedir(), card_cwd: defaultCwd(pl), recent: state(p).recent, rev: state(p).rev, rooms: state(p).rooms.map(summary) };
+      ...l, queue_controls: true, home: os.homedir(), card_cwd: defaultCwd(pl), recent: state(p).recent, rev: state(p).rev, rooms: state(p).rooms.map(summary) };
   }
   function room(p, id){ return roomOf(p, id); }
   // 카드 세션의 기본 작업 폴더(플러그인 설정) — 고를 때 먼저 보일 곳일 뿐, 저절로 정하지 않는다
@@ -256,15 +274,19 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
   }
 
   /* ---------- 말 보내기 → 차례로 실행 ---------- */
-  async function send(p, id, { id: tid, text } = {}){
+  async function send(p, id, { id: tid, text, attachments = [], provider = 'claude', model = 'default', effort = null } = {}){
     await need(p);
     const r = roomOf(p, id), msg = String(text || '').trim();
-    if (!msg) throw fail(400, '보낼 말을 적어 주세요');
+    if (!msg && (!Array.isArray(attachments) || !attachments.length)) throw fail(400, '보낼 말이나 사진·영상을 첨부해 주세요');
     if (msg.length > 20000) throw fail(400, '말이 너무 길어요(2만 자까지)');
     const key = /^[\w-]{6,64}$/.test(String(tid || '')) ? String(tid) : `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const dup = r.turns.find(t => t.id === key);
-    if (dup){ if (dup.text !== msg) throw fail(409, '같은 요청 id로 다른 말을 보냈어요'); return dup; }   // 다시 보내기 — 한 번만
-    const t = { id: key, text: msg, status: 'queued', created: now(), started: null, finished: null, job: null, reply: '', log: [], pending: [], error: null, until: null };
+    if (dup){ if (dup.text !== msg || JSON.stringify((dup.attachments || []).map(a => a.id)) !== JSON.stringify(attachments)) throw fail(409, '같은 요청 id로 다른 말을 보냈어요'); return dup; }   // 다시 보내기 — 한 번만
+    const chosen = await selection(provider, model, effort);
+    const resolved = media.resolve(p, id, attachments);
+    if (resolved.images.length && !['claude', 'codex'].includes(provider)) throw fail(400, '사진·영상은 Claude 또는 GPT를 골라 보내 주세요');
+    if (resolved.images.length && !chosen.input_images) throw fail(409, 'AI 서버가 이미지 입력을 지원하지 않는 버전이에요. pkm-ai-server를 업데이트·다시 켠 뒤 보내 주세요');
+    const t = { id: key, text: msg, attachments:resolved.attachments, provider, model, effort, status: 'queued', created: now(), started: null, finished: null, job: null, reply: '', log: [], pending: [], error: null, until: null };
     r.turns.push(t); if (r.turns.length > KEEP_TURNS) r.turns.splice(0, r.turns.length - KEEP_TURNS);
     r.updated = r.read = now(); touch(p, true);
     pump(p);
@@ -273,11 +295,120 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
   async function cancel(p, id){
     const r = roomOf(p, id), conn = readConf().ai;
     for (const t of r.turns){
-      if (t.status === 'queued'){ Object.assign(t, { status: 'canceled', finished: now() }); continue; }
+      if (t.status === 'queued' && !t.job){ Object.assign(t, { status: 'canceled', finished: now() }); continue; }
       if (!FINAL.has(t.status) && t.job && conn) await ai(conn, `/v1/jobs/${t.job}`, { method: 'DELETE' }).catch(() => {});
     }
     r.updated = now(); touch(p, true);
     return r;
+  }
+  // 대기 요청 하나를 다른 AI로 잇는다. 원본은 취소 기록으로 남기고 새 턴을 바로 다음에 둔다.
+  // 같은 방의 다음 요청이 먼저 시작하지 않게 전환 동안 pump를 잠깐 막는다.
+  const switching = new Set();
+  // 전체 그만두기와 별개로 대기 메시지 하나만 취소한다. 실행이 시작됐다면 취소하지 않는다.
+  async function cancelTurn(p, id, { turn_id } = {}){
+    const r = roomOf(p, id), key = `${p}|${id}`, t = r.turns.find(t => t.id === turn_id);
+    if (!t) throw fail(404, '취소할 메시지를 찾지 못했어요');
+    if (t.status === 'canceled') return t;
+    if (switching.has(key)) throw fail(409, '메시지를 처리 중이에요. 잠시 뒤 다시 해 주세요');
+    switching.add(key);
+    try {
+      if (!['queued', 'waiting'].includes(t.status)) throw fail(409, '이미 실행을 시작한 메시지예요. 진행 중인 작업은 그만두기로 멈춰 주세요');
+      if (t.job) await stopTurn(r, t, readConf().ai, true);
+      Object.assign(t, { status: 'canceled', cancel_kind: 'send', finished: now(), pending: [], until: null });
+      if (r.priority_turn === t.id) delete r.priority_turn;
+      r.updated = now(); touch(p, true);
+      return t;
+    } finally { switching.delete(key); pump(p); }
+  }
+  async function stopTurn(r, t, conn, idleOnly = false){
+    if (!conn?.url || !conn.token) throw fail(409, '작업을 중단하려면 AI 서버 연결이 필요해요');
+    // run()이 작업 생성 요청 중이면 job id를 받을 때까지 기다린다. 중단 확인 전에는 새 작업을 시작하지 않는다.
+    for (let checks = 0; !t.job && !FINAL.has(t.status) && checks < 75; checks++) await new Promise(resolve => setTimeout(resolve, 200));
+    if (!t.job){ if (FINAL.has(t.status)) return; throw fail(409, '작업 시작을 확인 중이에요. 잠시 뒤 다시 눌러 주세요'); }
+    let j = (await ai(conn, `/v1/jobs/${t.job}`)).job;
+    if (idleOnly && !['queued', 'waiting'].includes(j?.status)) throw fail(409, '이미 실행을 시작한 메시지예요. 새 상태를 확인해 주세요');
+    if (!FINAL.has(j?.status)) j = (await ai(conn, `/v1/jobs/${t.job}${idleOnly ? '?idle_only=1' : ''}`, { method: 'DELETE' })).job;
+    for (let checks = 0; j && !FINAL.has(j.status) && checks < 50; checks++){
+      await new Promise(resolve => setTimeout(resolve, 200));
+      j = (await ai(conn, `/v1/jobs/${t.job}`)).job;
+    }
+    if (!j || !FINAL.has(j.status) || (idleOnly && j.status !== 'canceled')) throw fail(409, '작업의 중단을 확인하지 못했어요. 새 작업은 시작하지 않았어요');
+    applyJob(r, t, j);
+  }
+  async function runNow(p, id, { turn_id } = {}){
+    const r = roomOf(p, id), key = `${p}|${id}`, t = r.turns.find(t => t.id === turn_id);
+    if (!t) throw fail(404, '반영할 메시지를 찾지 못했어요');
+    if (t.immediate) return t;   // 같은 버튼 재요청은 한 번만 반영
+    if (switching.has(key)) throw fail(409, '메시지를 처리 중이에요. 잠시 뒤 다시 해 주세요');
+    switching.add(key);
+    try {
+      if (t.status !== 'queued' || t.job) throw fail(409, '아직 실행하지 않은 대기 메시지만 바로 반영할 수 있어요');
+      await need(p);
+      const chosen = await selection(t.provider || 'claude', t.model || 'default', t.effort || null);
+      if (chosen.blocked) throw fail(409, '이 메시지의 AI가 사용 한도·로그인 문제로 대기 중이에요. 다른 AI로 이어서를 이용해 주세요');
+      const active = r.turns.find(x => x !== t && !FINAL.has(x.status) && (x.status === 'running' || x.status === 'waiting' || x.job));
+      const inherited = active ? [...(active.attachments || []), ...(active.immediate?.attachments || [])] : [];
+      if ((inherited.length || t.attachments?.length) && (!chosen.input_images || !['claude', 'codex'].includes(t.provider))) throw fail(409, '기존 첨부를 읽을 수 있는 Claude·GPT로 메시지를 보내 주세요');
+      if (active) await stopTurn(r, active, readConf().ai);
+      if (!state(p).rooms.includes(r) || !r.turns.includes(t) || t.status !== 'queued' || t.job) throw fail(409, '대기 메시지의 상태가 바뀌었어요. 새 상태를 확인해 주세요');
+      const history = r.turns.filter(x => x !== t && x !== active && x.status === 'done').slice(-6).map(x => `사용자: ${clip(x.text, 1000)}\nAI: ${clip(x.reply, 2000)}`).join('\n\n');
+      const previous = active ? `${active.immediate?.prompt || active.handoff?.prompt || active.text}\n\n최근 진행:\n${(active.log || []).slice(-20).map(l => `${l.tool || l.kind}: ${clip(l.text, 800)}`).join('\n')}${active.reply ? `\nAI 답변:\n${clip(active.reply, 6000)}` : ''}` : '';
+      const context = `${history}\n\n${previous}`;
+      const bounded = context.length > 150000 ? `${context.slice(0, 50000)}\n[중간 진행 기록 생략]\n${context.slice(-100000)}` : context;
+      t.immediate = { from_turn: active?.id || null, attachments: inherited, prompt: `진행 중인 응답을 중지하고 추가 지시를 지금 반영합니다. 기존 사용자 목표와 제약은 유지하고, 아래 추가 지시가 바꾸는 부분을 우선 적용하세요. 현재 파일·실행 상태를 확인하고 이미 끝낸 작업은 반복하지 마세요.\n\n기존 대화·작업:\n${bounded}\n\n지금 반영할 사용자 추가 지시:\n${t.text || '첨부한 사진·영상을 확인해 주세요.'}` };
+      if (active?.status === 'canceled'){ active.interrupted_by = t.id; note(active, '추가 지시를 지금 반영하기 위해 응답을 중지했어요'); }
+      // 화면의 메시지 순서는 유지하고 실행 우선순위만 바꾼다. 나머지 대기 메시지는 그대로 둔다.
+      r.priority_turn = t.id;
+      r.updated = r.read = now(); touch(p, true);
+      return t;
+    } finally { switching.delete(key); pump(p); }
+  }
+  async function handoff(p, id, { id: tid, turn_id, provider, model = 'default', effort = null } = {}){
+    const r = roomOf(p, id), key = `${p}|${id}`;
+    if (!/^[\w-]{6,64}$/.test(String(tid || ''))) throw fail(400, '전환 요청 id가 필요해요');
+    const dup = r.turns.find(t => t.id === tid);
+    if (dup){
+      if (dup.handoff?.from_turn !== turn_id || dup.provider !== provider || dup.handoff.target_model !== model || dup.effort !== effort) throw fail(409, '같은 요청 id로 다른 전환을 보냈어요');
+      return dup;
+    }
+    if (switching.has(key)) throw fail(409, '이 대화를 다른 AI로 넘기는 중이에요');
+    switching.add(key);
+    try {
+      await need(p);
+      const chosen = await selection(provider, model, effort);
+      if (chosen.blocked) throw fail(409, '선택한 AI도 대기 중이에요. 사용할 수 있는 AI를 고른 뒤 다시 눌러 주세요');
+      const source = r.turns.find(t => t.id === turn_id);
+      if (!source || source.continued_by || !['queued', 'waiting'].includes(source.status)) throw fail(409, '대기 중인 요청만 다른 AI로 이어갈 수 있어요');
+      if (source.attachments?.length && !chosen.input_images) throw fail(409, '첨부파일을 읽을 수 있는 Claude·GPT로 골라 주세요. AI 서버 업데이트·다시 켜기가 필요할 수 있어요');
+      const from = source.provider || 'claude';
+      if (from === provider) throw fail(400, '이미 같은 AI의 요청이에요');
+      const history = r.turns.slice(0, r.turns.indexOf(source) + 1).map(t => {
+        const progress = (t.log || []).slice(-20).map(l => `${l.tool || l.kind}: ${clip(l.text, 800)}`).join('\n');
+        return `사용자 지시:\n${t.text}\nAI 답변:\n${clip(t.reply || '', 6000)}${t.summary ? `\n요약: ${t.summary.q || ''} / ${t.summary.a || ''}` : ''}${progress ? `\n최근 진행:\n${progress}` : ''}`;
+      }).join('\n\n---\n\n');
+      const context = history.length > 160000 ? `${history.slice(0, 60000)}\n[중간 기록 생략: 원래 대화와 파일을 확인하세요]\n${history.slice(-100000)}` : history;
+      const prompt = `다른 AI가 진행하다 대기 중이던 요청을 이어받습니다. 아래의 원래 사용자 지시와 제한을 유지하세요. 먼저 현재 작업 폴더의 파일·git 상태와 진행 기록을 확인하고, 이미 끝낸 일을 반복하지 말고 남은 작업만 마무리하세요. 이전 AI의 내부 세션은 전달되지 않으므로 기록에서 확인할 수 없는 것은 파일에서 확인하세요.\n\n${context}`;
+      if (source.job){
+        const conn = readConf().ai;
+        const live = (await ai(conn, `/v1/jobs/${source.job}`)).job;
+        if (!['waiting', 'queued'].includes(live?.status)) throw fail(409, '이미 실행 중이거나 끝난 작업이에요. 대기 중일 때만 다른 AI로 넘길 수 있어요');
+        let stopped = (await ai(conn, `/v1/jobs/${source.job}?idle_only=1`, { method: 'DELETE' })).job;
+        // idle_only를 아직 모르는 서버와도 호환: 삭제 직전 실행이 시작됐어도 종료 확인 전에는 새 AI를 부르지 않는다.
+        for (let checks = 0; stopped && !FINAL.has(stopped.status) && checks < 50; checks++){
+          await new Promise(resolve => setTimeout(resolve, 200));
+          stopped = (await ai(conn, `/v1/jobs/${source.job}`)).job;
+        }
+        if (stopped?.status !== 'canceled') throw fail(409, '기존 요청의 중단을 확인하지 못해 다른 AI를 시작하지 않았어요');
+        applyJob(r, source, stopped);
+      }
+      Object.assign(source, { status: 'canceled', finished: now(), pending: [], until: null, continued_by: tid });
+      note(source, '다른 AI로 이어서 실행하도록 대기 요청을 취소했어요');
+      const t = { id: tid, text: source.text, attachments:source.attachments || [], provider, model, effort, status: 'queued', created: now(), started: null, finished: null, job: null, reply: '', log: [], pending: [], error: null, until: null,
+        handoff: { from_turn: source.id, from_provider: from, from_job: source.job, target_model: model, prompt } };
+      r.turns.splice(r.turns.indexOf(source) + 1, 0, t);
+      r.updated = r.read = now(); touch(p, true);
+      return t;
+    } finally { switching.delete(key); pump(p); }
   }
   async function answer(p, id, { request_id, allow, input } = {}){
     const r = roomOf(p, id), t = r.turns.find(t => (t.pending || []).some(q => q.id === request_id));
@@ -294,9 +425,10 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
   function pump(p){
     for (const r of state(p).rooms){
       const k = `${p}|${r.id}`;
-      if (running.has(k)) continue;
-      const t = r.turns.find(t => ['running', 'waiting'].includes(t.status) && t.job) || r.turns.find(t => t.status === 'queued');
+      if (running.has(k) || switching.has(k)) continue;
+      const t = r.turns.find(t => ['running', 'waiting'].includes(t.status) && t.job) || r.turns.find(t => t.id === r.priority_turn && t.status === 'queued') || r.turns.find(t => t.status === 'queued');
       if (!t) continue;
+      if (t.id === r.priority_turn) delete r.priority_turn;
       running.add(k);
       run(p, r, t).catch(e => { Object.assign(t, { status: 'error', error: clip(e.message, 500), finished: now(), pending: [] }); emit(p, r, t); touch(p); })
         .finally(() => { running.delete(k); if (state(p).rooms.includes(r)) pump(p); });
@@ -324,7 +456,10 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
   }
   function note(t, text){ t.log.push({ at: now(), kind: 'note', text: clip(text, 300) }); if (t.log.length > KEEP_LOG) t.log.splice(0, t.log.length - KEEP_LOG); }
   function applyJob(r, t, j){
-    if (j.session && r.session !== j.session) r.session = j.session;   // 중간에 멈춰도 같은 세션에서 이어 가게
+    if (FINAL.has(t.status) && !FINAL.has(j.status)) return;   // 중단 뒤 늦게 온 진행 이벤트로 되살리지 않는다
+    t.provider = j.provider || t.provider || 'claude';
+    if (j.result?.model) t.model = j.result.model;
+    if (j.session){ r.session = j.session; r.sessionProvider = t.provider; }   // 중간에 멈춰도 같은 AI 세션에서 이어 가게
     t.pending = (j.pending || []).map(q => ({ id: q.id, tool: q.tool, title: q.title, description: q.description, input: q.input, at: q.at }));
     if (j.status === 'waiting') Object.assign(t, { status: 'waiting', until: j.until || null, error: j.message || null });
     else if (j.status === 'queued' || j.status === 'running') Object.assign(t, { status: j.status, until: null });
@@ -363,21 +498,29 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
   async function run(p, r, t){
     const conn = readConf().ai;
     if (!t.job){
-      const pl = await need(p), l = await locality(), ctx = await context(p, pl, r);
-      const mode = ctx.mode === 'full' && !l.full ? 'auto' : ctx.mode;   // full을 허용하지 않은 서버면 자동 권한 모드로(물을 것은 채팅으로 온다)
+      t.status = 'running'; t.started = now(); touch(p);
+      const pl = await need(p), provider = t.provider || 'claude', chosen = await selection(provider, t.model || 'default', t.effort || null), ctx = await context(p, pl, r);
+      const mode = ctx.mode === 'full' && !chosen.agent.modes.includes('full') ? 'auto' : ctx.mode;
+      const changed = r.session && (r.sessionProvider || 'claude') !== provider;
+      if (changed){ r.session = null; r.carry = true; }
+      if (t.handoff){ r.session = null; r.carry = false; }
       const prof = path.join(DATA, p);
       const agent = isWork(r) ? { cwd: r.cwd || prof, add_dirs: r.cwd ? [prof] : [] } : { cwd: r.cwd, add_dirs: [DATA] };
-      Object.assign(agent, { mode, approvals: true, ...(r.session ? { session: r.session } : {}) });
+      Object.assign(agent, { mode, ...(chosen.agent.approvals ? { approvals: true } : {}), ...(r.session ? { session: r.session } : {}) });
       Object.assign(t, { status: 'running', started: now(), mode });
       if (mode !== ctx.mode) note(t, 'pkm-ai-server가 full 모드를 허용하지 않아 자동 권한 모드로 해요');
-      let prompt = t.text;
-      if (r.carry && !r.session){   // 작업 폴더를 바꿔 새 세션 — 앞선 대화를 짧게 붙여 맥락을 잇는다
+      let prompt = t.immediate?.prompt || t.handoff?.prompt || t.text || '첨부한 사진·영상의 내용을 설명해 주세요.';
+      if (r.carry && !r.session && !t.immediate){   // AI·작업 폴더를 바꾼 새 세션은 앞선 대화로 맥락을 잇는다
         const prev = r.turns.filter(x => x !== t && x.status === 'done').slice(-6).map(x => `사용자: ${clip(x.text, 600)}\nAI: ${clip(x.reply, 1200)}`).join('\n\n');
-        if (prev) prompt = `(작업 폴더를 ${r.cwd || '고르지 않음'}(으)로 바꿔 새로 시작해요. 앞선 대화:\n${prev}\n)\n\n${t.text}`;
-        r.carry = false;
+        if (prev) prompt = `(${changed ? 'AI를 바꿔' : `작업 폴더를 ${r.cwd || '고르지 않음'}(으)로 바꿔`} 새로 시작해요. 앞선 대화:\n${prev}\n)\n\n${t.text}`;
       }
-      const body = { plugin: { id: pl.id, root: pl.path }, provider: 'claude', prompt, system: ctx.system, tag: `plugin:${pl.id}`, agent };
+      const attached = media.resolve(p, r.id, [...new Set([...(t.attachments || []), ...(t.immediate?.attachments || [])].map(a => a.id))]);
+      if (attached.images.length && !['claude', 'codex'].includes(provider)) throw fail(400, '첨부파일은 Claude 또는 GPT에서 읽을 수 있어요');
+      if (attached.images.length && !chosen.input_images) throw fail(409, '이미지 입력을 지원하는 pkm-ai-server로 업데이트·다시 켜 주세요');
+      if (attached.text) prompt += `\n\n첨부 이미지 순서:\n${attached.text}`;
+      const body = { plugin: { id: pl.id, root: pl.path }, provider, model: t.model || 'default', ...(t.effort ? { effort: t.effort } : {}), ...(attached.images.length ? { images:attached.images.map(({ path, mime }) => ({ path, mime })) } : {}), prompt, system: ctx.system, tag: `plugin:${pl.id}`, agent };
       const j = (await ai(conn, '/v1/jobs', { method: 'POST', body: JSON.stringify(body) })).job;
+      r.carry = false;
       t.job = j.id; applyJob(r, t, j); emit(p, r, t); touch(p, true);
     }
     // 끝날 때까지 진행 상황을 받는다. 스트림이 끊기면 상태를 다시 읽고 이어 받는다(이 서버를 다시 켜도 같은 작업에 다시 붙는다)
@@ -415,5 +558,5 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     }
   }
   const forget = () => { loc = { key: '', at: 0, v: null }; };   // AI 연결을 바꾼 뒤 바로 다시 확인
-  return { status, room, open, remove, reset, send, cancel, answer, setCwd, setMemo, markRead, dirs, start, locality, forget };
+  return { status, room, open, remove, reset, send, handoff, cancel, cancelTurn, runNow, answer, setCwd, setMemo, markRead, dirs, start, locality, forget, upload, attachment };
 }

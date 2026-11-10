@@ -34,7 +34,7 @@
   }
 
   /* 피드 문서: "## 이름" 아래 "- 키: 값" 줄. 키 = run(필수) · every(분) · days(weekdays|daily) · hours(09:00-18:00) · start(워크플로우) · start_mode(auto|button)
-     · view(sections|inline|cards — inline이면 항목 자리에서 진행 상태를, cards면 항목마다 카드 한 장에 다 보이고 끝나면 사라진다) · reveal(cards에서 [이 kind 보기]를 누른 뒤에 보일 detail kind) · undo·undo_for(cards에서 끝난 뒤 토스트 [되돌리기]로 돌릴 워크플로우와 그 대상) · start_label(시작 버튼 글자) · dismiss(yes — 확인하고 닫기) · count · empty. 다른 줄은 설명 */
+     · view(sections|inline|cards — inline이면 항목 자리에서 진행 상태를, cards면 항목마다 카드 한 장에 다 보이고 끝나면 사라진다) · reveal(cards에서 [이 kind 보기]를 누른 뒤에 보일 detail kind) · undo·undo_for(cards에서 끝난 뒤 토스트 [되돌리기]로 돌릴 워크플로우와 그 대상) · start_label(시작 버튼 글자) · search(검색 칸 안내 글 — 적으면 목록 위에 찾는 칸) · dismiss(yes — 확인하고 닫기) · count · notify(yes — 사이드바 알림) · empty. 다른 줄은 설명 */
   function parseFeeds(text){
     const out = []; let cur = null;
     for (const line of String(text || '').split('\n')){
@@ -167,11 +167,15 @@
         if (d.undo && !workflows.some(x => x.name === d.undo)) err(`${where}: undo 워크플로우 "${d.undo}"가 없어요`);
         if (d.undo && d.view !== 'cards') err(`${where}: undo는 view: cards에서만 써요`);
         for (const w of startsOf(d.undo_for)) if (!starts.includes(w)) err(`${where}: undo_for의 "${w}"는 start에 없어요`);
+        if (d.controls && d.controls !== 'project') err(`${where}: controls는 project만 써요`);
+        if (d.controls && d.view !== 'inline') err(`${where}: controls는 view: inline과 함께 써요`);
+        if (d.inputs && startsOf(d.inputs).some(k => !KEY_RE.test(k))) err(`${where}: inputs는 변수 이름을 쉼표로 나눠요`);
         if (d.dismiss && d.dismiss !== 'yes') err(`${where}: dismiss는 yes만 써요`);
         if (d.dismiss && d.start) err(`${where}: dismiss는 start가 없는 목록에만 써요`);
+        if (d.notify && !['yes', 'no'].includes(d.notify)) err(`${where}: notify는 yes 또는 no`);
         if (feeds.some(x => x.name === d.name)) err(`${where}: 피드 이름이 겹쳐요`);
         feeds.push({ name: d.name, file: f.path, description: d.description, run: String(d.run || ''), every: every || 60, days: d.days || 'daily', hours: d.hours || null,
-          start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null });
+          start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null, notify: d.notify === 'yes' });
       }
     }
     // 검색 — 찾기 화면에서 사람이 누를 때만. {q}가 찾는 말

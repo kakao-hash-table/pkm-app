@@ -141,7 +141,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       id: clip(it.id, 200), title: clip(it.title || it.id, 300), url: /^https?:\/\//.test(String(it.url || '')) ? String(it.url) : '',
       meta: strs(it.meta, 6), tags: strs(it.tags, 4, 30), at: it.at ? String(it.at) : null, version: it.version != null ? clip(it.version, 100) : null,
       detail: (Array.isArray(it.detail) ? it.detail : []).slice(0, 8).map(d => ({ who: clip(d.who, 120), at: d.at ? String(d.at) : null, text: clip(d.text, 2000), url: /^https?:\/\//.test(String(d.url || '')) ? String(d.url) : '', kind: d.kind ? clip(d.kind, 30) : '' })),
-      vars: Object.fromEntries(Object.entries(it.vars && typeof it.vars === 'object' ? it.vars : {}).slice(0, 20).map(([k, v]) => [clip(k, 40), clip(v, 6000)]))
+      vars: Object.fromEntries(Object.entries(it.vars && typeof it.vars === 'object' ? it.vars : {}).slice(0, 20).map(([k, v]) => [clip(k, 40), clip(v, k === 'project' ? 30000 : 6000)]))
     };
   }
   async function scriptJob(conn, x, ref, args, cwd){
@@ -169,6 +169,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
   async function refreshFeed(p, x, conf, feed, st, conn){
     const f = st.feeds[feed.name] ||= { items: [], first: {} };
     f.running = true; f.started = now(); writeState(p, x.id, st);
+    let fresh = [];
     try {
       const missing = [], settings = settingsFor(x, conf), args = tokens(feed.run).map(a => fill(a, { item: { id: '', title: '', vars: {} }, steps: [] }, settings, missing));
       if (missing.length) throw fail(400, `설정이 비어 있어요: ${missing.join(' ')}`);
@@ -181,6 +182,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       const out = parseOut(job.result.stdout);
       if (!out || !Array.isArray(out.items)) throw fail(502, '스크립트 결과에 items 목록이 없어요');
       const items = out.items.map(normItem).filter(Boolean).slice(0, 200);
+      if (f.seeded && feed.notify === 'yes') fresh = items.filter(it => !f.first[it.id]);   // 처음 가져온 목록은 알리지 않는다
       // 처음 가져온 목록은 "원래 있던 것" — 자동 시작을 먼저 켰어도 이미 할당돼 있던 티켓까지 한꺼번에 돌지 않게
       for (const it of items) f.first[it.id] ||= f.seeded ? now() : '1970-01-01T00:00:00.000Z';
       f.seeded = true;
@@ -191,6 +193,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     } catch (e) {
       Object.assign(f, { at: now(), ok: false, error: clip(e.message, 500) });
     } finally { f.running = false; }
+    for (const it of fresh) addNote(st, { kind: 'new', feed: feed.name, item: it.id, title: it.title, text: `${feed.name}에 새로 올라왔어요`, url: it.url });
     // 새로 들어온 항목 — 자동 시작을 켠 뒤에 처음 본 것만 자동으로
     const pc = conf;
     if (f.ok && feed.start){
@@ -300,6 +303,31 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     }
   };
   // 끝난 실행은 다음 단계에 넘기려고 받은 큰 값(이름이 _로 시작하는 필드, 예: diff)을 버린다 — 상태 파일은 동기화된다
+  /* ---------- 알림: 피드에 notify: yes를 적은 목록만 ---------- */
+  // 새 항목, 그리고 그 목록에서 시작한 작업이 내 차례·멈춤·끝남이 될 때 한 번씩. 상태 파일(동기화됨)의 notes에 최근 50개
+  const NOTE_KEEP = 50;
+  function addNote(st, n){
+    (st.notes ||= []).unshift({ id: 'n' + crypto.randomBytes(5).toString('hex'), at: now(), read: false, ...n, title: clip(n.title, 200), text: clip(n.text, 300) });
+    st.notes = st.notes.slice(0, NOTE_KEEP);
+  }
+  function noteRuns(x, st){
+    const on = new Set(x.feeds.filter(f => f.notify === 'yes').map(f => f.name));
+    if (!on.size) return;
+    st.notes_since ||= now();   // 알림을 켜기 전에 이미 멈춰 있던 작업은 알리지 않는다
+    for (const r of st.runs){
+      if (!on.has(r.feed) || !['input', 'stopped', 'done'].includes(r.status)) continue;
+      const s = r.steps.find(z => ['input', 'failed'].includes(z.status)), key = `${r.status}|${s ? s.key : ''}`;
+      if (r.noted === key) continue;
+      const fresh = r.updated >= st.notes_since;
+      r.noted = key;
+      if (!fresh) continue;
+      const verdict = [...r.steps].reverse().map(z => z.output && z.output.verdict).find(Boolean);
+      const text = r.status === 'input' ? `내 차례예요: ${(s && s.ask && s.ask.question) || (s && s.name) || '확인'}${verdict ? ` · ${verdict.title}` : ''}`
+        : r.status === 'stopped' ? `멈췄어요: ${s ? s.name : ''}${s && s.error ? ` · ${s.error}` : ''}`
+        : `끝났어요${verdict ? `: ${verdict.title}` : ''}`;
+      addNote(st, { kind: r.status, feed: r.feed, item: r.item.id, run: r.id, title: r.item.title, text, url: r.item.url || '' });
+    }
+  }
   const slim = run => { for (const s of run.steps) if (s.output && typeof s.output === 'object') for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k]; };
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true, confirm: c.confirm ? clip(c.confirm, 200) : '' }),
@@ -351,17 +379,25 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       case 'start': {
         const feed = x.feeds.find(f => f.name === a.feed), it = feed && ((st.feeds[feed.name] || {}).items || []).find(i => i.id === a.item);
         if (!it) throw fail(404, '목록에 없는 항목이에요. 목록을 새로 가져와 주세요');
+        // 피드가 선언한 입력값만 덮어쓴다. 경로·프록시 설정 등 항목의 나머지 값은 서버 목록 그대로.
+        const values = {}, allowed = new Set(P.startsOf(feed.inputs));
+        for (const [key, value] of Object.entries(a.values || {})){
+          if (!allowed.has(key) || typeof value !== 'string' || value.length > 1000) throw fail(400, `이 목록에서 바꿀 수 없는 입력이에요: ${key}`);
+          if (['port', 'pid'].includes(key) && value && (!/^\d+$/.test(value) || Number(value) < 1 || (key === 'port' && Number(value) > 65535))) throw fail(400, `${key === 'port' ? '포트' : 'PID'} 번호를 확인해 주세요`);
+          values[key] = value;
+        }
+        const selected = { ...it, vars: { ...it.vars, ...values } };
         const wname = a.workflow || feed.start;
         if (!feed.starts.includes(wname)) throw fail(400, `이 목록에서 시작할 수 없는 워크플로우예요: ${wname}`);
         if (a.fork){   // 같은 항목을 다른 갈래로 하나 더 — 갈래가 겹치는지는 그 단계가 끝날 때 본다
           if (!x.workflows.find(w => w.name === wname)?.steps.some(s => s.key === a.fork.step)) throw fail(400, '없는 단계예요');
           newRun(st, x, feed, it, 'button', wname, null, { step: a.fork.step, value: a.fork.value }); return;
         }
-        const prev = st.runs.find(r => r.feed === feed.name && r.item.id === it.id && r.workflow === wname && !['done', 'canceled'].includes(r.status));
+        const prev = st.runs.find(r => r.feed === feed.name && r.item.id === it.id && r.workflow === wname && !['done', 'canceled'].includes(r.status) && !(feed.controls === 'project' && r.status === 'stopped'));
         // 항목이 바뀌었으면(새 커밋 등) 사람을 기다리던 이전 실행은 그만두고 새로 — 하는 중인 것은 끝날 때까지 둔다
         if (prev && (prev.item.version == null || prev.item.version === it.version || ['running', 'waiting'].includes(prev.status))) throw fail(409, '이미 진행 중이에요');
         if (prev){ for (const s of prev.steps) await cancelJob(s); Object.assign(prev, { status: 'canceled', note: '항목이 바뀌어서 새로 시작했어요', updated: now() }); slim(prev); }
-        newRun(st, x, feed, it, 'button', wname, a.answer); return;
+        newRun(st, x, feed, selected, 'button', wname, a.answer); return;
       }
       case 'answer': case 'confirm': {
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
@@ -400,6 +436,11 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
         if (a.type === 'hide') h[key] = a.version == null ? '*' : clip(a.version, 100); else delete h[key];
         return;
       }
+      case 'read_notes': {   // ids가 없으면 모두
+        const ids = Array.isArray(a.ids) ? new Set(a.ids.map(String)) : null;
+        for (const n of st.notes || []) if (!ids || ids.has(n.id)) n.read = true;
+        return;
+      }
       default: throw fail(400, '모르는 동작이에요');
     }
   }
@@ -433,11 +474,16 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
           }
           for (const feed of x.feeds){
             const f = st.feeds[feed.name];
+            const interval = feed.controls === 'project' ? Math.min(everyOf(pc, feed) * 60000, 30000) : everyOf(pc, feed) * 60000;
             const force = again === 'all' || (again && f && !f.ok);
-            if (!force && (!inWindow(feed) || (f && f.at && Date.now() - Date.parse(f.at) < everyOf(pc, feed) * 60000))) continue;
+            if (!force && (!inWindow(feed) || (f && f.at && Date.now() - Date.parse(f.at) < interval))) continue;
             await refreshFeed(p, x, pc, feed, st, conf.ai);
           }
+          const prior = new Map(st.runs.map(r => [r.id, r.status]));
           await advance(p, x, pc, st, conf.ai);
+          const changed = st.runs.filter(r => ['done', 'stopped'].includes(r.status) && prior.get(r.id) !== r.status);
+          if (changed.length) for (const feed of x.feeds.filter(f => f.controls === 'project')) await refreshFeed(p, x, pc, feed, st, conf.ai);
+          noteRuns(x, st);
           st.auto = !!pc.auto;   // 다른 기기도 돌리는 컴퓨터의 자동 시작 상태를 보게
           writeState(p, x.id, st);
         } catch (e) { console.error(`플러그인 실행기 ${p}/${x0.id}: ${e.message}`); }
@@ -459,7 +505,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     const out = {};
     for (const x of list){
       const st = readState(p, x.id), pc = plugConf(c, p, x.id), full = await pluginOf(p, x.id);
-      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, checkins: full.checkins, links: full.links, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
+      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, input_values: !!f.inputs, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, checkins: full.checkins, links: full.links, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
         local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null, every: pc.every || {}, gates: pc.gates || {} } };
     }
     return { here: here(p), plugins: out };
@@ -524,8 +570,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
       busy.add(key);
       try {
         const st = readState(p, id);
+        const prior = new Map(st.runs.map(r => [r.id, r.status]));
         await apply(p, x, st, action, c.ai);
-        if (a.type !== 'refresh'){
+        if (a.type !== 'refresh' && a.type !== 'read_notes'){
           // 스크립트 단계는 금방 끝난다 — 다음 차례(10초)를 기다리지 않고 잠깐씩 이어서 본다(사람이 누른 직후 바로 다음 물음·결과가 보이게)
           for (let i = 0; i < 6; i++){
             await advance(p, x, plugConf(c, p, id), st, c.ai).catch(() => {});
@@ -533,6 +580,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
             if (!r || (s && s.kind !== 'script')) break;
             await new Promise(res => setTimeout(res, 500));
           }
+          noteRuns(x, st);
+          if (st.runs.some(r => ['done', 'stopped'].includes(r.status) && prior.get(r.id) !== r.status)) for (const feed of x.feeds.filter(f => f.controls === 'project')) await refreshFeed(p, x, plugConf(c, p, id), feed, st, c.ai);
         }
         writeState(p, id, st);
         return { applied: true, state: st };
@@ -597,5 +646,24 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {} }){
     return r;
   }
 
-  return { tick, start, status, setRunner, setLocal, act, approve, machine, setSecret, here, search };
+  // 알림 모아 보기 — 프로필의 모든 플러그인 상태 파일에서 최근 것부터. 어느 컴퓨터에서든 읽는다(상태 파일은 동기화된다)
+  async function notes(p){
+    const out = [];
+    for (const x of await installed(p).catch(() => [])){
+      const st = readJSON(statePath(p, x.id), null);
+      for (const n of (st && st.notes) || []) out.push({ ...n, plugin: x.id, plugin_name: x.manifest.name });
+    }
+    out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const list = out.slice(0, 50);
+    return { notes: list, unread: list.filter(n => !n.read).length };
+  }
+  // 읽음 — 플러그인마다 act(read_notes)로. 돌리는 컴퓨터가 아니면 받은편지함으로 간다
+  async function readNotes(p, ids){
+    const all = (await notes(p)).notes, pick = Array.isArray(ids) ? all.filter(n => ids.includes(n.id)) : all.filter(n => !n.read);
+    const by = {};
+    for (const n of pick) (by[n.plugin] ||= []).push(n.id);
+    for (const [id, list] of Object.entries(by)) await act(p, id, { type: 'read_notes', ids: list });
+    return notes(p);
+  }
+  return { tick, start, status, setRunner, setLocal, act, approve, machine, setSecret, here, search, notes, readNotes };
 }

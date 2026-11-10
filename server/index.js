@@ -17,6 +17,7 @@
 // POST /api/profile/:p/plugins/:id/update  설치 기록의 출처에서 다시 가져와 검사만 → { stage, …, update:{from, to, changes} }
 // DELETE /api/profile/:p/plugins/:id      휴지통으로
 // GET  /api/profile/:p/plugins/state      피드·실행 기록과 이 컴퓨터의 실행기 상태(server/runner.js)
+// GET  /api/profile/:p/notifications      알림(notify: yes 목록의 새 항목·내 차례·멈춤·끝남)   POST …/notifications/read {ids?}  읽음(없으면 모두)
 // POST /api/profile/:p/runner {on, ai}     이 컴퓨터에서 돌리기 켜기·끄기, AI 연결 넣기
 // GET  /api/profile/:p/plugins/:id/machine 이 컴퓨터의 승인·비밀값 상태     POST …/approve  승인     POST …/secret {name, value|null}
 // POST /api/profile/:p/plugins/:id/local {settings, auto}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
@@ -29,7 +30,7 @@
 // GET  /api/profile/:p/jobs               AI 예약 작업의 마지막 실행(이 컴퓨터) · POST …/jobs/:id/run  지금 돌리기(server/jobs.js)
 // GET  /api/profile/:p/chats              AI 챗봇 상태(로컬 AI 연결인지)와 방 목록 · GET …/chats/:room  방 하나(말·진행·확인 요청)
 // POST /api/profile/:p/chats {card? | project?, cwd?} 데이터 방, 카드 방, 프로젝트 방 열기(없으면 만든다) · DELETE …/chats/:room  카드 세션 지우기
-// POST …/chats/:room/send {id, text}  말 보내기 · …/cancel  그만두기 · …/reset  새 대화 · …/answer {request_id, allow}  확인 요청에 답하기(server/chats.js)
+// POST …/chats/:room/send {id, text, provider, model?, effort?}  말 보내기 · …/cancel  그만두기 · …/reset  새 대화 · …/answer {request_id, allow}  확인 요청에 답하기(server/chats.js)
 // POST …/chats/:room/memo {text}  방 메모 적기(빈 글이면 지운다) · …/read  끝난 답을 읽었다고 적기(카드의 '새 답'을 지운다)
 // POST …/chats/:room/cwd {cwd|null}  카드 세션의 작업 폴더 고르기·비우기 · GET …/chats/_dirs?path=  폴더 고르기 화면의 하위 폴더 목록
 // GET  /api/profile/:p/push?endpoint=   휴대폰 알림 서명 키와 이 기기의 구독 · POST …/push {subscription, kinds}  켜기·종류 바꾸기
@@ -377,14 +378,21 @@ async function api(req, res, url){
     if (sub === 'jobs' && !parts[3] && req.method === 'GET') return send(res, 200, await jobs.status(p));
     if (sub === 'jobs' && parts[3] && parts[4] === 'run' && req.method === 'POST') return send(res, 200, await jobs.runNow(p, parts[3]));
     if (sub === 'plugins' && parts[3] === 'state' && req.method === 'GET') return send(res, 200, await runner.status(p));
+    if (sub === 'notifications' && !parts[3] && req.method === 'GET') return send(res, 200, await runner.notes(p));
+    if (sub === 'notifications' && parts[3] === 'read' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.readNotes(p, Array.isArray(b.ids) ? b.ids.map(String).slice(0, 200) : null)); }
     if (sub === 'chats'){
       const rid = parts[3], act = parts[4];
       if (!rid && req.method === 'GET'){ push.mark(url.searchParams.get('dev'), true); return send(res, 200, await chats.status(p)); }
       if (rid === '_dirs' && req.method === 'GET') return send(res, 200, await chats.dirs(p, url.searchParams.get('path')));
+      if (rid && act === 'attachments' && parts[5] && req.method === 'GET') return chats.attachment(p, rid, parts[5], req, res);
+      if (rid && act === 'attachments' && !parts[5] && req.method === 'POST') return send(res, 201, await chats.upload(p, rid, req, url.searchParams.get('name')));
       if (!rid && req.method === 'POST'){ const b = await body(req); return send(res, 200, await chats.open(p, { card:b.card ? String(b.card) : null, project:b.project ? String(b.project) : null, cwd:b.cwd ? String(b.cwd) : null })); }
       if (rid && !act && req.method === 'GET') return send(res, 200, chats.room(p, rid));
       if (rid && !act && req.method === 'DELETE') return send(res, 200, await chats.remove(p, rid));
       if (rid && req.method === 'POST' && act === 'send') return send(res, 202, await chats.send(p, rid, await body(req)));
+      if (rid && req.method === 'POST' && act === 'handoff') return send(res, 202, await chats.handoff(p, rid, await body(req)));
+      if (rid && req.method === 'POST' && act === 'cancel-turn') return send(res, 200, await chats.cancelTurn(p, rid, await body(req)));
+      if (rid && req.method === 'POST' && act === 'run-now') return send(res, 202, await chats.runNow(p, rid, await body(req)));
       if (rid && req.method === 'POST' && act === 'cancel') return send(res, 200, await chats.cancel(p, rid));
       if (rid && req.method === 'POST' && act === 'reset') return send(res, 200, await chats.reset(p, rid));
       if (rid && req.method === 'POST' && act === 'answer') return send(res, 200, await chats.answer(p, rid, await body(req)));

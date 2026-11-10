@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: fe-projects
 name: FE 프로젝트 관리
-version: 0.2.0
+version: 0.2.1
 author: pkm
 permissions:
   ai: [agent]

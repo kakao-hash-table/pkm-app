@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "relevant": { "type": "boolean" },
+    "reason": { "type": "string" },
+    "targets": { "type": "array", "items": { "type": "string" } },
+    "fix": { "type": "string" }
+  },
+  "required": ["relevant", "reason", "targets", "fix"],
+  "additionalProperties": false
+}
