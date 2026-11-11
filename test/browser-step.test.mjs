@@ -1,6 +1,7 @@
 // 워크플로우의 브라우저 단계(browser(…))를 실제 실행기(server/runner.js)와 가짜 pkm-ai-server로 —
 // 요청 꼴(only·vars·allow·files·tab), 넘겨받기 → 내 확인 → 답 → 같은 작업으로 이어 감, 구조화 결과가 뒤 단계로, 승인에 브라우저가 없으면 멈춤,
-// 내 정보(vars)가 브라우저 단계 기록과 끝난 실행의 상태 파일에 남지 않음, 사람이 보는 브라우저 경로의 탭 검사, 규격 검사.
+// 내 정보(vars)가 브라우저 단계 기록과 끝난 실행의 상태 파일에 남지 않음, 사람이 보는 브라우저 경로의 탭 검사, 규격 검사,
+// 멈춰 둔 넘겨받기(작업이 done + parked) → 내 확인으로 남고 답하면 같은 대화·같은 브라우저 옵션으로 이어 함, 스크립트의 again(앞 단계로 되돌리기).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,11 +26,14 @@ const ROOT = path.join(DATA, P, '_플러그인', ID);
 const fake = { approved: true, browser: true, hand: null, result: { text: '', structured: { _result: { sent: 'yes', proof: '홍길동님 접수 완료 · 접수 번호 77' } } }, posts: [], answers: [], deleted: [], tabs: [] };
 const jobs = new Map(); let n = 0;
 const finish = j => Object.assign(j, { status: 'done', pending: [], result: { ...fake.result, session: 'sess-1' } });
+// 에이전트가 답을 기다리다 쉬러 갔다 — 작업은 끝났고(done) 멈춰 둔 넘겨받기(parked)가 남는다
+const parkJob = (j, message) => Object.assign(j, { status: 'done', pending: [], session: 'sess-park', result: { text: '사용자를 기다리다 쉬어요', structured: null, session: 'sess-park' },
+  parked: { message, tab: j.agent.browser.tab, url: 'https://apply.example.com/login', title: '로그인', at: new Date().toISOString() } });
 const ai = http.createServer(async (req, res) => {
   const send = (s, b) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); };
   let body = ''; for await (const c of req) body += c; body = body ? JSON.parse(body) : {};
   const u = new URL(req.url, 'http://x');
-  if (u.pathname === '/v1/providers') return send(200, { providers: [{ id: 'claude', installed: true, logged_in: true, agent: { modes: ['read', 'auto'], approvals: true, browser: fake.browser } }] });
+  if (u.pathname === '/v1/providers') return send(200, { providers: [{ id: 'claude', installed: true, logged_in: true, agent: { modes: ['read', 'auto'], approvals: true, browser: fake.browser, browser_park: true } }] });
   if (u.pathname === '/v1/plugins') return req.method === 'POST' ? send(201, { plugin: body }) : send(200, { plugins: fake.approved === null ? [] : [{ id: ID, root: ROOT, permissions: { browser: fake.approved }, files: {} }] });
   if (u.pathname === '/v1/jobs' && req.method === 'POST'){
     const id = `job${++n}`;
@@ -38,9 +42,12 @@ const ai = http.createServer(async (req, res) => {
       jobs.set(id, job); return send(201, { job });
     }
     fake.posts.push(body);
+    if (body.agent.session && (fake.gone || []).includes(body.agent.session)) return send(400, { error: '이어 갈 대화를 찾지 못했어요' });
     const job = { id, status: 'running', agent: body.agent, pending: [], result: null };
+    if (fake.hold){ jobs.set(id, job); return send(201, { job }); }
     if (fake.hand && body.agent.browser) job.pending = [{ id: `bh_${n}`, tool: 'BrowserHandoff', title: '브라우저에서 해 주세요', description: fake.hand, input: { message: fake.hand, tab: body.agent.browser.tab, url: 'https://apply.example.com/login', title: '로그인' }, at: new Date().toISOString() }];
     else finish(job);
+    if (/하지 못했다고 해요/.test(body.prompt)) job.result = { text: '', structured: { _result: { sent: 'no', proof: '본인 인증을 하지 못했어요' } }, session: 'sess-park' };
     jobs.set(id, job); return send(201, { job });
   }
   let m = u.pathname.match(/^\/v1\/jobs\/(\w+)\/answer$/);
@@ -88,7 +95,7 @@ async function start(item, workflow = '내기'){
   const st = (await runner.act(P, ID, { type: 'start', feed: '낼 곳', item, workflow })).state;
   return st.runs[0].id;
 }
-const reset = () => Object.assign(fake, { approved: true, browser: true, hand: null, posts: [], answers: [], deleted: [], tabs: [] });
+const reset = () => Object.assign(fake, { approved: true, browser: true, hand: null, hold: false, gone: [], posts: [], answers: [], deleted: [], tabs: [] });
 const MINE = /홍길동|010-9999-8888/;
 
 test('브라우저 단계 — 계약대로 보낸다(브라우저 도구만 · 내 정보 · 갈 수 있는 곳 · 올릴 파일 · 탭 키)', async () => {
@@ -232,6 +239,96 @@ test('에이전트 단계도 옆의 .schema.json 모양으로 답하게 하고, 
     assert.deepEqual(fake.posts[0].agent, { cwd: ROOT, mode: 'read' }, '브라우저는 browser 단계에만 붙는다');
     assert.deepEqual(stepOf(r, '살피기').output, { found: true, summary: '쓸 만한 글이 있어요' });
   } finally { fake.result = keep; }
+});
+
+test('멈춰 둔 넘겨받기 — 에이전트가 쉬러 가도 내 확인으로 남고, 답하면 같은 대화·같은 브라우저 옵션으로 이어 한다', async () => {
+  reset(); fake.hand = '본인 인증을 해 주세요'; asked.length = 0;
+  const rid = await start('cm-2026');
+  let r = await until(rid, r => r.status === 'input', '내 확인으로 멈춘다');
+  parkJob(jobs.get(stepOf(r, '브라우저').job), '본인 인증을 해 주세요');
+  await runner.tick();
+  r = (await state()).runs.find(z => z.id === rid);
+  const s = stepOf(r, '브라우저');
+  assert.equal(r.status, 'input'); assert.equal(s.status, 'input');
+  assert.deepEqual(s.ask, { type: 'handoff', question: '본인 인증을 해 주세요', parked: true, url: 'https://apply.example.com/login', title: '로그인' }, '답할 요청(request_id)은 없다');
+  assert.equal(s.session, 'sess-park'); assert.equal(s.job, null);
+  assert.equal(s.output, undefined, '쉬러 간 작업의 결과는 버린다');
+  assert.equal(asked.length, 1, '알림은 처음 넘겼을 때 한 번만');
+  assert.equal(V.runFeedback(r).text, '내 확인이 필요해요 · 본인 인증을 해 주세요', '목록 줄은 진행 중 넘겨받기와 같다');
+  for (let i = 0; i < 3; i++) await runner.tick();   // 며칠이고 그대로
+  assert.equal((await state()).runs.find(z => z.id === rid).status, 'input');
+  assert.equal(fake.posts.length, 1); assert.equal(asked.length, 1);
+
+  fake.hand = null;
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: 'done' });
+  assert.equal(fake.posts.length, 2, '새 작업으로 이어 한다');
+  assert.equal(fake.answers.length, 0, '끝난 작업에 답하지 않는다');
+  const [first, again] = fake.posts;
+  assert.equal(again.prompt, '사용자가 부탁한 일을 끝냈다고 해요. snapshot으로 화면을 확인하고, 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.');
+  assert.deepEqual(again.json_schema, first.json_schema, '스키마는 원래 것 그대로');
+  assert.deepEqual(again.agent, { ...first.agent, session: 'sess-park' }, '같은 대화, 같은 브라우저 옵션(탭·내 정보·갈 수 있는 곳·올릴 파일)');
+  r = await until(rid, r => r.status === 'done', '이어서 끝까지 간다');
+  assert.equal(stepOf(r, '결과').output.verdict.title, '냈어요');
+  assert.doesNotMatch(stateFile(), MINE);
+});
+
+test('멈춰 둔 넘겨받기 — 넘긴 것을 보기 전에 쉬러 갔으면 그때 알리고, [못 했어요]는 더 하지 말라고 이어 한다', async () => {
+  reset(); fake.hold = true; asked.length = 0;
+  const rid = await start('cm-2026');
+  let r = await until(rid, r => stepOf(r, '브라우저').status === 'running', '브라우저 단계가 돈다');
+  parkJob(jobs.get(stepOf(r, '브라우저').job), '홍길동 이름으로 본인 인증을 해 주세요');
+  r = await until(rid, r => r.status === 'input', '멈춰 둔 넘겨받기로 올린다');
+  assert.deepEqual(stepOf(r, '브라우저').ask, { type: 'handoff', question: '{{이름}} 이름으로 본인 인증을 해 주세요', parked: true, url: 'https://apply.example.com/login', title: '로그인' });
+  assert.deepEqual(asked.map(a => a.question), ['{{이름}} 이름으로 본인 인증을 해 주세요']);
+  fake.hold = false;
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: 'fail' });
+  assert.equal(fake.posts[1].prompt, '사용자가 하지 못했다고 해요. 더 진행하지 말고 지금 상태로 결과를 돌려주세요.');
+  assert.equal(fake.posts[1].agent.session, 'sess-park');
+  r = await until(rid, r => r.status === 'done', '에이전트가 낸 결과대로 끝난다');
+  assert.equal(stepOf(r, '결과').output.verdict.title, '내지 못했어요');
+});
+
+test('멈춰 둔 넘겨받기 — AI 서버가 그 대화를 모르면 단계를 멈춘 것으로 두고, 다시 하면 새 대화로 한다', async () => {
+  reset(); fake.hand = '로그인해 주세요';
+  const rid = await start('cm-2026');
+  let r = await until(rid, r => r.status === 'input', '멈춘다');
+  parkJob(jobs.get(stepOf(r, '브라우저').job), '로그인해 주세요');
+  await runner.tick();
+  fake.hand = null; fake.gone = ['sess-park'];
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: 'done' });
+  r = (await state()).runs.find(z => z.id === rid);
+  assert.equal(r.status, 'stopped');
+  assert.equal(stepOf(r, '브라우저').status, 'failed');
+  assert.match(stepOf(r, '브라우저').error, /AI가 하던 대화를 잇지 못했어요 — 이어 갈 대화를 찾지 못했어요/);
+  await runner.act(P, ID, { type: 'retry', run: rid, step: '브라우저' });
+  r = await until(rid, r => r.status === 'done', '다시 하면 끝까지 간다');
+  const last = fake.posts.at(-1);
+  assert.equal('session' in last.agent, false, '모르는 대화는 버리고 새로');
+  assert.match(last.prompt, /접수 화면을 열어 "표어 공모"/, '원래 프롬프트로');
+});
+
+test('again — 스크립트가 앞 스크립트 단계로 되돌리면 사람이 그 답을 한 것처럼 거기부터 다시 돈다(5번까지)', async () => {
+  reset();
+  let rid = await start('cm-2026', '되돌리기');
+  let r = await until(rid, r => r.status === 'input', '모자란 내용을 묻는다');
+  assert.equal(stepOf(r, '고르기').output.picked, 'first');
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '확인', value: '연락처를 더했어요' });
+  r = await until(rid, r => r.status === 'done', '되돌린 뒤 끝까지 간다');
+  assert.equal(stepOf(r, '고르기').answer, 'ok', '앞 단계에 그 답을 한 것처럼');
+  assert.equal(stepOf(r, '고르기').output.picked, 'ok');
+  assert.equal(stepOf(r, '확인').output.summary, '다 됐어요');
+  assert.equal(stepOf(r, '확인').answer, null, '되돌린 단계 뒤의 답은 비운다(같은 답으로 또 되돌리지 않게)');
+  assert.equal(r.again, 1);
+
+  rid = await start('위비티:12/3', '되돌리기');
+  r = await until(rid, r => r.status === 'stopped', '끝없이 되돌리면 멈춘다');
+  assert.equal(stepOf(r, '확인').error, '같은 단계를 너무 여러 번 되돌렸어요');
+  assert.equal(r.again, 5);
+  assert.equal(stepOf(r, '고르기').output.picked, 'loop');
+
+  rid = await start('no-web', '되돌리기');
+  r = await until(rid, r => r.status === 'stopped', '앞 스크립트 단계가 아니면 멈춘다');
+  assert.match(stepOf(r, '확인').error, /again은 앞에 있는 스크립트 단계만 가리킬 수 있어요: 확인/);
 });
 
 test('사람이 보는 브라우저 — 이 플러그인의 탭만 중계한다', async () => {

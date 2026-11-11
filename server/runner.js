@@ -7,6 +7,7 @@
 // 비밀값(토큰)은 어느 쪽에도 두지 않는다 — pkm-ai-server에만 있고, 승인한 플러그인 스크립트의 환경 변수로만 간다.
 // 이 컴퓨터의 플러그인 설정(runner.json)에는 설정값 말고도 every(목록마다 가져오는 주기, 분)와 gates(자동 시작한 작업에서 내 확인을 받을 단계)가 있다.
 // 브라우저 단계(browser(…)): 브라우저 도구만 가진 에이전트. 에이전트가 사람에게 넘긴 일(BrowserHandoff)은 그 단계의 '내 확인'으로 올리고, 답하면 같은 작업을 이어 간다.
+// 답이 오래 없으면 pkm-ai-server가 에이전트를 쉬게 한다(작업은 done + parked) — 내 확인은 그대로 남기고, 답하면 같은 대화(session)·같은 탭으로 새 작업을 만들어 이어 한다.
 // 사람이 보는 화면(작업 화면의 브라우저 보기·미리 로그인)은 이 서버가 pkm-ai-server의 같은 탭으로 중계한다(browser()).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -72,6 +73,9 @@ const TAB_RE = /^[\w:.|\-/]{1,160}$/;
 const tabSeg = v => /^[\w.-]{1,48}$/.test(String(v)) ? String(v) : 'h' + crypto.createHash('sha1').update(String(v)).digest('hex').slice(0, 16);
 export const tabKey = (p, id, name) => `${tabSeg(p)}|${id}|${tabSeg(name)}`;
 const LOST = 'AI 서버에서 이 작업을 찾지 못했어요. 이 단계를 다시 해 주세요';
+// 멈춰 둔 넘겨받기에 답했을 때 에이전트에게 하는 말(같은 대화를 이어 간다)
+const RESUME = { done: '사용자가 부탁한 일을 끝냈다고 해요. snapshot으로 화면을 확인하고, 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.', fail: '사용자가 하지 못했다고 해요. 더 진행하지 말고 지금 상태로 결과를 돌려주세요.' };
+const AGAIN_MAX = 5;
 // 앞 스크립트 단계가 낸 옵션 { vars, allow, files, tab } — 꼴이 틀린 값은 버리지 않고 멈춘다(갈 수 있는 곳이 조용히 넓어지지 않게)
 function browserOpts(v){
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {}, out = {};
@@ -346,14 +350,21 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           const h = (j.pending || []).find(q => q.tool === 'BrowserHandoff' && !(step.answered || []).includes(q.id));
           if (h){
             const inp = h.input || {}, what = scrub(clip(inp.message || h.description || '브라우저에서 할 일이 있어요', 300), my);
-            Object.assign(step, { status: 'input', ask: { type: 'handoff', question: what, request_id: String(h.id), url: /^https?:\/\//.test(String(inp.url || '')) ? clip(inp.url, 500) : '', title: clip(inp.title || '', 120) } });
+            Object.assign(step, { status: 'input', told: step.job, ask: { type: 'handoff', question: what, request_id: String(h.id), url: /^https?:\/\//.test(String(inp.url || '')) ? clip(inp.url, 500) : '', title: clip(inp.title || '', 120) } });
             Object.assign(run, { status: 'input', updated: now() });
             Promise.resolve().then(() => onAsk(p, { plugin: x.id, name: x.manifest.name, run: run.id, step: step.key, title: run.item.title, question: what })).catch(() => {});
             return;
           }
         }
         if (!['done', 'error', 'canceled'].includes(j.status)){ if (step.status !== 'running'){ step.status = 'running'; run.status = 'running'; run.updated = now(); } return; }
-        if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : scrub(jobError(j), my), text: scrub(clip(j.result && (j.result.stdout || j.result.text), 4000), my), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
+        // 이어 하던 대화가 실패했으면 그 대화는 버린다 — 다시 하면 새 대화로
+        if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : scrub(jobError(j), my), text: scrub(clip(j.result && (j.result.stdout || j.result.text), 4000), my), finished: now(), ...(web ? { session: undefined } : {}) }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
+        if (web && j.parked){   // 넘긴 일을 보기 전에 에이전트가 이미 쉬러 갔다 — 알림은 지금 보낸다
+          const told = step.told === step.job || !!(step.ask && step.ask.type === 'handoff');   // 이 작업에서 넘긴 일을 이미 알렸으면 다시 알리지 않는다(서버가 넘긴 일을 거둔 뒤 쉬러 가는 사이에 봤어도)
+          park(run, step, j, my);
+          if (!told) Promise.resolve().then(() => onAsk(p, { plugin: x.id, name: x.manifest.name, run: run.id, step: step.key, title: run.item.title, question: step.ask.question })).catch(() => {});
+          return;
+        }
         let out = d.kind === 'script' ? parseOut(j.result.stdout) : (j.result.structured || parseOut(j.result.text));
         // 브라우저 단계의 결과는 웹 페이지를 읽은 AI의 글이다 — 실행기를 움직이는 필드(묻기·설정 바꾸기·지우기·갈래)는 스크립트 단계만 낸다
         if (web && out && typeof out === 'object'){ out = scrub(out, my); for (const k of ['ask', 'settings_patch', 'forget', 'lane', 'change', 'fork']) delete out[k]; }
@@ -370,6 +381,16 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         if (out && out.settings_patch){   // 같은 차례에 이어 시작하는 다음 단계도 바뀐 설정을 보게. 목록도 바뀐 설정으로 다시 가져온다(설정을 인자로 받는 목록·다시 묻기)
           patchSettings(p, x, out.settings_patch); settings = settingsFor(x, plugConf(readConf(), p, x.id));
           for (const fs_ of Object.values(st.feeds)) if (fs_) fs_.at = null;
+        }
+        if (d.kind === 'script' && out && out.again && typeof out.again === 'object'){   // 앞 스크립트 단계로 되돌리기 — 사람이 그 단계에 그 답을 한 것처럼 거기부터 다시 돈다
+          const i = run.steps.indexOf(step), k = run.steps.findIndex(z => z.key === String(out.again.step)), stop = error => { Object.assign(step, { status: 'failed', error, output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); };
+          if (k < 0 || k >= i || (def.steps.find(z => z.key === run.steps[k].key) || {}).kind !== 'script') return stop(`again은 앞에 있는 스크립트 단계만 가리킬 수 있어요: ${clip(out.again.step, 60)}`);
+          if ((run.again || 0) >= AGAIN_MAX) return stop('같은 단계를 너무 여러 번 되돌렸어요');
+          run.again = (run.again || 0) + 1;
+          for (const z of run.steps.slice(k)) Object.assign(z, { status: 'pending', job: null, error: null, ask: null, answered: undefined, output: z === run.steps[k] ? z.output : null, finished: null, when_skipped: undefined, lenient: undefined, answer: null, answer_label: null });
+          run.steps[k].answer = String(out.again.value ?? '').slice(0, 2000);
+          run.updated = now();
+          return;   // 다음 차례에 그 단계부터
         }
         if (out && out.lane){   // 갈래 이름(예: 저장소) — 같은 항목·워크플로우에서 같은 갈래는 하나만 돈다
           const lane = clip(out.lane, 60);
@@ -408,7 +429,16 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true, confirm: c.confirm ? clip(c.confirm, 200) : '' }),
     free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true, value: a.value ? clip(a.value, 2000) : '' });   // value: 적는 칸에 미리 채울 글(고쳐서 보낸다)   // inline: 목록 줄에서 바로 고르는 버튼으로
 
-  async function startStep(conn, x, run, step, d, settings, p){
+  // 멈춰 둔 넘겨받기 — 에이전트가 답을 기다리다 쉬러 갔다(작업은 끝났고 탭과 채운 내용은 남아 있다). 내 확인은 그대로 두고, 답하면 그 대화(session)를 이어 새 작업을 만든다
+  function park(run, step, j, my){
+    const k = j.parked || {}, was = step.ask && step.ask.type === 'handoff' ? step.ask : null;   // 이미 내 확인으로 올린 일이면 그 말 그대로
+    Object.assign(step, { status: 'input', job: null, session: j.session || (j.result && j.result.session) || step.session, until: null, reason: null,
+      ask: { type: 'handoff', question: was ? was.question : scrub(clip(k.message || '브라우저에서 할 일이 있어요', 300), my), parked: true,
+        url: /^https?:\/\//.test(String(k.url || '')) ? clip(k.url, 500) : was ? was.url : '', title: clip(k.title || (was ? was.title : ''), 120) } });
+    Object.assign(run, { status: 'input', updated: now() });
+  }
+  // resume: 멈춰 둔 넘겨받기를 이어 할 때 프롬프트 대신 보낼 말(스키마·브라우저 옵션·대화는 그대로)
+  async function startStep(conn, x, run, step, d, settings, p, resume){
     let web = null;   // 브라우저 단계 — 이 컴퓨터에서 브라우저까지 승인했을 때만, 앞 스크립트 단계가 낸 옵션으로
     if (d.kind === 'browser'){
       const bs = await browserState(p, x.id);
@@ -433,10 +463,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       if (fs.existsSync(sf)) try { schema = JSON.parse(fs.readFileSync(sf, 'utf8')); } catch { throw fail(400, `${path.basename(sf)}이 JSON이 아니에요`); }
       prompt = fs.readFileSync(path.join(x.path, prompt), 'utf8');
     }
-    const pm = []; prompt = fill(prompt, run, settings, pm);
+    const pm = []; prompt = resume || fill(prompt, run, settings, pm);
     const lost = pm.filter(k => k.includes('.') && run.steps.some(z => z.key === k.slice(1, -1).split('.')[0] && z.status !== 'skipped'));   // JSON 예시 같은 중괄호와 사람이 건너뛴 단계는 두고, 끝난 단계에 빠진 결과만 본다
     if (lost.length && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${lost.join(' ')}`);
-    if (step.answer != null) prompt += `\n\n사용자 추가 요청: ${step.answer}`;
+    if (step.answer != null && !resume) prompt += `\n\n사용자 추가 요청: ${step.answer}`;
     const provider = web ? 'claude' : settings.provider || 'claude';   // 브라우저 도구는 Claude만
     const body = { plugin: { id: x.id, root: x.path }, provider, prompt, tag: `plugin:${x.id}` };
     if (schema){   // ai·agent·browser 모두 — 결과(구조화 출력)가 단계 결과가 된다
@@ -484,6 +514,18 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       }
       case 'answer': case 'confirm': {
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
+        if (handed(step) && step.ask.parked){   // 멈춰 둔 넘겨받기 — 그 대화를 이어 새 작업을 만든다(탭과 채운 내용은 그대로다)
+          const bs = await browserState(p, x.id), d = (x.workflows.find(w => w.name === run.workflow) || { steps: [] }).steps.find(z => z.key === step.key);
+          if (!bs.ok) throw fail(409, bs.message);   // 승인이 풀렸다 — 멈춰 둔 채로 두고 알려 준다
+          if (!d) throw fail(409, '이 단계가 플러그인에서 사라졌어요');
+          try { step.job = await startStep(conn, x, run, step, d, settingsFor(x, conf), p, RESUME[a.type === 'confirm' || a.value === 'done' ? 'done' : 'fail']); }
+          catch (e) {
+            if (e.status === 502) throw e;   // AI 서버에 닿지 않는다 — 켜진 뒤 다시 누르면 된다
+            Object.assign(step, { status: 'failed', ask: null, session: undefined, error: clip(`AI가 하던 대화를 잇지 못했어요 — ${e.message}`, 500), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return;
+          }
+          Object.assign(step, { status: 'running', ask: null, answered: undefined, error: null });
+          Object.assign(run, { status: 'running', updated: now() }); return;
+        }
         if (handed(step)){   // 넘겨받은 일을 마쳤다·못 했다 — 같은 작업에 답해 이어 가게 한다(단계를 다시 돌리지 않는다)
           const ok = a.type === 'confirm' || a.value === 'done';
           try { await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id: step.ask.request_id, allow: ok, message: ok ? '' : '사용자가 브라우저에서 하지 못했다고 했어요' }) }); }
@@ -509,7 +551,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         for (const s of run.steps.slice(i)) await cancelJob(s);
         // lenient: 못 채운 값은 빈 값으로 두고 이 단계를 한다(앞 단계 결과가 비었을 때 처음부터 다시 말고 이어 가는 길)
         for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, answered: undefined, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
-        Object.assign(run, { status: 'queued', note: null, finished: null, updated: now() }); return;
+        Object.assign(run, { status: 'queued', note: null, finished: null, again: undefined, updated: now() }); return;
       }
       case 'skip': {
         if (!step || !['failed', 'input'].includes(step.status)) throw fail(409, '건너뛸 수 있는 단계가 아니에요');
@@ -536,6 +578,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
   }
 
   /* 넘겨받기를 기다리는 단계 — 그 사이 작업이 사라졌으면(AI 서버 기록이 없어졌다) 멈춘 것으로 두어 다시 하게 하고,
+     에이전트가 쉬러 갔으면(done + parked) 멈춰 둔 넘겨받기로 바꿔 며칠이고 내 확인으로 남기고,
      답할 것이 사라졌으면(AI 서버를 다시 켜 작업이 처음부터 다시 돈다·시간이 넘어 끝났다) 기다림을 풀어 다음 차례에 작업 상태대로 한다 */
   async function handoffs(st, conn){
     for (const run of st.runs){
@@ -545,6 +588,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       try { j = (await ai(conn, `/v1/jobs/${step.job}`)).job; }
       catch (e) { if (e.status === 404){ Object.assign(step, { status: 'failed', ask: null, error: LOST, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); } continue; }
       if ((j.pending || []).some(q => q.id === step.ask.request_id)) continue;
+      if (j.status === 'done' && j.parked){ park(run, step, j); continue; }   // 에이전트가 기다리다 쉬러 갔다 — 내 확인은 그대로(알림은 처음 넘겼을 때 갔다)
       Object.assign(step, { status: 'running', ask: null }); Object.assign(run, { status: 'running', updated: now() });
     }
   }

@@ -54,6 +54,17 @@ test('결과 적기 — 완료를 봤을 때만 냈어요. 확인 못 했으면 
   assert.deepEqual(r.ask.choices.map(c => c.value), ['yes', 'later']);
   assert.equal(db().contests['wevity:1'].submitted, undefined);
   assert.equal(run('browsed', { cid: 'wevity:1', answer: 'later' }).sent, false);
+  // 내지 못했을 때 — 양식이 요구한 내용(need)을 적으면 내 데이터에 기억하고 제출 단계부터 다시 돈다. 없으면 [브라우저로 다시 내기]
+  r = run('browsed', { cid: 'wevity:1', result: { sent: 'no', reason: "필수 칸 '주소'에 넣을 정보가 없어요", proof: '', did: [], need: ['주소'] } });
+  assert.equal(r.ask.value, '주소: '); assert.equal(r.ask.free, true);
+  r = run('browsed', { cid: 'wevity:1', answer: '주소: 서울특별시 중구 세종대로 110' });
+  assert.deepEqual(r.again, { step: '제출', value: 'browse' });
+  r = run('submit', { cid: 'wevity:1', me: ME, answer: 'browse' });
+  assert.equal(r._browser.vars.주소, '서울특별시 중구 세종대로 110'); assert.match(r._task, /\{\{주소\}\}/); assert.equal(r.choice, 'browse', '고른 안 그대로 — 다시 묻지 않는다');
+  r = run('browsed', { cid: 'wevity:1', result: { sent: 'no', reason: '본인 인증을 하지 못했어요', proof: '', did: [], need: [] } });
+  assert.deepEqual(r.ask.choices.map(c => c.value), ['retry', 'yes', 'later']);
+  assert.deepEqual(run('browsed', { cid: 'wevity:1', answer: 'retry' }).again, { step: '제출', value: 'browse' });
+  run('browsed', { cid: 'wevity:1', result: { sent: 'unknown', reason: '제출을 눌렀지만 완료 화면이 뜨지 않았어요', proof: '잠시 후 다시 시도', did: [], need: [] } });
   r = run('submit', { cid: 'wevity:1', me: ME, full: 'true' });
   assert.equal(r.summary, '냈는지 묻기', '지난 시도가 불확실하면 묻는다');
   assert.equal(where(r, '지난 시도')[0].title, '제출됐는지 확인하지 못했어요');

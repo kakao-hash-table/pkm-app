@@ -4815,7 +4815,7 @@ function vPluginRun(id, rid){
      ${rep && rep.pr ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="copy" data-text="${esc(rep.pr)}" data-msg="PR 설명을 복사했어요">PR 설명 복사</button>` : ''}
      ${agent ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="redo" data-id="${id}" data-run="${r.id}" data-step="${esc(agent.key)}">AI에게 다시 시키기</button>` : ''}
      <span class="pl-quiet">${btn('confirm', '끝난 것으로 옮기기', 'btn-text')}${cancel}</span>`];
-  else if (hand) card = ['wait', `${i}/${n} ${esc(s.name)} — 내 차례예요`, 'AI가 브라우저에서 할 일을 넘겼어요. 끝내고 [다 했어요]를 누르면 AI가 이어서 해요.', cancel];   // 부탁한 일과 [다 했어요]는 브라우저 화면 바로 위에(하는 곳 옆, 주요 버튼은 한 곳에만)
+  else if (hand) card = ['wait', `${i}/${n} ${esc(s.name)} — 내 차례예요`, s.ask.parked ? 'AI가 브라우저에서 할 일을 넘겼어요. AI는 기다리다 쉬고 있어요. 끝내고 누르면 이어서 해요.' : 'AI가 브라우저에서 할 일을 넘겼어요. 끝내고 [다 했어요]를 누르면 AI가 이어서 해요.', cancel];   // 부탁한 일과 [다 했어요]는 브라우저 화면 바로 위에(하는 곳 옆, 주요 버튼은 한 곳에만)
   else if (r.status === 'input' && vd && s.ask && s.ask.inline) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), `${plChoices(id, r, s)}${cancel}`];
   else if (r.status === 'input' && vd && s.ask) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), ''];   // 판정을 먼저 보이고, 묻는 말은 아래 폼에서
   else if (r.status === 'input') card = ['wait', esc(s.ask.question || '답이 필요해요'), esc(s.ask.hint || ''), ''];

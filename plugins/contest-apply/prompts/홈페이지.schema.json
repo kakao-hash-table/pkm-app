@@ -27,13 +27,21 @@
       "type": "string"
      },
      "description": "한 일을 순서대로 짧게(칸 이름과 넣은 것 — 내 정보는 자리표시로, 넘긴 일, 누른 버튼)"
+    },
+    "need": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "양식이 꼭 요구하는데 '쓸 수 있는 자리표시'에 없던 응모자 정보의 이름(예: 주소, 생년월일, 소속). 없으면 빈 배열"
     }
    },
    "required": [
     "sent",
     "reason",
     "proof",
-    "did"
+    "did",
+    "need"
    ]
   }
  },

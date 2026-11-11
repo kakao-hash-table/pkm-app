@@ -64,7 +64,7 @@ const SEND = { email: '이메일로 내요', form: '구글 폼으로 내요', nf
 const item = c => ({ id: c.key, title: titleOf(c.title), url: c.url, at: c.added, vars: { cid: c.key }, sort: E.sortOf(c),
   version: `${c.fit ? 'f' : ''}${c.draft ? `d${c.draft.at}` : ''}${c.submitted ? 's' : ''}${c.result || ''}` });
 // 제출 화면이 달라지는 값만 — 날짜(D-day)·접수 방법·접수처·메일 계정. 이 값이 바뀌면 기다리던 '냈나요?'를 새로 묻는다(reask). AI 안처럼 실행이 스스로 바꾸는 값은 넣지 않는다
-const ver = (c, db) => crypto.createHash('sha1').update(['6', TODAY, c.fit.submit.method, c.fit.submit.to, mailReady(c.fit) ? 'm' : '', c.refit_at || '', FULL ? 'auto' : '', ...Object.keys(FORM).filter(k => tested(db, k))].join('|')).digest('hex').slice(0, 12);
+const ver = (c, db) => crypto.createHash('sha1').update(['7', TODAY, c.fit.submit.method, c.fit.submit.to, mailReady(c.fit) ? 'm' : '', c.refit_at || '', FULL ? 'auto' : '', ...Object.keys(FORM).filter(k => tested(db, k))].join('|')).digest('hex').slice(0, 12);
 const aiTop = c => c.draft ? c.draft.items.slice(0, Math.min(c.fit ? c.fit.submit.allow : 1, c.draft.items.length)) : [];   // AI가 추천한 안(응모 건수만큼)
 // 낼 안 — 내가 골랐으면 그것, 아니면 AI 추천
 const top = c => { const it = c.draft ? c.draft.items : [], p = (c.picks || []).filter(i => it[i]); return p.length ? p.map(i => it[i]) : aiTop(c); };
@@ -586,7 +586,8 @@ async function submit(){
   if (!answer && c.plan && !c.filled) await fillDocs(db, c);
   const k = aiTop(c).length, n = E.ddays(c.deadline, TODAY), me = meOf(), ready = mailReady(f), fmode = !ready && planned(c), fname = fmode ? FORM[c.form.kind] : '', bro = !ready && c.draft ? browsable(c) : null, sendable = ready || fmode || !!bro;
   const done = (choice, extra = {}) => {
-    if (choice === 'browse'){ save(db); return { summary: '브라우저로 내기', choice, browse: true, ask_names: false, names: top(c)[0].text, ...extra, _task: browseTask(c, bro, me), _browser: browseOpts(c, bro, me) }; }
+    if (choice === 'browse'){ c.picks ||= [c.draft.items.indexOf(top(c)[0])]; save(db);   // 다시 낼 때 같은 안으로(다시 묻지 않는다)
+      return { summary: '브라우저로 내기', choice, browse: true, ask_names: false, names: top(c)[0].text, ...extra, _task: browseTask(c, bro, me), _browser: browseOpts(c, bro, me) }; }
     if (['mail', 'form', 'yes'].includes(choice)){ c.submitted ||= AT; if (choice !== 'yes') c.sent_names = top(c).slice(0, choice === 'form' ? 1 : 99).map(x => x.text); }
     if (choice === 'no') c.dropped = AT;
     save(db);
@@ -698,11 +699,16 @@ async function submit(){
 function browsed(){
   const db = load(), c = contest(db, args.cid), a = blank(args.answer) ? '' : String(args.answer);
   const mark = () => { c.submitted ||= AT; c.sent_names = top(c).slice(0, 1).map(x => x.text); };
-  if (a){
-    if (!['yes', 'later'].includes(a)) fail('모르는 답이에요');
-    if (a === 'yes') mark();
-    save(db);
-    return { summary: a === 'yes' ? '냈어요' : '나중에', sent: a === 'yes' };
+  const again = { step: '제출', value: 'browse' };   // 제출 단계부터 다시 — 새로 적은 내 정보를 넣어 브라우저로 다시 낸다
+  if (a === 'yes'){ mark(); save(db); return { summary: '냈어요', sent: true }; }
+  if (a === 'later') return { summary: '나중에', sent: false };
+  if (a === 'retry') return { summary: '브라우저로 다시 내기', sent: false, again };
+  if (a){   // 적은 내용('항목: 값' 줄) — 내 데이터에 기억하고 다시 낸다
+    const kept = readKept(); let n = 0;
+    for (const line of a.split(/\r?\n/)){ const i = line.search(/[:：]/), k = i < 0 ? '' : line.slice(0, i).trim().slice(0, 40), v = i < 0 ? '' : line.slice(i + 1).trim().slice(0, 400); if (k && v){ kept.제출용[k] = v; n++; } }
+    if (!n) fail("줄마다 '항목: 값' 꼴로 적어 주세요. 직접 냈거나 나중에 하려면 아래에서 골라요");
+    writeLocal(KEPT, kept);
+    return { summary: `적은 내용 ${n}개 · 브라우저로 다시 내기`, sent: false, again };
   }
   const r = E.normalizeBrowse(json(args.result, '브라우저 제출 결과')), did = r.did.length ? [{ where: 'AI가 한 일', text: r.did.map((x, i) => `${i + 1}. ${x}`).join('\n') }] : [];
   c.sited = { at: AT, sent: r.sent, reason: r.reason, proof: E.str(r.proof, 300) };
@@ -711,8 +717,13 @@ function browsed(){
   const unsure = r.sent === 'unknown';
   return { summary: unsure ? '제출 확인 못 함' : '내지 못함', sent: false, verdict: { tone: 'bad', title: unsure ? '제출됐는지 확인하지 못했어요' : '브라우저로 내지 못했어요', text: r.reason || '이유를 알 수 없어요' },
     findings: [...(r.proof ? [{ where: '마지막 화면', text: r.proof }] : []), ...did, { where: '접수 화면', url: (browsable(c) || {}).url || c.url }],
-    ask: { question: unsure ? '접수 화면에서 제출된 것을 확인했나요?' : '어떻게 할까요?', hint: unsure ? '다시 내면 두 번 들어갈 수 있어요. 접수 화면이나 주최의 확인 메일·문자를 먼저 봐 주세요' : '나중에 다시 → 그대로 두고, [제출 준비]에서 다시 시도할 수 있어요',
-      choices: [{ value: 'yes', label: unsure ? '제출된 걸 확인했어요' : '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요', recommended: !unsure }] } };
+    ask: unsure ? { question: '접수 화면에서 제출된 것을 확인했나요?', hint: '다시 내면 두 번 들어갈 수 있어요. 접수 화면이나 주최의 확인 메일·문자를 먼저 봐 주세요',
+        choices: [{ value: 'yes', label: '제출된 걸 확인했어요' }, { value: 'later', label: '나중에 다시 할게요' }] }
+      : r.need.length ? { question: '접수 양식이 요구하는데 없던 내용이에요. 적으면 바로 다시 내요', free: true, value: r.need.map(k => `${k}: `).join('\n'),
+        hint: "줄마다 ':' 뒤에 적고 보내요. 적은 내용은 내 데이터에 기억해서 다음 공모전에도 써요. AI에게 보내지 않아요\n직접 냈거나 나중에 하려면 아래에서 골라요",
+        choices: [{ value: 'yes', label: '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요' }] }
+      : { question: '어떻게 할까요?', hint: '브라우저로 다시 내기 → 접수 화면을 다시 열어 처음부터 채워요. 사람이 할 일이 나오면 또 넘겨요\n나중에 다시 → 그대로 둬요',
+        choices: [{ value: 'retry', label: '브라우저로 다시 내기', recommended: true }, { value: 'yes', label: '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요' }] } };
 }
 function picked(){
   const db = load(), c = contest(db, args.cid);
