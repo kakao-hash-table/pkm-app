@@ -64,7 +64,7 @@ const SEND = { email: '이메일로 내요', form: '구글 폼으로 내요', nf
 const item = c => ({ id: c.key, title: titleOf(c.title), url: c.url, at: c.added, vars: { cid: c.key }, sort: E.sortOf(c),
   version: `${c.fit ? 'f' : ''}${c.draft ? `d${c.draft.at}` : ''}${c.submitted ? 's' : ''}${c.result || ''}` });
 // 제출 화면이 달라지는 값만 — 날짜(D-day)·접수 방법·접수처·메일 계정. 이 값이 바뀌면 기다리던 '냈나요?'를 새로 묻는다(reask). AI 안처럼 실행이 스스로 바꾸는 값은 넣지 않는다
-const ver = (c, db) => crypto.createHash('sha1').update(['7', TODAY, c.fit.submit.method, c.fit.submit.to, mailReady(c.fit) ? 'm' : '', c.refit_at || '', FULL ? 'auto' : '', ...Object.keys(FORM).filter(k => tested(db, k))].join('|')).digest('hex').slice(0, 12);
+const ver = (c, db) => crypto.createHash('sha1').update(['8', TODAY, c.fit.submit.method, c.fit.submit.to, mailReady(c.fit) ? 'm' : '', c.refit_at || '', FULL ? 'auto' : '', ...Object.keys(FORM).filter(k => tested(db, k))].join('|')).digest('hex').slice(0, 12);
 const aiTop = c => c.draft ? c.draft.items.slice(0, Math.min(c.fit ? c.fit.submit.allow : 1, c.draft.items.length)) : [];   // AI가 추천한 안(응모 건수만큼)
 // 낼 안 — 내가 골랐으면 그것, 아니면 AI 추천
 const top = c => { const it = c.draft ? c.draft.items : [], p = (c.picks || []).filter(i => it[i]); return p.length ? p.map(i => it[i]) : aiTop(c); };
