@@ -352,6 +352,8 @@ function meVars(me){
   }
   return v;
 }
+// 이 공모전에 대해 받은 답 — 내 정보(이름·주소 같은)는 자리표시로 숨기고, 고르는 답(조합원 여부 같은)은 화면의 보기와 맞춰야 하니 글 그대로 준다
+const answered = c => { const a = readJSON(ANSWERS(c), {}), mine = {}, open = {}; for (const [k, v] of Object.entries(a)) (PERSONAL.test(k) ? mine : open)[k] = v; return { mine, open }; };
 function browseTask(c, bro, me){
   const f = c.fit, cand = pickIdx(c)[0], x = c.draft.items[cand], files = attachOf(c);
   const plan = bro.kind === 'form' && c.fplan && c.fplan.sig === c.form.sig ? c.form.questions.map((q, i) => { const a = c.fplan.answers.find(v => v.id === q.id);
@@ -360,9 +362,9 @@ function browseTask(c, bro, me){
     `요강의 접수 방법: ${f.submit.how || '-'}`, `양식·주의: ${f.submit.note || '-'}`, `뜻풀이 글자 제한: ${f.submit.desc_limit ? `${f.submit.desc_limit}자` : '요강에 없음(칸의 제한을 따름)'}`, '',
     `응모작: ${x.text}`, `뜻풀이: ${x.why}`, '',
     ...(plan.length ? ['문항별 답 계획(폼을 미리 읽어 세운 것 — 화면의 문항과 맞춰 넣기)', ...plan, ''] : []),
-    `쓸 수 있는 자리표시: ${Object.keys(meVars(me)).map(a => `{{${a}}}`).join(' ') || '(없음)'}`, `올릴 수 있는 파일: ${files.map(a => a.filename).join(', ') || '(없음)'}`, '', `요강 원문 일부:\n${E.text(c.brief || '', 1500) || '(없음)'}`].join('\n');
+    `쓸 수 있는 자리표시: ${Object.keys({ ...meVars(me), ...answered(c).mine }).map(a => `{{${a}}}`).join(' ') || '(없음)'}`, ...Object.entries(answered(c).open).map(([k, v]) => `사용자가 정한 답 — ${k}: ${v}`), `올릴 수 있는 파일: ${files.map(a => a.filename).join(', ') || '(없음)'}`, '', `요강 원문 일부:\n${E.text(c.brief || '', 1500) || '(없음)'}`].join('\n');
 }
-const browseOpts = (c, bro, me) => ({ vars: meVars(me), files: attachOf(c).map(a => ({ name: a.filename, path: a.path })),
+const browseOpts = (c, bro, me) => ({ vars: { ...meVars(me), ...answered(c).mine }, files: attachOf(c).map(a => ({ name: a.filename, path: a.path })),
   allow: [...new Set([hostOf(bro.url), hostOf(E.urlOf(String(c.homepage || ''))), ...(bro.kind === 'form' ? ['docs.google.com', 'form.naver.com'] : [])].filter(Boolean))] });
 // 확인 없이 브라우저로 내도 되는 경우(완전 자동화) — 조건·AI 제한·요강 의문이 없고, 지난 시도가 불확실하게 끝나지 않았을 때
 const browseAutoOk = c => { const f = c.fit; return !(c.sited && c.sited.sent === 'unknown') && (!f.ai || f.ai.rule === 'none') && f.eligibility.ok === 'yes' && !f.doubt && !f.unreadable; };
@@ -715,10 +717,10 @@ function browsed(){
   if (a === 'later') return { summary: '나중에', sent: false };
   if (a === 'retry') return { summary: '브라우저로 다시 내기', sent: false, again };
   if (a){   // 적은 내용('항목: 값' 줄) — 내 데이터에 기억하고 다시 낸다
-    const kept = readKept(); let n = 0;
-    for (const line of a.split(/\r?\n/)){ const i = line.search(/[:：]/), k = i < 0 ? '' : line.slice(0, i).trim().slice(0, 40), v = i < 0 ? '' : line.slice(i + 1).trim().slice(0, 400); if (k && v){ kept.제출용[k] = v; n++; } }
+    const kept = readKept(), ans = readJSON(ANSWERS(c), {}); let n = 0;
+    for (const line of a.split(/\r?\n/)){ const i = line.search(/[:：]/), k = i < 0 ? '' : line.slice(0, i).trim().slice(0, 40), v = i < 0 ? '' : line.slice(i + 1).trim().slice(0, 400); if (k && v){ if (PERSONAL.test(k)) kept.제출용[k] = v; else ans[k] = v; n++; } }   // 내 정보는 다음 공모전에도, 그 밖의 답은 이 공모전에만
     if (!n) fail("줄마다 '항목: 값' 꼴로 적어 주세요. 직접 냈거나 나중에 하려면 아래에서 골라요");
-    writeLocal(KEPT, kept);
+    writeLocal(KEPT, kept); writeLocal(ANSWERS(c), ans);
     return { summary: `적은 내용 ${n}개 · 브라우저로 다시 내기`, sent: false, again };
   }
   const r = E.normalizeBrowse(json(args.result, '브라우저 제출 결과')), did = r.did.length ? [{ where: 'AI가 한 일', text: r.did.map((x, i) => `${i + 1}. ${x}`).join('\n') }] : [];
@@ -730,8 +732,8 @@ function browsed(){
     findings: [...(r.proof ? [{ where: '마지막 화면', text: r.proof }] : []), ...did, { where: '접수 화면', url: (browsable(c) || {}).url || c.url }],
     ask: unsure ? { question: '접수 화면에서 제출된 것을 확인했나요?', hint: '다시 내면 두 번 들어갈 수 있어요. 접수 화면이나 주최의 확인 메일·문자를 먼저 봐 주세요',
         choices: [{ value: 'yes', label: '제출된 걸 확인했어요' }, { value: 'later', label: '나중에 다시 할게요' }] }
-      : r.need.length ? { question: '접수 양식이 요구하는데 없던 내용이에요. 적으면 바로 다시 내요', free: true, value: r.need.map(k => `${k}: `).join('\n'),
-        hint: "줄마다 ':' 뒤에 적고 보내요. 적은 내용은 내 데이터에 기억해서 다음 공모전에도 써요. AI에게 보내지 않아요\n직접 냈거나 나중에 하려면 아래에서 골라요",
+      : r.need.length ? { question: `접수 양식에 넣을 내용 ${r.need.length}개를 한 번에 적어 주세요. 보내면 바로 다시 내요`, free: true, value: r.need.map(k => `${k.name}: `).join('\n'),
+        hint: [...r.need.map(k => `${k.name} — ${k.question || '알려 주세요'}${k.options.length ? ` (보기: ${k.options.join(' / ')})` : ''}`), "줄마다 ':' 뒤에 적고 보내요. 이름·주소 같은 내 정보는 내 데이터에 기억해서 다음에는 묻지 않아요. AI에게는 값이 아니라 자리표시만 가요"].join('\n'),
         choices: [{ value: 'yes', label: '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요' }] }
       : { question: '어떻게 할까요?', hint: '브라우저로 다시 내기 → 접수 화면을 다시 열어 처음부터 채워요. 사람이 할 일이 나오면 또 넘겨요\n나중에 다시 → 그대로 둬요',
         choices: [{ value: 'retry', label: '브라우저로 다시 내기', recommended: true }, { value: 'yes', label: '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요' }] } };

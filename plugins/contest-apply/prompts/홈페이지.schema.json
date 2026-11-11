@@ -30,10 +30,32 @@
     },
     "need": {
      "type": "array",
+     "description": "필수인데 정할 수 없고 자리표시에도 없는 칸들 — 한꺼번에",
      "items": {
-      "type": "string"
-     },
-     "description": "양식이 꼭 요구하는데 '쓸 수 있는 자리표시'에 없던 응모자 정보의 이름(예: 주소, 생년월일, 소속). 없으면 빈 배열"
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string",
+        "description": "자리표시로 쓸 짧은 이름, 예: 주소"
+       },
+       "question": {
+        "type": "string",
+        "description": "사용자에게 물을 한 줄"
+       },
+       "options": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "고르는 칸이면 보기 글 그대로, 아니면 빈 배열"
+       }
+      },
+      "required": [
+       "name",
+       "question",
+       "options"
+      ]
+     }
     }
    },
    "required": [

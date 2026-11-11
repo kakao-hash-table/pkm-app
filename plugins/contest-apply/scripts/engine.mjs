@@ -90,7 +90,8 @@ export function normalizeBrowse(a){
   const r = (a && a._result) || a || {};
   return { sent: ['yes', 'no'].includes(r.sent) ? r.sent : 'unknown', reason: str(r.reason, 300), proof: text(r.proof, 500),
     did: (Array.isArray(r.did) ? r.did : []).map(x => str(x, 120)).filter(Boolean).slice(0, 20),
-    need: [...new Set((Array.isArray(r.need) ? r.need : []).map(x => str(x, 30).replace(/[{}:：]/g, '').trim()).filter(Boolean))].slice(0, 8) };   // 양식이 요구했는데 없던 응모자 정보 이름
+    need: (Array.isArray(r.need) ? r.need : []).map(x => typeof x === 'string' ? { name: x } : x || {}).map(x => ({ name: str(x.name, 30).replace(/[{}:：]/g, '').trim(), question: str(x.question, 160),
+      options: (Array.isArray(x.options) ? x.options : []).map(o => str(o, 60)).filter(Boolean).slice(0, 20) })).filter((x, i, a) => x.name && a.findIndex(y => y.name === x.name) === i).slice(0, 12) };   // 양식이 요구했는데 없던 응모자 정보 이름
 }
 
 /* 상태: new(정리 전) → ready | out(분야·조건) → submitted → won | lost. dropped는 사람이 뺀 것, dup은 다른 사이트에 같이 올라온 것 */
