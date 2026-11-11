@@ -195,7 +195,7 @@ test('제출 준비 — AI 안이 없으면 만들고, 복사할 것·제출처�
   assert.ok(!run('open-list').items.some(i => i.id === 'wevity:1'));
   const sent = run('sent-list').items[0];
   assert.deepEqual(sent.meta, ['발표 D-25 · 12월 5일', '1등 100만원 · 총 200만원', '11월 10일에 냄', '주최 수원시']);
-  assert.deepEqual(sent.detail, [{ who: '낸 안', text: '수원새빛' }]);
+  assert.deepEqual(sent.detail, [{ who: '낸 안', text: '수원새빛' }, { who: '증거', text: '직접 냈다고 적은 것이에요(프로그램이 확인한 증거는 없어요)' }]);   // 프로그램이 낸 게 아니면 증거가 없다고 그대로 적는다(A4·A6)
   assert.match(run('find-list', { sites: 'true,true,true,true' }).items[0].meta[1], /낸 것 1 · 당선 0/);
 });
 

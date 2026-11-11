@@ -67,7 +67,9 @@ test('결과 적기 — 완료를 봤을 때만 냈어요. 확인 못 했으면 
   r = run('submit', { cid: 'wevity:1', me: ME, answer: 'browse' });
   assert.equal(r._browser.vars.주소, '서울특별시 중구 세종대로 110'); assert.equal(r._browser.vars['조합원 여부'], undefined); assert.match(r._task, /사용자가 정한 답 — 조합원 여부: 비조합원/); assert.equal(r.choice, 'browse', '고른 안 그대로 — 다시 묻지 않는다');
   r = run('browsed', { cid: 'wevity:1', result: { sent: 'no', reason: '본인 인증을 하지 못했어요', proof: '', did: [], need: [] } });
-  assert.deepEqual(r.ask.choices.map(c => c.value), ['retry', 'yes', 'later']);
+  assert.deepEqual(r.again, { step: '제출', value: 'browse' }, '처음 실패는 묻지 않고 스스로 다시 한다');
+  r = run('browsed', { cid: 'wevity:1', result: { sent: 'no', reason: '본인 인증을 하지 못했어요', proof: '', did: [], need: [] } });
+  assert.deepEqual(r.ask.choices.map(c => c.value), ['retry', 'yes', 'later'], '두 번째 실패에서만 묻는다');
   assert.deepEqual(run('browsed', { cid: 'wevity:1', answer: 'retry' }).again, { step: '제출', value: 'browse' });
   run('browsed', { cid: 'wevity:1', result: { sent: 'unknown', reason: '제출을 눌렀지만 완료 화면이 뜨지 않았어요', proof: '잠시 후 다시 시도', did: [], need: [] } });
   r = run('submit', { cid: 'wevity:1', me: ME, full: 'true' });
@@ -78,8 +80,9 @@ test('결과 적기 — 완료를 봤을 때만 냈어요. 확인 못 했으면 
   r = run('browsed', { cid: 'wevity:1', result: { _result: { sent: 'yes', reason: '', proof: '접수가 완료되었습니다. 접수번호 2026-0412', did: ['제출 누름'] } } });
   assert.deepEqual([r.summary, r.sent], ['홈페이지에 냈어요', true]);
   assert.deepEqual(db().contests['wevity:1'].sent_names, ['안전은 설계부터']);
-  assert.match(run('finish', { cid: 'wevity:1', choice: 'browse' }).verdict.text, /브라우저로 접수 화면에 냈어요/);
-  assert.deepEqual(run('sent-list').items.map(i => i.id), ['wevity:1']);
+  assert.match(run('finish', { cid: 'wevity:1', choice: 'browse' }).verdict.text, /접수번호 2026-0412/, '끝 화면에 증거(접수 번호)가 보인다');
+  const sl = run('sent-list').items; assert.deepEqual(sl.map(i => i.id), ['wevity:1']);
+  assert.match(sl[0].detail.find(d => d.who === '증거 · 접수 화면').text, /접수번호 2026-0412/, '낸 증거가 목록에 보인다');
 });
 
 test('구글 로그인이 필요한 폼 — 이 브라우저에서는 로그인이 막혀 브라우저로 내지 않는다(완전 자동화여도 묻는다)', () => {

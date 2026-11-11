@@ -93,13 +93,21 @@ function openList(){
       meta: [...(c.sited && c.sited.sent !== 'yes' && c.sited.reason ? [`멈춘 이유 · ${E.cut(c.sited.reason, 90)}`] : []), E.prizeLine(f), E.deadlineLine(c.deadline, TODAY), E.announceLine(f, TODAY), host(c)].filter(Boolean), detail: d };
   }) };
 }
+// 낸 증거 — '냈어요'라고만 하지 않고 무엇으로 확인했는지(A4)
+const kst = at => new Date(Date.parse(at) + 9 * 3600000).toISOString().slice(5, 16).replace('T', ' ').replace('-', '/');
+function proofOf(c){
+  if (c.mailed) return [{ who: '증거 · 메일', text: `${kst(c.mailed.at)}에 ${c.mailed.to}로 보냄${c.mailed.id ? ` · 메일 번호 ${E.cut(c.mailed.id, 40)}` : ''}${(c.filled || []).length ? ` · 첨부 ${c.filled.filter(o => o.file).length}개` : ''}` }];
+  if (c.formed) return [{ who: `증거 · ${FORM[c.formed.kind] || '폼'}`, text: `${kst(c.formed.at)}에 제출 · ${c.formed.sure ? '접수 완료 응답을 받음' : '제출은 됐지만 확인 화면은 못 봄 — 폼에서 확인해 주세요'}${c.formed.id ? ` · 응답 번호 ${c.formed.id}` : ''}` }];
+  if (c.sited && c.sited.sent === 'yes') return [{ who: '증거 · 접수 화면', text: `${kst(c.sited.at)} · ${c.sited.proof || '완료 화면을 봄'}` }];
+  return [{ who: '증거', text: '직접 냈다고 적은 것이에요(프로그램이 확인한 증거는 없어요)' }];
+}
 function sentList(){
   const db = load(), list = all(db).filter(c => st(c) === 'submitted').sort((a, b) => (E.sortOf(a).announce || '9999').localeCompare(E.sortOf(b).announce || '9999'));
   return { items: list.map(c => {
     const f = c.fit, past = f && f.announce && f.announce < TODAY, sent = c.sent_names && c.sent_names.length ? c.sent_names : top(c).map(x => x.text);
     return { ...item(c), tags: [f ? E.kindLabel(f) : '', past ? '발표 지남' : ''].filter(Boolean),
       meta: [E.announceLine(f, TODAY, true), E.prizeLine(f), `${E.kday(c.submitted.slice(0, 10))}에 냄`, host(c)].filter(Boolean),
-      detail: sent.length ? [{ who: '낸 안', text: sent.join(' · ') }] : [] };
+      detail: [...(sent.length ? [{ who: '낸 안', text: sent.join(' · ') }] : []), ...proofOf(c)] };
   }) };
 }
 function outList(){
@@ -715,6 +723,7 @@ function browsed(){
   const again = { step: '제출', value: 'browse' };   // 제출 단계부터 다시 — 새로 적은 내 정보를 넣어 브라우저로 다시 낸다
   if (a === 'yes'){ mark(); save(db); return { summary: '냈어요', sent: true }; }
   if (a === 'later') return { summary: '나중에', sent: false };
+  if (c.sited && (a === 'retry' || (a && a !== 'yes' && a !== 'later'))){ c.sited.tries = 0; save(db); }   // 사람이 막힌 것을 풀었다 — 스스로 다시 해 보는 횟수를 새로 센다
   if (a === 'retry') return { summary: '브라우저로 다시 내기', sent: false, again };
   if (a){   // 적은 내용('항목: 값' 줄) — 내 데이터에 기억하고 다시 낸다
     const kept = readKept(), ans = readJSON(ANSWERS(c), {}); let n = 0;
@@ -724,9 +733,11 @@ function browsed(){
     return { summary: `적은 내용 ${n}개 · 브라우저로 다시 내기`, sent: false, again };
   }
   const r = E.normalizeBrowse(json(args.result, '브라우저 제출 결과')), did = r.did.length ? [{ where: 'AI가 한 일', text: r.did.map((x, i) => `${i + 1}. ${x}`).join('\n') }] : [];
-  c.sited = { at: AT, sent: r.sent, reason: r.reason, proof: E.str(r.proof, 300) };
+  const tries = (c.sited && c.sited.sent === 'no' ? c.sited.tries ?? 1 : 0) + (r.sent === 'no' && !r.need.length ? 1 : 0);   // 모자란 정보 때문에 멈춘 것은 실패로 세지 않는다
+  c.sited = { at: AT, sent: r.sent, reason: r.reason, proof: E.str(r.proof, 300), tries };
   if (r.sent === 'yes'){ mark(); save(db); return { summary: '홈페이지에 냈어요', sent: true, findings: [...(r.proof ? [{ where: '완료 화면', text: r.proof }] : []), ...did] }; }
   save(db);
+  if (r.sent === 'no' && !r.need.length && tries < 2) return { summary: `내지 못함 · 스스로 한 번 더 해요(${r.reason ? E.cut(r.reason, 60) : '이유 모름'})`, sent: false, again: { step: '제출', value: 'browse' } };   // A1 — 방법을 되묻지 않고 먼저 다시 해 본다
   const unsure = r.sent === 'unknown';
   return { summary: unsure ? '제출 확인 못 함' : '내지 못함', sent: false, verdict: { tone: 'bad', title: unsure ? '제출됐는지 확인하지 못했어요' : '브라우저로 내지 못했어요', text: r.reason || '이유를 알 수 없어요' },
     findings: [...(r.proof ? [{ where: '마지막 화면', text: r.proof }] : []), ...did, { where: '접수 화면', url: (browsable(c) || {}).url || c.url }],
@@ -735,7 +746,7 @@ function browsed(){
       : r.need.length ? { question: `접수 양식에 넣을 내용 ${r.need.length}개를 한 번에 적어 주세요. 보내면 바로 다시 내요`, free: true, value: r.need.map(k => `${k.name}: `).join('\n'),
         hint: [...r.need.map(k => `${k.name} — ${k.question || '알려 주세요'}${k.options.length ? ` (보기: ${k.options.join(' / ')})` : ''}`), "줄마다 ':' 뒤에 적고 보내요. 이름·주소 같은 내 정보는 내 데이터에 기억해서 다음에는 묻지 않아요. AI에게는 값이 아니라 자리표시만 가요"].join('\n'),
         choices: [{ value: 'yes', label: '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요' }] }
-      : { question: '어떻게 할까요?', hint: '브라우저로 다시 내기 → 접수 화면을 다시 열어 처음부터 채워요. 사람이 할 일이 나오면 또 넘겨요\n나중에 다시 → 그대로 둬요',
+      : { question: '두 번 해 봤지만 내지 못했어요. 위 이유를 보고 골라 주세요', hint: '직접 냈다면 → 결과 기다리는 쪽으로 옮겨요\n다시 내기 → 막힌 것을 풀었을 때(예: 사이트 회원가입을 해 뒀다)',
         choices: [{ value: 'retry', label: '브라우저로 다시 내기', recommended: true }, { value: 'yes', label: '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요' }] } };
 }
 function picked(){
@@ -746,9 +757,9 @@ function picked(){
 }
 function finish(){
   const db = load(), c = contest(db, args.cid), ch = args.choice;
-  const v = ch === 'mail' ? { tone: 'ok', title: `메일을 보냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${(c.mailed && c.mailed.to) || '접수처'}로 보냈어요. '결과 기다리는 공모전'에서 발표일 순으로 보여요` }
+  const v = ch === 'mail' ? { tone: 'ok', title: `메일을 보냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${proofOf(c)[0].text}\n'결과 기다리는 공모전'에서 발표일 순으로 보여요` }
     : ch === 'form' ? { tone: 'ok', title: `폼을 제출했어요 · ${E.announceLine(c.fit, TODAY)}`, text: c.formed && !c.formed.sure ? "제출 요청은 받아들여졌지만 확인 화면까지는 보지 못했어요. 폼이나 주최 쪽 안내에서 한 번 확인해 주세요. '결과 기다리는 공모전'으로 옮겼어요" : `${FORM[(c.formed || {}).kind] || '폼'}에 냈어요. '결과 기다리는 공모전'에서 발표일 순으로 보여요` }
-    : ch === 'browse' && c.submitted ? { tone: 'ok', title: `냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${c.sited && c.sited.sent === 'yes' ? '브라우저로 접수 화면에 냈어요. ' : ''}'결과 기다리는 공모전'에서 발표일 순으로 보여요` }
+    : ch === 'browse' && c.submitted ? { tone: 'ok', title: `냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${proofOf(c)[0].text}\n'결과 기다리는 공모전'에서 발표일 순으로 보여요` }
     : ch === 'yes' ? { tone: 'ok', title: `냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: "'결과 기다리는 공모전'에서 발표일 순으로 보여요" }
     : ch === 'no' ? { tone: 'ok', title: '뺐어요', text: "'뺀 공모전'에서 다시 넣을 수 있어요" }
     : { tone: 'ok', title: `그대로 둘게요 · ${E.deadlineLine(c.deadline, TODAY).replace(/ · .*$/, '')}`, text: '다시 [제출 준비]를 누르면 만든 안을 바로 보여요' };
