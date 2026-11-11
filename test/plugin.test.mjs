@@ -265,3 +265,12 @@ test('누른 항목 자리 — 실행이 사라지면 추적을 지우고, 글�
   setup(cards, [run(cards, done)], { run: 'r1', said: 'done', doneAt: now - 1300, doneMs: 1200, stay: true });   // 되돌린 카드는 끝나도 남는다
   assert.equal(T.plTrackUpdate(), true); assert.deepEqual(PL.track, {});
 });
+
+test('목록의 tab — 탭 이름을 받고 20자를 넘으면 막는다', () => {
+  const files = tab => [{ path: 'plugin.md', size: 1, text: '---\npkm_plugin: 1\nid: tab-demo\nname: 탭\nversion: 0.1.0\npermissions:\n  bundled: [scripts/a.mjs]\n---\n탭' }, { path: 'scripts/a.mjs', size: 1, text: '' },
+    { path: 'feeds/f.md', size: 1, text: `## 낼 것\n- run: scripts/a.mjs\n\n## 낸 것\n- run: scripts/a.mjs\n- tab: ${tab}\n` }];
+  const ok = P.validate(files('낸 것·뺀 것'));
+  assert.equal(ok.ok, true, ok.errors.join());
+  assert.deepEqual(ok.feeds.map(f => f.tab), [undefined, '낸 것·뺀 것']);
+  assert.match(P.validate(files('가'.repeat(21))).errors.join('\n'), /낸 것: tab은 탭 이름 20자까지예요/);
+});

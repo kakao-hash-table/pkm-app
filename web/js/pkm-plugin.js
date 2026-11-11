@@ -198,9 +198,10 @@
         for (const x of sorts.filter(x => x.bad)) err(`${where}: sort는 "이름=키" 또는 "이름=-키"(큰 것부터)를 쉼표로 이어 써요: ${x.bad}`);
         if (sorts.length > 4) err(`${where}: sort는 4개까지예요`);
         if (sorts.length && ['inline', 'cards'].includes(d.view)) err(`${where}: sort는 view: ${d.view}에서 쓰지 않아요(항목 자리가 고정이에요)`);
+        if (d.tab != null && (!String(d.tab).trim() || String(d.tab).length > 20)) err(`${where}: tab은 탭 이름 20자까지예요`);   // 플러그인 화면에서 이 목록을 따로 볼 탭(없으면 첫 탭 '할 일')
         if (feeds.some(x => x.name === d.name)) err(`${where}: 피드 이름이 겹쳐요`);
         feeds.push({ name: d.name, file: f.path, description: d.description, run: String(d.run || ''), every: every || 60, days: d.days || 'daily', hours: d.hours || null,
-          start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null });
+          ...(d.tab ? { tab: String(d.tab).trim().slice(0, 20) } : {}), start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null });
       }
     }
     // 검색 — 찾기 화면에서 사람이 누를 때만. {q}가 찾는 말

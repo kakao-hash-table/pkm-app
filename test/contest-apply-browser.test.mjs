@@ -82,13 +82,9 @@ test('결과 적기 — 완료를 봤을 때만 냈어요. 확인 못 했으면 
   assert.deepEqual(run('sent-list').items.map(i => i.id), ['wevity:1']);
 });
 
-test('로그인이 필요한 폼 — 브라우저로 내고, 미리 세운 문항별 답 계획을 자리표시째로 넘긴다. 완전 자동화면 묻지 않고 넘긴다', () => {
+test('구글 로그인이 필요한 폼 — 이 브라우저에서는 로그인이 막혀 브라우저로 내지 않는다(완전 자동화여도 묻는다)', () => {
   const r = run('submit', { cid: 'wevity:2', me: ME, full: 'true' });
-  assert.deepEqual([r.choice, r.auto], ['browse', true]);
-  assert.deepEqual(r._browser.allow, ['docs.google.com', 'cmak.or.kr', 'form.naver.com']);
-  assert.match(r._task, /문항별 답 계획/);
-  assert.match(r._task, /응모자 성명을 입력해 주시기 바랍니다\. → \{\{이름\}\}/);
-  assert.match(r._task, /주제를 작성해주십시오\. → 안전은 설계부터/);
-  assert.doesNotMatch(r._task, /김테스트/);
+  assert.equal(r.summary, '냈는지 묻기');
+  assert.equal(r.ask.choices.some(c => c.value === 'browse'), false);
 });
 }

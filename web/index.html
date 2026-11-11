@@ -944,6 +944,13 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 dialog .cw-addr,dialog .cw-type{padding:0;flex-direction:row;gap:6px}
 @media (min-width:600px){.dlg-web{width:min(1100px,calc(100vw - 32px));max-width:none}}
 @media (max-width:599px){.dlg-web-in{padding:24px 16px 20px}.dlg-web .dlg-actions{margin:4px -16px -20px;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}.dlg-web .cw-frame{max-height:none}.pl-web{padding:8px 8px 10px}.pl-login-row .btn{min-height:44px}}
+/* 목록 탭(feed의 tab) — 플러그인 화면의 목록을 탭으로 나눠 본다. 넘치면 가로로 민다 */
+.pl-tabs [role="tab"]{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:8px 14px 10px;min-height:48px;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;color:var(--text-3);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.pl-tabs [role="tab"]:hover{color:var(--text-2)}
+.pl-tabs [role="tab"][aria-selected="true"]{color:var(--text);border-bottom-color:var(--text)}
+.pl-tabs [role="tab"]:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.pl-tabs .num{font-weight:500;font-size:.8125rem;color:var(--text-3)}
+.pl-tab-dot{width:8px;height:8px;border-radius:50%;background:var(--s-review)}
 .ch-empty{color:var(--text-2);font-size:.9375rem;margin:auto 8px;text-align:center}
 .ch-sums{display:flex;flex-direction:column;gap:6px}
 .ch-sums h3{font-size:.8125rem;color:var(--text-2);margin:8px 4px 0}
@@ -4653,7 +4660,14 @@ function vPlugins(id){
     (x.links || []).length ? section('퀵링크', `<p class="faint" style="margin:0">단기 카드 제목 맨 앞이 규칙에 맞으면 그 부분이 링크가 돼요. 지금 규칙 <span class="num">${qlRules().length}</span>개 · <a href="#/plugins/${id}/setup">규칙 고치기</a></p>`) : '',
     (x.searches || []).length ? section('검색', `<p class="faint" style="margin:0">찾기 화면 아래 '다른 곳에서 찾기'에 ${x.searches.map(s => `<b>${esc(s.name)}</b>`).join(', ')}이 생겨요. ${PL.machine[id] && PL.machine[id].approved ? '' : '이 컴퓨터에서 플러그인을 승인하고 비밀값을 넣어야 찾을 수 있어요. '}<a href="#/search">찾기 열기</a></p>`) : ''
   ].join('');
-  const body = extra + feeds.map(f => {
+  // 목록의 tab — 하나라도 있으면 목록 위에 탭 줄. 첫 탭은 tab이 없는 목록('할 일'), 뒤는 선언 순서. 고른 탭은 이 브라우저에 기억한다
+  const tabOf = f => (f.tab || '').trim(), tabNames = [...new Set(feeds.map(tabOf))].sort((a, b) => !!a - !!b), tabbed = tabNames.some(Boolean);
+  if (tabbed && !tabNames.includes('')) tabNames.unshift('');
+  const tabKey = `pkm:v1:pl-ftab:${S.profile}:${id}`, tabNow = tabbed && tabNames.includes(LS.get(tabKey, '')) ? LS.get(tabKey, '') : '';
+  const tabMine = t => (x.state.runs || []).some(r => plMine(r) && tabOf(feeds.find(f => f.name === r.feed) || {}) === t);
+  const tabCount = t => feeds.filter(f => tabOf(f) === t && f.count !== 'no').reduce((n, f) => n + plVisible(x, f).length, 0);
+  const tabBar = !tabbed ? '' : `<div class="seg pl-tabs" role="tablist" aria-label="목록 나눠 보기">${tabNames.map(t => `<button type="button" role="tab" id="pl-ftab-${tabNames.indexOf(t)}" data-pl="feed-tab" data-id="${id}" data-tab="${esc(t)}" aria-selected="${t === tabNow}" aria-controls="pl-ftab-panel" tabindex="${t === tabNow ? 0 : -1}">${esc(t || '할 일')}${tabCount(t) ? ` <span class="num">${tabCount(t)}</span>` : ''}${t !== tabNow && tabMine(t) ? '<span class="pl-tab-dot" aria-hidden="true"></span><span class="sr-only"> 내 확인이 필요해요</span>' : ''}</button>`).join('')}</div>`;
+  const body = (tabNow ? '' : extra) + feeds.filter(f => !tabbed || tabOf(f) === tabNow).map(f => {
     const fs_ = x.state.feeds[f.name] || {}, items = fs_.items || [];
     if (f.view === 'inline') return plInlineFeed(id, x, f);
     if (f.view === 'cards') return plCardsFeed(id, x, f);
@@ -4683,7 +4697,7 @@ function vPlugins(id){
     ${tabs}
     <div class="pl-fresh" ${feeds.length ? '' : 'hidden'}>${fresh ? `<span class="num">${fresh}</span>` : ''}${plIsRunner() ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="refresh" data-id="${id}" ${busy ? 'aria-disabled="true"' : ''}>${busy ? '가져오는 중' : '지금 가져오기'}</button>` : ''}<a class="btn btn-text btn-sm" href="#/plugins/${id}/setup">설정</a></div>
     ${stale ? `<p class="faint">${esc(plRunner())}에서 한동안 소식이 없어요. 컴퓨터가 잠들었거나 pkm 서버가 꺼졌을 수 있어요.</p>` : ''}
-    ${plUpdBanner(id)}${gate}${autoLine}${body}${plLoginBox(id)}
+    ${plUpdBanner(id)}${gate}${autoLine}${tabBar}${tabbed ? `<div role="tabpanel" id="pl-ftab-panel" aria-labelledby="pl-ftab-${tabNames.indexOf(tabNow)}">${body}</div>` : body}${tabNow ? '' : plLoginBox(id)}
   </div>`;
 }
 /* 검색·편집기만 있는 플러그인 — 돌리는 컴퓨터 없이 지금 이 컴퓨터에서 쓴다 */
@@ -5207,6 +5221,7 @@ document.addEventListener('click', async e => {
     case 'confirm': plAct(id, { type:'confirm', run, step }, b.dataset.msg || '끝난 것으로 옮겼어요'); break;
     case 'hand': b.disabled = true; plAct(id, { type:'answer', run, step, value:b.dataset.value }, b.dataset.value === 'done' ? 'AI가 이어서 해요' : 'AI에게 못 했다고 알렸어요'); break;   // 브라우저에서 넘겨받은 일
     case 'give-skip': b.disabled = true; plAct(id, { type:'answer', run, step, skip:true }, '건너뛰고 이어서 해요'); break;
+    case 'feed-tab': { LS.set(`pkm:v1:pl-ftab:${S.profile}:${id}`, b.dataset.tab); render(); focusEl($(`.pl-tabs [role="tab"][aria-selected="true"]`)); break; }
     case 'login': pwLogin(id, b.dataset.url, b.dataset.name); break;
     case 'web-check': pwState(id, true); break;
     case 'reveal': { const k = b.dataset.key; PL.reveal[k] = ++PL.revealN; render(); focusEl($(`#pla-${PL.reveal[k]}`)); break; }   // 카드 안에서 정답을 펼친다
@@ -5825,6 +5840,12 @@ async function chSend(){
   } catch (e) { CH.err = e.message; chPaint(true); }
   finally { CH.sending = false; }
 }
+// 목록 탭 — 화살표·Home·End로 옆 탭을 고른다
+document.addEventListener('keydown', e => {
+  const t = e.target.closest && e.target.closest('.pl-tabs [role="tab"]'); if (!t) return;
+  const all = [...t.parentElement.querySelectorAll('[role="tab"]')], i = all.indexOf(t), to = { ArrowRight:all[(i + 1) % all.length], ArrowLeft:all[(i - 1 + all.length) % all.length], Home:all[0], End:all[all.length - 1] }[e.key];
+  if (to){ e.preventDefault(); to.click(); }
+});
 /* 브라우저 보기 — pkm-ai-server의 탭 하나(Chrome)를 실시간으로 보고 누르고 적는다. 적은 글은 AI에게 가지 않는다.
    채팅 창(방마다 탭 — server/chats.js browser)과 플러그인(작업 화면·로그인 창 — server/runner.js browser)이 같이 쓴다. 쓰는 곳이 o로 주는 것:
    key() 지금 볼 탭 · want() 보일 때인가 · api(key, sub, body) · frameUrl(key) · block() 못 쓰는 이유({ note } 화면 위 한 줄 | { empty } 화면 자리에, stop이면 묻지도 않는다)

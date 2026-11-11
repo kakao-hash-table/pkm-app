@@ -89,8 +89,8 @@ function openList(){
       ...(aiLine(f) ? [`AI · ${aiLine(f)}`] : []), ...(f.submit.note ? [`양식 · ${f.submit.note}`] : []), ...(f.doubt ? [`확인 · ${f.doubt} — 원문을 봐 주세요`] : [])].join('\n') });
     if (c.draft) d.push({ who: `AI 안 ${c.draft.items.length}개 · 추천 ${aiTop(c).length}`, text: E.cut(E.names(c.draft), 120) });
     const flag = n === 0 ? '오늘 마감' : f.ai && f.ai.rule === 'banned' ? 'AI 작품 제한' : f.eligibility.ok === 'unsure' ? '조건 확인' : f.unreadable || f.doubt ? '요강 확인' : '';
-    return { ...item(c), version: ver(c, db), tags: [E.kindLabel(f), mailReady(f) ? '메일로 바로 보내기' : SEND[f.submit.method] ? E.METHODS[f.submit.method] : '방식 확인', c.draft ? '' : 'AI 안 없음', flag].filter(Boolean),
-      meta: [E.prizeLine(f), E.deadlineLine(c.deadline, TODAY), E.announceLine(f, TODAY), host(c)].filter(Boolean), detail: d };
+    return { ...item(c), version: ver(c, db), tags: [E.kindLabel(f), mailReady(f) ? '메일로 바로 보내기' : SEND[f.submit.method] ? E.METHODS[f.submit.method] : '방식 확인', c.draft ? '' : 'AI 안 없음', flag, c.sited && c.sited.sent !== 'yes' ? (c.sited.sent === 'unknown' ? '제출 확인 필요' : '브라우저 제출 멈춤') : ''].filter(Boolean),
+      meta: [...(c.sited && c.sited.sent !== 'yes' && c.sited.reason ? [`멈춘 이유 · ${E.cut(c.sited.reason, 90)}`] : []), E.prizeLine(f), E.deadlineLine(c.deadline, TODAY), E.announceLine(f, TODAY), host(c)].filter(Boolean), detail: d };
   }) };
 }
 function sentList(){
@@ -329,7 +329,7 @@ function browsable(c){
   const f = c.fit, s = f.submit, u = E.urlOf(s.to);
   if (f.unreadable || (c.deadline && c.deadline < TODAY)) return null;
   if (s.method === 'site' && u && S.isPublicUrl(u)) return { url: u, kind: 'site' };
-  if (c.form && !c.form.error && c.form.url && ((c.form.blockers || []).length || c.form.login)) return { url: c.form.url, kind: 'form' };
+  if (c.form && !c.form.error && c.form.url && ((c.form.blockers || []).length || c.form.login) && !(c.form.kind === 'google' && c.form.login)) return { url: c.form.url, kind: 'form' };   // 구글 로그인이 필요한 폼은 이 브라우저에서 로그인이 막힌다 — 직접 낸다
   return null;
 }
 // 자리표시 가운데 응모작·AI가 쓴 글·날짜만 값으로 바꾸고 내 정보는 {{이름}} 그대로 둔다 — 에이전트에게 보이는 글
