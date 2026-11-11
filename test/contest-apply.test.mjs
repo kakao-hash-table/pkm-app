@@ -152,19 +152,23 @@ test('제출 준비 — AI 안이 없으면 만들고, 복사할 것·제출처�
   // 네이버 비밀값이 있으면 [메일 보내기]가 생기고, '확인 없이 보내기'를 켜도 뜻풀이가 글자 제한을 넘으면(안 2: 210/200자) 묻는다
   Object.assign(process.env, { NAVER_ID: 'tester', NAVER_APP_PASSWORD: 'fake-not-real' });
   try {
-    // 메일로 보낼 공모전은 보낼 안부터 고른다(1인 2건까지 — AI 추천 그대로, 하나만, 또는 번호로 여러 개)
-    assert.equal(run('submit', { cid: 'wevity:1', draft: '', me, answer: 'mail' }).ask.question, '어떤 안을 보낼까요? (2개까지)', '고르기 전에는 메일 보내기를 눌러도 보내지 않는다');
-    const pick = run('submit', { cid: 'wevity:1', draft: '', me, auto: 'true' });
-    assert.ok(pick.ask, '글자 초과면 자동으로 보내지 않는다');
+    // 안이 여러 개여도 먼저 고르라고 묻지 않는다 — AI 추천 안(1인 2건까지)으로 바로 제출 화면. [메일 보내기]에는 확인창이 없다
+    const first = run('submit', { cid: 'wevity:1', draft: '', me, auto: 'true' });
+    assert.ok(first.ask, '글자 초과면 자동으로 보내지 않는다');
+    assert.equal(first.ask.question.startsWith('냈나요?'), true);
+    assert.equal(first.verdict.title, '보낼 안 · 수원새빛 · HWASEONG · 이메일로 내요');
+    assert.deepEqual(first.ask.choices.map(c => [c.label, c.confirm]), [['메일 보내기', undefined], ['보낼 안 다시 고르기', undefined], ['직접 냈어요', undefined], ['나중에 낼게요', undefined], ['안 낼래요', undefined]]);
+    // 고르기는 [보낼 안 다시 고르기](repick)를 눌렀을 때만 — AI 추천 그대로, 하나만, 또는 번호로 여러 개
+    const pick = run('submit', { cid: 'wevity:1', draft: '', me, auto: 'true', answer: 'repick' });
     assert.equal(pick.ask.question, '어떤 안을 보낼까요? (2개까지)');
     assert.deepEqual(pick.ask.choices.map(c => [c.value, c.label]), [['pick:0,1', 'AI 추천 2개 · 수원새빛 · HWASEONG'], ['pick:0', '수원새빛만'], ['pick:1', 'HWASEONG만'], ['pick:2', '수원온만']]);
     assert.equal(pick.ask.free, true);
     assert.deepEqual(pick.findings.map(f => f.where), ['안 1', '안 2', '안 3']);
     assert.equal(pick.verdict.title, '메일로 보낼 안을 골라 주세요');
-    // 번호로 고르면(1, 3) 그 안으로 메일을 만들어 보이고, 확인창에도 보낼 안이 나온다
+    // 번호로 고르면(1, 3) 그 안으로 메일을 만들어 보인다
     const sel = run('submit', { cid: 'wevity:1', draft: '', me, auto: 'true', answer: '1, 3' });
     assert.deepEqual(sel.ask.choices.map(c => c.label), ['메일 보내기', '보낼 안 다시 고르기', '직접 냈어요', '나중에 낼게요', '안 낼래요']);
-    assert.equal(sel.ask.choices[0].confirm, 'name@suwon.go.kr로 보내요 · 보낼 안: 수원새빛, 수원온 · 첨부 없음. 보낸 메일은 되돌릴 수 없어요');
+    assert.equal(sel.ask.choices[0].confirm, undefined);
     assert.deepEqual(sel.findings.slice(0, 3).map(f => f.where), ['보낼 안 1', '안 2', '보낼 안 3']);
     assert.equal(sel.verdict.title, '보낼 안 · 수원새빛 · 수원온 · 이메일로 내요');
     const body = sel.findings.find(f => f.where === '메일 본문').copy;

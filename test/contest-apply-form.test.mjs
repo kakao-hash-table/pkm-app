@@ -43,7 +43,7 @@ test('네이버 폼 — 문항을 AI가 볼 글로 만들고, 계획이 오면 �
     { id: 'q4', text: '{{작품}}', consent: false, format: '' }, { id: 'q5', text: '{{뜻풀이}}', consent: false, format: '' },
     { id: 'q6', text: '예', consent: true, format: '' }, { id: 'q7', text: '동의합니다.', consent: false, format: '' }, { id: 'q8', text: '동의합니다.', consent: false, format: '' },
     { id: 'q9', text: '동의', consent: false, format: '' }, { id: 'q10', text: '동의', consent: false, format: '' }, { id: 'q99', text: '없는 문항', consent: false, format: '' }] };
-  const ask = run('info', { cid: 'wevity:1', fplan: { ...plan }, me: ME });
+  const ask = run('info', { cid: 'wevity:1', fplan: { ...plan }, me: ME, consent_auto: 'false' });   // 동의는 '묻지 않고 동의로'를 껐을 때만 묻는다
   assert.equal(ask.summary, '폼 동의 문항 묻기');
   assert.equal(text(ask, '동의 문항').length, 5, 'AI가 표시하지 않아도 서약·동의 문항은 내가 정한다');
   assert.equal(db().contests['wevity:1'].fplan.answers.length, 10, '폼에 없는 문항은 버린다');
@@ -51,9 +51,14 @@ test('네이버 폼 — 문항을 AI가 볼 글로 만들고, 계획이 오면 �
   assert.equal(run('info', { cid: 'wevity:1', me: ME, answer: 'fconsent:yes' }).summary, '모자란 내용 없음');
 });
 
-test('네이버 폼 — 안을 고르면 문항별 답을 보이고, 시험하기 전에는 [폼 제출하기]를 두지 않는다', () => {
-  assert.equal(run('submit', { cid: 'wevity:1', me: ME }).summary, '보낼 안 고르기');
-  let r = run('submit', { cid: 'wevity:1', me: ME, answer: 'pick:1' });
+test('네이버 폼 — 고르기를 먼저 묻지 않고 문항별 답을 보이고, 시험하기 전에는 [폼 제출하기]를 두지 않는다', () => {
+  // 안이 여러 개여도 먼저 고르라고 묻지 않는다 — AI 추천 안으로 바로 제출 화면. 고르기는 repick 답에만
+  let r = run('submit', { cid: 'wevity:1', me: ME });
+  assert.equal(r.summary, '냈는지 묻기');
+  assert.equal(text(r, '폼 ')[3].copy, '세계를 잇는 길', 'AI 추천 안으로 답을 만든다');
+  assert.equal(r.ask.choices.some(c => c.value === 'repick'), true);
+  assert.equal(run('submit', { cid: 'wevity:1', me: ME, answer: 'repick' }).summary, '보낼 안 고르기');
+  r = run('submit', { cid: 'wevity:1', me: ME, answer: 'pick:1' });
   const rows = text(r, '폼 ');
   assert.equal(rows[0].copy, '김테스트'); assert.equal(rows[0].private, true);
   assert.equal(rows[1].copy, '01012345678', '숫자만');
@@ -66,8 +71,12 @@ test('네이버 폼 — 안을 고르면 문항별 답을 보이고, 시험하�
   const d = db(); d.form_test = { naver: { at: NOW, ok: true, sent: true } }; put(d);
   r = run('submit', { cid: 'wevity:1', me: ME });
   const b = r.ask.choices.find(c => c.value === 'form');
-  assert.equal(b.label, '폼 제출하기'); assert.match(b.confirm, /낼 안: 함께 짓는 내일 · 문항 10개에 답해요\. 제출하면 되돌릴 수 없어요/);
+  assert.equal(b.label, '폼 제출하기'); assert.equal(b.confirm, undefined, '확인창은 지난 제출이 불확실할 때만 둔다');
+  assert.equal(text(r, '폼 6')[0].text, '→ 예'); assert.equal(text(r, '폼 4')[0].copy, '함께 짓는 내일', '고른 안 그대로');
   assert.equal(text(r, '폼 제출').length, 0);
+  const u = db(); u.contests['wevity:1'].form_doubt = NOW; put(u);
+  assert.match(run('submit', { cid: 'wevity:1', me: ME }).ask.choices.find(c => c.value === 'form').confirm, /두 번 내게 돼요/);
+  delete u.contests['wevity:1'].form_doubt; put(u);
   assert.equal(run('open-list').items.find(i => i.id === 'wevity:1').tags[1], '네이버 폼');
 });
 
@@ -83,7 +92,7 @@ test('구글 폼 — 글자 제한을 넘으면 막고, 작품 칸만 채운 주
   const qs = google.questions, plan = { note: '', extras: [{ cand: 0, values: [{ name: '기획의도', value: '가'.repeat(501) }] }, { cand: 1, values: [{ name: '기획의도', value: '짧은 기획의도' }] }],
     answers: qs.map(q => ({ id: q.id, format: /연락처/.test(q.title) && !/법정/.test(q.title) ? 'digits' : '', consent: q.type === 'multi',
       text: /법정대리인 (성함|연락처)/.test(q.title) ? '' : /성함/.test(q.title) ? '{{이름}}' : /연락처/.test(q.title) ? '{{연락처}}' : /이메일/.test(q.title) ? '{{이메일}}' : /기획의도/.test(q.title) ? '{{기획의도}}' : /공모 작품/.test(q.title) ? '{{작품}}' : q.options[0] })) };
-  assert.equal(run('info', { cid: 'wevity:2', fplan: plan, me: ME }).summary, '폼 동의 문항 묻기');
+  assert.equal(run('info', { cid: 'wevity:2', fplan: plan, me: ME, consent_auto: 'false' }).summary, '폼 동의 문항 묻기');
   run('info', { cid: 'wevity:2', me: ME, answer: 'fconsent:yes' });
   const d = db(); d.form_test.google = { at: NOW, ok: true, sent: true }; put(d);
   let r = run('submit', { cid: 'wevity:2', me: ME, answer: 'pick:0' });
@@ -96,12 +105,18 @@ test('구글 폼 — 글자 제한을 넘으면 막고, 작품 칸만 채운 주
   assert.equal(r.ask.choices.find(c => c.value === 'form').recommended, true);
 });
 
-test('완전 자동 — 동의 자동 답 설정이면 묻지 않고, 확인 없이 제출은 시험을 통과한 종류의 폼에만 한다', () => {
+test('완전 자동 — 동의는 기본이 묻지 않고 동의(끈 때만 묻는다), 확인 없이 제출은 시험을 통과한 종류의 폼에만 한다', () => {
   const d = db(), c = d.contests['wevity:1']; delete c.fconsent; delete c.picks; delete d.form_test.naver; put(d);
+  assert.equal(run('info', { cid: 'wevity:1', me: ME, consent_auto: 'false' }).summary, '폼 동의 문항 묻기');
+  assert.equal(db().contests['wevity:1'].fconsent, undefined);
+  assert.equal(run('info', { cid: 'wevity:1', me: ME }).summary, '모자란 내용 없음', '인자가 없으면 묻지 않는다(기본)');
+  assert.equal(db().contests['wevity:1'].fconsent, 'yes'); assert.ok(db().contests['wevity:1'].consent_auto);
+  const e = db(); delete e.contests['wevity:1'].fconsent; delete e.contests['wevity:1'].consent_auto; put(e);
   assert.equal(run('info', { cid: 'wevity:1', me: ME, consent_auto: 'true' }).summary, '모자란 내용 없음');
   assert.equal(db().contests['wevity:1'].fconsent, 'yes'); assert.ok(db().contests['wevity:1'].consent_auto);
   const r = run('submit', { cid: 'wevity:1', me: ME, fauto: 'true' });   // 네이버 폼은 아직 시험 전 — 보내지 않고 묻는다
-  assert.equal(r.summary, '보낼 안 고르기');
+  assert.equal(r.summary, '냈는지 묻기');
+  assert.equal(r.ask.choices.some(c => c.value === 'form'), false);
   assert.equal(db().contests['wevity:1'].submitted, undefined);
 });
 

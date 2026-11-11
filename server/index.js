@@ -228,7 +228,7 @@ setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다
 /* ---------- 플러그인 실행기: 이 컴퓨터에서 돌리기를 켠 프로필만 ---------- */
 const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p, 30000); },
   // 브라우저 단계에서 AI가 사람에게 넘긴 일 — 채팅의 넘겨받기와 같은 알림(내 답이 필요할 때)으로
-  onAsk:(p, m) => push.notify(p, { kind:'ask', title:`브라우저에서 해 주세요 · ${m.name}`, body:String(m.question).slice(0, 160), tag:`plugin:${m.plugin}:${m.run}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}/run/${m.run}` }) });
+  onAsk:(p, m) => push.notify(p, { kind:'ask', title:`${m.kind === 'value' ? '알려 주세요' : '브라우저에서 해 주세요'} · ${m.name}`, body:String(m.question).slice(0, 160), tag:`plugin:${m.plugin}:${m.run}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}/run/${m.run}` }) });
 /* ---------- AI 예약 작업: 돌리는 컴퓨터가 정한 때에 AI에 맡기고 결과를 인박스로 ---------- */
 const jobs = createJobs({ DATA, listProfiles, settingsOf, here:p => runner.here(p), onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p); } });
 

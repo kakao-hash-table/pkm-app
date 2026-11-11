@@ -7,6 +7,7 @@
 // 비밀값(토큰)은 어느 쪽에도 두지 않는다 — pkm-ai-server에만 있고, 승인한 플러그인 스크립트의 환경 변수로만 간다.
 // 이 컴퓨터의 플러그인 설정(runner.json)에는 설정값 말고도 every(목록마다 가져오는 주기, 분)와 gates(자동 시작한 작업에서 내 확인을 받을 단계)가 있다.
 // 브라우저 단계(browser(…)): 브라우저 도구만 가진 에이전트. 에이전트가 사람에게 넘긴 일(BrowserHandoff)은 그 단계의 '내 확인'으로 올리고, 답하면 같은 작업을 이어 간다.
+// 에이전트가 모자란 값을 물으면(BrowserValue) 그 단계의 입력창으로 올리고, 적은 값은 단계의 given에 모아 끝날 때 출력의 _given으로 뒤 단계에 넘긴다.
 // 답이 오래 없으면 pkm-ai-server가 에이전트를 쉬게 한다(작업은 done + parked) — 내 확인은 그대로 남기고, 답하면 같은 대화(session)·같은 탭으로 새 작업을 만들어 이어 한다.
 // 사람이 보는 화면(작업 화면의 브라우저 보기·미리 로그인)은 이 서버가 pkm-ai-server의 같은 탭으로 중계한다(browser()).
 import fs from 'node:fs';
@@ -76,6 +77,10 @@ const LOST = 'AI 서버에서 이 작업을 찾지 못했어요. 이 단계를 �
 // 멈춰 둔 넘겨받기에 답했을 때 에이전트에게 하는 말(같은 대화를 이어 간다)
 const RESUME = { done: '사용자가 부탁한 일을 끝냈다고 해요. snapshot으로 화면을 확인하고, 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.', fail: '사용자가 하지 못했다고 해요. 더 진행하지 말고 지금 상태로 결과를 돌려주세요.' };
 const AGAIN_MAX = 5;
+// 멈춰 둔 값 묻기에 답했을 때 — 값은 vars에 합쳐 보내고 에이전트는 자리표시로 넣는다
+const RESUME_VALUE = (name, given) => given ? `사용자가 ${name}을(를) 알려 줬어요. {{${name}}} 자리표시로 넣고 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.` : `사용자가 ${name}을(를) 건너뛰었어요. 그 칸은 비워 두고 할 수 있는 데까지 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.`;
+const ASKS = ['handoff', 'value'];   // 에이전트가 사람을 기다리는 내 확인 — 넘겨받기와 값 묻기
+const httpUrl = v => /^https?:\/\//.test(String(v || '')) ? clip(v, 500) : '';
 // 앞 스크립트 단계가 낸 옵션 { vars, allow, files, tab } — 꼴이 틀린 값은 버리지 않고 멈춘다(갈 수 있는 곳이 조용히 넓어지지 않게)
 function browserOpts(v){
   const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {}, out = {};
@@ -343,11 +348,18 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           step.note = clip(e.message, 300); return;
         }
         if (j.status === 'waiting'){ Object.assign(step, { status: 'waiting', reason: j.reason, until: j.until || null }); Object.assign(run, { status: 'waiting', updated: now() }); return; }
-        const web = d.kind === 'browser', my = web && d.browser ? (stepValue(run, d.browser.slice(1, -1)) || {}).vars : null;   // my: 내 정보 — 이 단계가 남기는 글에서 가린다
+        const web = d.kind === 'browser', my = web && d.browser ? { ...(stepValue(run, d.browser.slice(1, -1)) || {}).vars, ...step.given } : web ? step.given : null;   // my: 내 정보와 사람이 알려 준 값 — 이 단계가 남기는 글에서 가린다
         if (web && !['done', 'error', 'canceled'].includes(j.status)){
           // 브라우저 도구만 쓰는 단계 — 다른 확인 요청은 거절하고, 사람에게 넘긴 일은 내 확인으로 올린다(작업은 답을 기다리며 살아 있다)
-          for (const q of (j.pending || []).filter(q => q.tool !== 'BrowserHandoff')) await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id: q.id, allow: false, message: '이 단계에서는 브라우저 도구만 써요' }) }).catch(() => {});
-          const h = (j.pending || []).find(q => q.tool === 'BrowserHandoff' && !(step.answered || []).includes(q.id));
+          for (const q of (j.pending || []).filter(q => !['BrowserHandoff', 'BrowserValue'].includes(q.tool))) await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id: q.id, allow: false, message: '이 단계에서는 브라우저 도구만 써요' }) }).catch(() => {});
+          const ask1 = (j.pending || []).find(q => ['BrowserHandoff', 'BrowserValue'].includes(q.tool) && !(step.answered || []).includes(q.id)), h = ask1 && ask1.tool === 'BrowserHandoff' ? ask1 : null;
+          if (ask1 && !h){   // 모자란 값을 묻는다 — 입력창으로 올린다. 적은 값은 에이전트가 아니라 pkm-ai-server가 받아 넣는다
+            const inp = ask1.input || {}, name = clip(inp.name || '값', 60), what = scrub(clip(inp.question || ask1.description || `${name}을(를) 알려 주세요`, 300), my);
+            Object.assign(step, { status: 'input', told: step.job, ask: { type: 'value', name, question: what, request_id: String(ask1.id), url: httpUrl(inp.url), title: clip(inp.title || '', 120) } });
+            Object.assign(run, { status: 'input', updated: now() });
+            Promise.resolve().then(() => onAsk(p, { kind: 'value', plugin: x.id, name: x.manifest.name, run: run.id, step: step.key, title: run.item.title, question: what })).catch(() => {});
+            return;
+          }
           if (h){
             const inp = h.input || {}, what = scrub(clip(inp.message || h.description || '브라우저에서 할 일이 있어요', 300), my);
             Object.assign(step, { status: 'input', told: step.job, ask: { type: 'handoff', question: what, request_id: String(h.id), url: /^https?:\/\//.test(String(inp.url || '')) ? clip(inp.url, 500) : '', title: clip(inp.title || '', 120) } });
@@ -360,14 +372,15 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         // 이어 하던 대화가 실패했으면 그 대화는 버린다 — 다시 하면 새 대화로
         if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : scrub(jobError(j), my), text: scrub(clip(j.result && (j.result.stdout || j.result.text), 4000), my), finished: now(), ...(web ? { session: undefined } : {}) }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (web && j.parked){   // 넘긴 일을 보기 전에 에이전트가 이미 쉬러 갔다 — 알림은 지금 보낸다
-          const told = step.told === step.job || !!(step.ask && step.ask.type === 'handoff');   // 이 작업에서 넘긴 일을 이미 알렸으면 다시 알리지 않는다(서버가 넘긴 일을 거둔 뒤 쉬러 가는 사이에 봤어도)
+          const told = step.told === step.job || !!(step.ask && ASKS.includes(step.ask.type));   // 이 작업에서 넘긴 일을 이미 알렸으면 다시 알리지 않는다(서버가 넘긴 일을 거둔 뒤 쉬러 가는 사이에 봤어도)
           park(run, step, j, my);
-          if (!told) Promise.resolve().then(() => onAsk(p, { plugin: x.id, name: x.manifest.name, run: run.id, step: step.key, title: run.item.title, question: step.ask.question })).catch(() => {});
+          if (!told) Promise.resolve().then(() => onAsk(p, { kind: step.ask.type, plugin: x.id, name: x.manifest.name, run: run.id, step: step.key, title: run.item.title, question: step.ask.question })).catch(() => {});
           return;
         }
         let out = d.kind === 'script' ? parseOut(j.result.stdout) : (j.result.structured || parseOut(j.result.text));
         // 브라우저 단계의 결과는 웹 페이지를 읽은 AI의 글이다 — 실행기를 움직이는 필드(묻기·설정 바꾸기·지우기·갈래)는 스크립트 단계만 낸다
         if (web && out && typeof out === 'object'){ out = scrub(out, my); for (const k of ['ask', 'settings_patch', 'forget', 'lane', 'change', 'fork']) delete out[k]; }
+        if (web && !(out && out.error)){ out = { ...(out && typeof out === 'object' ? out : {}), _given: step.given || {} }; step.given = undefined; }   // 사람이 알려 준 값(없으면 빈 객체) — 뒤 단계에만 넘기고 실행이 끝나면 지운다
         const text = scrub(clip(d.kind === 'script' ? (out ? out.summary || '' : j.result.stdout) : j.result.text, 6000), my);
         // JSON을 내려다 중간에 잘린 출력 — 결과 없이 넘기면 다음 단계가 "채우지 못한 값"으로 멈춘다. 여기서 멈춰 다시 하게 한다
         if (d.kind === 'script' && !out && /^\s*\{/.test(j.result.stdout || '')){ Object.assign(step, { status: 'failed', error: '스크립트 결과를 읽지 못했어요. 출력이 중간에 잘렸을 수 있어요', text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
@@ -387,7 +400,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           if (k < 0 || k >= i || (def.steps.find(z => z.key === run.steps[k].key) || {}).kind !== 'script') return stop(`again은 앞에 있는 스크립트 단계만 가리킬 수 있어요: ${clip(out.again.step, 60)}`);
           if ((run.again || 0) >= AGAIN_MAX) return stop('같은 단계를 너무 여러 번 되돌렸어요');
           run.again = (run.again || 0) + 1;
-          for (const z of run.steps.slice(k)) Object.assign(z, { status: 'pending', job: null, error: null, ask: null, answered: undefined, output: z === run.steps[k] ? z.output : null, finished: null, when_skipped: undefined, lenient: undefined, answer: null, answer_label: null });
+          for (const z of run.steps.slice(k)) Object.assign(z, { status: 'pending', job: null, error: null, ask: null, answered: undefined, given: undefined, output: z === run.steps[k] ? z.output : null, finished: null, when_skipped: undefined, lenient: undefined, answer: null, answer_label: null });
           run.steps[k].answer = String(out.again.value ?? '').slice(0, 2000);
           run.updated = now();
           return;   // 다음 차례에 그 단계부터
@@ -421,7 +434,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     }
   };
   // 끝나거나 그만둔 실행은 다음 단계에 넘기려고 받은 큰 값(이름이 _로 시작하는 필드, 예: diff)과 private 짚은 곳(예: 제출용 내 정보)을 버린다 — 상태 파일은 동기화된다
-  const slim = run => { for (const s of run.steps) if (s.output && typeof s.output === 'object'){
+  const slim = run => { for (const s of run.steps){ s.given = undefined; if (!(s.output && typeof s.output === 'object')) continue;
     for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k];
     if (Array.isArray(s.output.findings)) s.output.findings = s.output.findings.filter(f => !(f && f.private));
   } };
@@ -431,10 +444,11 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
 
   // 멈춰 둔 넘겨받기 — 에이전트가 답을 기다리다 쉬러 갔다(작업은 끝났고 탭과 채운 내용은 남아 있다). 내 확인은 그대로 두고, 답하면 그 대화(session)를 이어 새 작업을 만든다
   function park(run, step, j, my){
-    const k = j.parked || {}, was = step.ask && step.ask.type === 'handoff' ? step.ask : null;   // 이미 내 확인으로 올린 일이면 그 말 그대로
+    const k = j.parked || {}, value = k.kind === 'value', was = step.ask && step.ask.type === (value ? 'value' : 'handoff') ? step.ask : null;   // 이미 내 확인으로 올린 일이면 그 말 그대로
+    const name = value ? clip(k.name || (was && was.name) || '값', 60) : null;
     Object.assign(step, { status: 'input', job: null, session: j.session || (j.result && j.result.session) || step.session, until: null, reason: null,
-      ask: { type: 'handoff', question: was ? was.question : scrub(clip(k.message || '브라우저에서 할 일이 있어요', 300), my), parked: true,
-        url: /^https?:\/\//.test(String(k.url || '')) ? clip(k.url, 500) : was ? was.url : '', title: clip(k.title || (was ? was.title : ''), 120) } });
+      ask: { type: value ? 'value' : 'handoff', ...(value ? { name } : {}), question: was ? was.question : scrub(clip((value && k.question) || k.message || (value ? `${name}을(를) 알려 주세요` : '브라우저에서 할 일이 있어요'), 300), my), parked: true,
+        url: httpUrl(k.url) || (was ? was.url : ''), title: clip(k.title || (was ? was.title : ''), 120) } });
     Object.assign(run, { status: 'input', updated: now() });
   }
   // resume: 멈춰 둔 넘겨받기를 이어 할 때 프롬프트 대신 보낼 말(스키마·브라우저 옵션·대화는 그대로)
@@ -447,7 +461,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       if ((v == null || typeof v !== 'object') && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${d.browser}`);
       const o = browserOpts(v);
       step.tab = tabKey(p, x.id, o.tab || run.item.id);
-      web = { tab: step.tab, only: true, ...o.opts };
+      web = { tab: step.tab, only: true, ...o.opts, ...(step.given ? { vars: { ...o.opts.vars, ...step.given } } : {}) };   // 사람이 알려 준 값도 자리표시로 넣게
     }
     const miss = [], cwd = d.cwd ? fill(d.cwd, run, settings, miss) : null;
     if (cwd && (miss.length || !path.isAbsolute(cwd) || !fs.existsSync(cwd))) throw fail(400, `작업 폴더를 찾지 못했어요: ${cwd}`);
@@ -493,7 +507,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     const conf = plugConf(readConf(), p, x.id);
     const run = a.run ? st.runs.find(r => r.id === a.run) : null;
     const step = run && a.step ? run.steps.find(s => s.key === a.step) : null;
-    const handed = s => !!s && s.status === 'input' && !!s.ask && s.ask.type === 'handoff';   // 넘겨받기를 기다리는 단계 — 에이전트 작업이 답을 기다리며 살아 있다
+    const handed = s => !!s && s.status === 'input' && !!s.ask && ASKS.includes(s.ask.type);   // 넘겨받기를 기다리는 단계 — 에이전트 작업이 답을 기다리며 살아 있다
     const cancelJob = async s => { if (s && s.job && (['running', 'waiting'].includes(s.status) || handed(s))) await ai(conn, `/v1/jobs/${s.job}`, { method: 'DELETE' }).catch(() => {}); };
     switch (a.type){
       case 'refresh': { const feed = x.feeds.find(f => f.name === a.feed); if (!feed) throw fail(404, '없는 목록이에요'); await refreshFeed(p, x, conf, feed, st, conn); return; }
@@ -514,11 +528,14 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       }
       case 'answer': case 'confirm': {
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
+        // 값 묻기의 답 — 적은 글이 값, 빈 글이나 skip: true면 건너뛰기. 값은 이 단계의 given에 모은다(끝나면 출력의 _given으로)
+        const asked = handed(step) && step.ask.type === 'value' ? step.ask.name : null, val = asked && a.skip !== true ? String(a.value ?? '').trim().slice(0, 4000) : '';
+        if (asked && val) step.given = { ...step.given, [asked]: val };
         if (handed(step) && step.ask.parked){   // 멈춰 둔 넘겨받기 — 그 대화를 이어 새 작업을 만든다(탭과 채운 내용은 그대로다)
           const bs = await browserState(p, x.id), d = (x.workflows.find(w => w.name === run.workflow) || { steps: [] }).steps.find(z => z.key === step.key);
           if (!bs.ok) throw fail(409, bs.message);   // 승인이 풀렸다 — 멈춰 둔 채로 두고 알려 준다
           if (!d) throw fail(409, '이 단계가 플러그인에서 사라졌어요');
-          try { step.job = await startStep(conn, x, run, step, d, settingsFor(x, conf), p, RESUME[a.type === 'confirm' || a.value === 'done' ? 'done' : 'fail']); }
+          try { step.job = await startStep(conn, x, run, step, d, settingsFor(x, conf), p, asked ? RESUME_VALUE(asked, !!val) : RESUME[a.type === 'confirm' || a.value === 'done' ? 'done' : 'fail']); }
           catch (e) {
             if (e.status === 502) throw e;   // AI 서버에 닿지 않는다 — 켜진 뒤 다시 누르면 된다
             Object.assign(step, { status: 'failed', ask: null, session: undefined, error: clip(`AI가 하던 대화를 잇지 못했어요 — ${e.message}`, 500), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return;
@@ -528,7 +545,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         }
         if (handed(step)){   // 넘겨받은 일을 마쳤다·못 했다 — 같은 작업에 답해 이어 가게 한다(단계를 다시 돌리지 않는다)
           const ok = a.type === 'confirm' || a.value === 'done';
-          try { await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id: step.ask.request_id, allow: ok, message: ok ? '' : '사용자가 브라우저에서 하지 못했다고 했어요' }) }); }
+          try { await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify(asked ? (val ? { request_id: step.ask.request_id, allow: true, value: val } : { request_id: step.ask.request_id, allow: false }) : { request_id: step.ask.request_id, allow: ok, message: ok ? '' : '사용자가 브라우저에서 하지 못했다고 했어요' }) }); }
           catch (e) {
             if (e.status === 404){ Object.assign(step, { status: 'failed', ask: null, error: LOST, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
             if (e.status !== 409) throw e;   // 409: 그 사이 작업이 다시 시작됐거나 끝났다 — 다음 차례에 작업 상태대로
@@ -550,7 +567,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         const i = run.steps.indexOf(step);
         for (const s of run.steps.slice(i)) await cancelJob(s);
         // lenient: 못 채운 값은 빈 값으로 두고 이 단계를 한다(앞 단계 결과가 비었을 때 처음부터 다시 말고 이어 가는 길)
-        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, answered: undefined, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
+        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, answered: undefined, given: undefined, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
         Object.assign(run, { status: 'queued', note: null, finished: null, again: undefined, updated: now() }); return;
       }
       case 'skip': {
@@ -582,7 +599,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
      답할 것이 사라졌으면(AI 서버를 다시 켜 작업이 처음부터 다시 돈다·시간이 넘어 끝났다) 기다림을 풀어 다음 차례에 작업 상태대로 한다 */
   async function handoffs(st, conn){
     for (const run of st.runs){
-      const step = run.status === 'input' && run.steps.find(s => s.status === 'input' && s.ask && s.ask.type === 'handoff' && s.job);
+      const step = run.status === 'input' && run.steps.find(s => s.status === 'input' && s.ask && ASKS.includes(s.ask.type) && s.job);
       if (!step) continue;
       let j;
       try { j = (await ai(conn, `/v1/jobs/${step.job}`)).job; }

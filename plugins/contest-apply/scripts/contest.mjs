@@ -488,7 +488,7 @@ async function info(){
   if (/^fconsent:(yes|no)$/.test(answer)){ c.fconsent = answer.slice(9); save(db); answer = ''; }
   const agree = used(c).filter(d => d.fills.some(x => /\{\{\s*동의\s*:/.test(x.text)));
   // '동의 문항은 묻지 않고 동의로' 설정 — 내가 켜 둔 대로 답하고, 그렇게 했다는 걸 남긴다
-  if ((args.consent_auto === 'true' || FULL) && !answer){
+  if ((args.consent_auto !== 'false' || FULL) && !answer){
     if (agree.length && !c.consent){ c.consent = 'yes'; c.consent_auto = AT; delete c.filled; }
     if (planned(c) && c.fplan.answers.some(a => a.consent && a.text.trim()) && !c.fconsent){ c.fconsent = 'yes'; c.consent_auto = AT; }
     save(db);
@@ -601,8 +601,7 @@ async function submit(){
   const aiRule = f.ai && f.ai.rule !== 'none' ? [{ where: '응모 규칙', ...(f.ai.rule === 'banned' ? { tag: 'AI 작품 제한' } : {}), title: f.ai.rule === 'banned' ? aiLine(f) : 'AI를 썼으면 신청서에 밝혀요',
     text: `${f.ai.text ? `${f.ai.text} — ` : ''}AI 안은 출발점으로 쓰고, 내 손으로 고쳐서 내요` }] : [];
   // 메일로 보낼 공모전은 보낼 안부터 고른다 — 고른 안으로 만든 메일을 확인한 뒤에 보낸다. 고른 적이 없으면 [메일 보내기]를 눌러도 고르는 것부터
-  if (['mail', 'form', 'browse'].includes(answer) && sendable && items.length > 1 && !c.picks) answer = 'repick';
-  if (sendable && items.length > 1 && (answer === 'repick' || (!answer && !c.picks))){
+  if (sendable && items.length > 1 && answer === 'repick'){
     const web = !fmode && !!bro, one = allow === 1 || fmode || web, ai = aiTop(c), cur = top(c)[0];
     return { summary: '보낼 안 고르기', verdict: { tone: 'ok', title: fmode ? `${fname}에 낼 안을 골라 주세요` : web ? '브라우저로 낼 안을 골라 주세요' : '메일로 보낼 안을 골라 주세요', text: [web ? `고른 안으로 접수 화면을 채워요${allow > 1 ? ' · 한 번에 한 안만 내요' : ''}` : fmode ? `고른 안으로 ${fname} 문항의 답을 만들어요${allow > 1 ? ' · 폼은 한 번에 한 안만 내요' : ''}` : `${E.firstEmail(f.submit.to)}로 보낼 메일을 만들어요`, ...limits].join(' · ') },
       findings: [...aiRule, ...items.map((x, i) => ({ ...cand(x, i, `안 ${i + 1}`), text: x.why }))],
@@ -676,10 +675,18 @@ async function submit(){
       "안 낼래요 → '뺀 공모전'으로 옮겨요. 다시 넣을 수 있어요", s.method === 'email' && !ready && m && m.to ? '네이버 아이디·애플리케이션 비밀번호를 플러그인 준비 화면의 비밀값에 넣으면 여기서 바로 보낼 수 있어요' : '',
       hasAccount() && s.method !== 'email' && !fmode ? `[메일 보내기]는 이메일로 받는 공모전에만 나와요 · 이 공모전은 ${SEND[s.method] ? `${E.METHODS[s.method]} 접수예요` : '접수 방법을 요강에서 확인해야 해요'}` : '',
       hasAccount() && s.method === 'email' && !(m && m.to) ? '접수 메일 주소를 요강에서 찾지 못해 [메일 보내기]를 둘 수 없어요. 원문에서 주소를 확인해 직접 보내 주세요' : ''].filter(Boolean).join('\n');
-    return { summary: '냈는지 묻기', verdict, findings: findings.slice(0, 45), ask: { question: `냈나요? · ${n == null ? '마감일 요강 확인' : n < 0 ? `마감 지남 (${E.kday(c.deadline)})` : `마감 ${n === 0 ? '오늘' : `D-${n}`} (${E.kday(c.deadline)})`}`, hint,
-      choices: [...(ready ? [{ value: 'mail', label: '메일 보내기', recommended: true, confirm: `${m.to}로 보내요 · 보낼 안: ${E.cut(top(c).map(x => x.text).join(', '), 60)}${m.attachments.length ? ` · 첨부 ${m.attachments.length}개(${E.cut(m.attachments.map(a => a.filename).join(', '), 70)})` : ' · 첨부 없음'}. 보낸 메일은 되돌릴 수 없어요` }] : []),
-        ...(fcan ? [{ value: 'form', label: '폼 제출하기', recommended: true, confirm: `${fname} "${E.cut(c.form.title, 30)}"에 제출해요 · 낼 안: ${E.cut(top(c)[0].text, 50)} · 문항 ${sheet.rows.filter(r => r.value).length}개에 답해요. 제출하면 되돌릴 수 없어요${c.form_doubt ? ' · 지난번 제출이 됐는지 확인하지 못했어요. 이미 들어갔다면 두 번 내게 돼요' : ''}` }] : []),
-        ...(canBrowse ? [{ value: 'browse', label: 'AI가 브라우저로 내기', recommended: true, confirm: `${hostOf(bro.url)}의 접수 화면을 열어 "${E.cut(top(c)[0].text, 40)}"로 채우고 제출해요. 필수 동의 항목에 동의로 표시해요. 제출하면 되돌릴 수 없어요${c.sited && c.sited.sent === 'unknown' ? ' · 지난번에 제출됐는지 확인하지 못했어요. 이미 들어갔다면 두 번 내게 돼요' : ''}` }] : []),
+    // 내가 할 일만 남기고, 이미 자동으로 채운 것은 접어 둔다(펼치면 그대로 보인다). 여기서 못 내는 접수(직접 복사해 내야 함)는 고른 안과 복사할 것을 그대로 보인다
+    const NEED = new Set(['응모 규칙', '폼 제출', '폼 읽기', '지난 시도', '접수 폼 후보', '직접 받을 양식', '양식', '접수 방법', '이메일 주소는 원문에서']);
+    const mineNow = top(c).slice(0, fmode || bro ? 1 : 99);
+    for (const [i, x] of findings.entries()){
+      const cand = i >= aiRule.length && i < aiRule.length + items.length ? items[i - aiRule.length] : null;
+      const todo = NEED.has(x.where) || /답이 비었어요|채우지 못했어요|빈칸으로 둔|직접 할 일|자필 서명|직접 채워/.test(x.text || '');
+      if (cand ? !mineNow.includes(cand) : sendable && !todo) x.fold = true;
+    }
+    return { summary: '냈는지 묻기', verdict, fold_label: '자동으로 채운 것', findings: findings.slice(0, 45), ask: { question: `냈나요? · ${n == null ? '마감일 요강 확인' : n < 0 ? `마감 지남 (${E.kday(c.deadline)})` : `마감 ${n === 0 ? '오늘' : `D-${n}`} (${E.kday(c.deadline)})`}`, hint,
+      choices: [...(ready ? [{ value: 'mail', label: '메일 보내기', recommended: true }] : []),
+        ...(fcan ? [{ value: 'form', label: '폼 제출하기', recommended: true, ...(c.form_doubt ? { confirm: '지난번 제출이 됐는지 확인하지 못했어요. 이미 들어갔다면 두 번 내게 돼요' } : {}) }] : []),
+        ...(canBrowse ? [{ value: 'browse', label: 'AI가 브라우저로 내기', recommended: true, ...(c.sited && c.sited.sent === 'unknown' ? { confirm: '지난번에 제출됐는지 확인하지 못했어요. 이미 들어갔다면 두 번 내게 돼요' } : {}) }] : []),
         ...(repick ? [{ value: 'repick', label: '보낼 안 다시 고르기' }] : []), { value: 'yes', label: sendable ? '직접 냈어요' : '냈어요', recommended: !ready && !fcan && !canBrowse }, { value: 'later', label: '나중에 낼게요' }, { value: 'no', label: '안 낼래요' }] } };
   }
   if (!['mail', 'form', 'browse', 'yes', 'later', 'no'].includes(answer)) fail('모르는 답이에요');
@@ -699,6 +706,10 @@ async function submit(){
 function browsed(){
   const db = load(), c = contest(db, args.cid), a = blank(args.answer) ? '' : String(args.answer);
   const mark = () => { c.submitted ||= AT; c.sent_names = top(c).slice(0, 1).map(x => x.text); };
+  // 브라우저에서 내다가 물어서 받은 내 정보(이름 → 값) — 내 데이터에 기억해 다음에는 묻지 않는다
+  if (!blank(args.given)){ const g = json(args.given, '받은 내용'), kept = readKept(); let n = 0;
+    for (const [k, v] of Object.entries(g && typeof g === 'object' ? g : {})) if (k && typeof v === 'string' && v.trim()){ kept.제출용[String(k).slice(0, 40)] = v.trim().slice(0, 400); n++; }
+    if (n) writeLocal(KEPT, kept); }
   const again = { step: '제출', value: 'browse' };   // 제출 단계부터 다시 — 새로 적은 내 정보를 넣어 브라우저로 다시 낸다
   if (a === 'yes'){ mark(); save(db); return { summary: '냈어요', sent: true }; }
   if (a === 'later') return { summary: '나중에', sent: false };

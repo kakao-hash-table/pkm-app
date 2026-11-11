@@ -58,7 +58,7 @@ test('양식 읽기 — 받아 둔 양식을 AI가 볼 글로 만들고(자리�
 });
 
 test('모자란 내용 묻기 — 동의 표시는 내가 고르고, 양식에 필요한데 없는 내 정보는 적어서 내 프로필 데이터에 기억한다', () => {
-  const a = run('info', { cid: 'thinkcontest:1', plan: PLAN, me: ME });
+  const a = run('info', { cid: 'thinkcontest:1', plan: PLAN, me: ME, consent_auto: 'false' });   // 동의는 '묻지 않고 동의로'를 껐을 때만 묻는다
   assert.equal(a.ask.question, "동의서에 '동의함'으로 표시할까요?");
   assert.deepEqual(a.ask.choices.map(c => c.value), ['consent:yes', 'consent:no']);
   assert.deepEqual(a.findings.map(f => [f.where, f.file]), [['개인정보 동의서', 'thinkcontest-1-원본-2.hwpx']]);
@@ -100,14 +100,15 @@ test('제출 화면 — 채운 서류를 미리 보기 파일로 보이고, 메�
   assert.match(docs[1].text, /자필 서명이 필요해서 메일에 붙이지 않아요/);
 
   const env = { NAVER_ID: 'tester', NAVER_APP_PASSWORD: 'fake-not-real' };
-  assert.equal(run('submit', { cid: 'thinkcontest:1', draft: '', me: ME, auto: 'true' }, env).ask.question, '어떤 안을 보낼까요?');
+  assert.ok(run('submit', { cid: 'thinkcontest:1', draft: '', me: ME, auto: 'true' }, env).ask.question.startsWith('냈나요?'), '안이 여러 개여도 먼저 고르라고 묻지 않는다');
+  assert.equal(run('submit', { cid: 'thinkcontest:1', draft: '', me: ME, auto: 'true', answer: 'repick' }, env).ask.question, '어떤 안을 보낼까요?');
   const sel = run('submit', { cid: 'thinkcontest:1', draft: '', me: ME, auto: 'true', answer: 'pick:1' }, env);
   assert.ok(sel.ask.question.startsWith('냈나요?'), '서류에 손으로 할 일이 있으면 확인 없이 보내지 않는다');
   const at = sel.findings.find(f => f.where === '메일에 붙일 파일');
   assert.equal(at.title, '1개');
   assert.match(at.text, /^국민제안서_믿음을 잇다\.hwpx\n/);
   assert.match(at.copy, /thinkcontest-1-보탤 파일$/);
-  assert.match(sel.ask.choices[0].confirm, /첨부 1개\(국민제안서_믿음을 잇다\.hwpx\)/);
+  assert.deepEqual([sel.ask.choices[0].label, sel.ask.choices[0].confirm], ['메일 보내기', undefined], '[메일 보내기]에는 확인창이 없다');
   const t = await textOf(db().filled[0].file);
   assert.ok(t.includes('믿음을 잇다') && t.includes('이유-일') && !t.includes('이유-영'), '고른 안으로 다시 채운다');
 
@@ -123,7 +124,9 @@ test('제출 화면 — 채운 서류를 미리 보기 파일로 보이고, 메�
 
 test('동의 표시를 하지 않기로 하면 동의 칸은 비워 둔다', async () => {
   run('info', { cid: 'thinkcontest:1', plan: PLAN, me: ME });   // 계획을 다시 받으면 처음부터
-  const c = JSON.parse(fs.readFileSync(DB, 'utf8')); delete c.contests['thinkcontest:1'].consent; fs.writeFileSync(DB, JSON.stringify(c));
+  const c = JSON.parse(fs.readFileSync(DB, 'utf8')); delete c.contests['thinkcontest:1'].consent; delete c.contests['thinkcontest:1'].consent_auto; fs.writeFileSync(DB, JSON.stringify(c));
+  assert.equal(run('info', { cid: 'thinkcontest:1', plan: '', me: ME }).summary, '모자란 내용 없음', '인자가 없으면 동의를 묻지 않는다(기본)');
+  assert.equal(db().consent, 'yes'); assert.ok(db().consent_auto);
   run('info', { cid: 'thinkcontest:1', plan: '', me: ME, answer: 'consent:no' });
   run('fill', { cid: 'thinkcontest:1', me: ME });
   assert.match(await textOf(db().filled[1].file), /동의함 ☐\s+동의하지 않음 ☐/);

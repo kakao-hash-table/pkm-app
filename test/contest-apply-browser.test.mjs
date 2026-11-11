@@ -31,11 +31,16 @@ put({ contests: { 'wevity:1': base('wevity:1', fit('site', 'www.cmak.or.kr/recep
     fplan: { made: 'm1', sig: lib.sig, note: '', extras: [], answers: lib.questions.map(q => ({ id: q.id, consent: false, text: /성명/.test(q.title) ? '{{이름}}' : /주제를 작성/.test(q.title) ? '{{작품}}' : /의미/.test(q.title) ? '{{뜻풀이}}' : '' })) } } } });
 const where = (r, w) => r.findings.filter(f => f.where === w);
 
-test('홈페이지 접수 — 안을 고르면 [AI가 브라우저로 내기]가 나오고, 과제에는 내 정보 값 없이 자리표시만 넘긴다', () => {
-  assert.equal(run('submit', { cid: 'wevity:1', me: ME }).summary, '보낼 안 고르기');
-  let r = run('submit', { cid: 'wevity:1', me: ME, answer: 'pick:0' });
+test('홈페이지 접수 — 고르기를 먼저 묻지 않고 [AI가 브라우저로 내기]가 나오고, 과제에는 내 정보 값 없이 자리표시만 넘긴다', () => {
+  // 안이 여러 개여도 먼저 고르라고 묻지 않는다 — AI 추천 안으로 바로 제출 화면. 고르기는 [보낼 안 다시 고르기]를 눌렀을 때만
+  let r = run('submit', { cid: 'wevity:1', me: ME });
+  assert.equal(r.summary, '냈는지 묻기');
+  assert.match(r.verdict.title, /^보낼 안 · 안전은 설계부터 · /);
+  assert.equal(r.ask.choices.some(c => c.value === 'browse'), true);
+  assert.equal(run('submit', { cid: 'wevity:1', me: ME, answer: 'repick' }).summary, '보낼 안 고르기');
+  r = run('submit', { cid: 'wevity:1', me: ME, answer: 'pick:0' });
   const b = r.ask.choices.find(c => c.value === 'browse');
-  assert.equal(b.label, 'AI가 브라우저로 내기'); assert.match(b.confirm, /cmak\.or\.kr의 접수 화면을 열어 "안전은 설계부터"로 채우고 제출해요/);
+  assert.equal(b.label, 'AI가 브라우저로 내기'); assert.equal(b.confirm, undefined, '지난 시도가 불확실하지 않으면 확인창을 두지 않는다');
   assert.match(where(r, '브라우저로 내기')[0].text, /내 정보는 AI에게 보이지 않고/);
   r = run('submit', { cid: 'wevity:1', me: ME, answer: 'browse' });
   assert.deepEqual([r.choice, r.browse, r.ask_names], ['browse', true, false]);

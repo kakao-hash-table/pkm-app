@@ -316,7 +316,7 @@
       const min = cur.started ? Math.floor((now - Date.parse(cur.started)) / 60000) : 0;
       return { phase: 'ai', text: `AI가 하는 중 · ${min >= 1 ? `${min}분째` : '몇 분 걸려요'}` };
     }
-    if (r.status === 'input'){ const q = cur.ask && cur.ask.type !== 'confirm' && line(cur.ask.question); return { phase: 'input', text: `내 확인이 필요해요${q ? ` · ${q}` : ''}`, step: cur.key }; }   // 무엇을 묻는지 목록 줄에서 바로 보이게
+    if (r.status === 'input'){ const q = cur.ask && cur.ask.type !== 'confirm' && line(cur.ask.question); return { phase: 'input', text: `${cur.ask && cur.ask.type === 'value' ? '알려 주세요' : '내 확인이 필요해요'}${q ? ` · ${q}` : ''}`, step: cur.key }; }   // 무엇을 묻는지 목록 줄에서 바로 보이게
     if (r.status === 'stopped'){ const why = line(cur.status === 'failed' ? cur.error : r.note || cur.error); return { phase: 'failed', text: `멈췄어요${why ? ` · ${why}` : ''}`, step: cur.key }; }
     if (r.status === 'canceled') return { phase: 'canceled', text: '그만뒀어요' };
     for (let i = steps.length - 1; i >= 0; i--){

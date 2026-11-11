@@ -898,6 +898,10 @@ dialog .dlg-actions{position:sticky;bottom:0;z-index:1;margin:4px -24px -24px;pa
 .cw-frame:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .cw-frame img{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none}
 .cw-frame img[hidden]{display:none}
+.cw-frame img{touch-action:none}
+.cw-nav{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;z-index:1}
+.cw-nav .btn{min-width:44px;min-height:44px;padding:0;border:1px solid var(--line-strong);background:var(--surface);color:var(--text);box-shadow:var(--shadow-pop);font-size:1.125rem}
+.cw-frame.big .cw-nav{position:sticky;float:right;margin:8px}
 .cw-frame.big{overflow:auto;overscroll-behavior:contain}
 .cw-frame.big img{position:static;margin:0;width:1280px;max-width:none;max-height:none}
 .cw-frame.stale img{opacity:.45}
@@ -4474,8 +4478,12 @@ function plKept(id, f, items){
 }
 // 단계 결과의 판정(verdict: {tone, title, text})과 짚은 곳(findings: [{where, url, tag, title, text, copy, note}]) — 플러그인이 정한 말을 그대로 그린다
 const plVerdictOf = r => { for (let i = r.steps.length - 1; i >= 0; i--){ const o = r.steps[i].output; if (o && o.verdict && typeof o.verdict === 'object') return { v:o.verdict, findings:Array.isArray(o.findings) ? o.findings : [], step:r.steps[i] }; } return null; };
-function plFinds(list, id){
+// fold: true인 줄(자동으로 채운 것처럼 내가 할 일이 아닌 것)은 접힌 한 묶음으로 아래에 — 펼친 상태는 다시 그려도 남는다(data-key)
+const plFoldOf = (r, vd) => ({ key:`pl-fold-${r.id}-${vd.step.key}`.replace(/[^\w가-힣-]/g, '_'), label:String((vd.step.output || {}).fold_label || '').slice(0, 30) });
+function plFinds(list, id, fold){
   if (!list.length) return '';
+  const folded = fold ? list.filter(f => f && f.fold) : [];
+  if (folded.length) return `${plFinds(list.filter(f => !(f && f.fold)), id)}<details class="more pl-fold-finds" data-key="${esc(fold.key)}"><summary id="${esc(fold.key)}">${esc(fold.label || '자동으로 채운 것')} ${folded.length}개 보기</summary>${plFinds(folded, id)}</details>`;
   return `<ol class="pl-finds">${list.map((f, k) => `<li>
     <div class="pl-find-head">${plUrl(f.url) ? `<a class="pl-where" href="${esc(plUrl(f.url))}" target="_blank" rel="noopener"><code>${esc(f.where || '')}</code> <span aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>` : `<code class="pl-where">${esc(f.where || '')}</code>`}${f.tag ? plBadge(f.tag, 'bad') : ''}${f.note ? plBadge(f.note, 'wait') : ''}</div>
     ${f.title ? `<b class="pl-find-title">${esc(f.title)}</b>` : ''}
@@ -4589,7 +4597,7 @@ function plInlineFeed(id, x, f){
     else if (['queued', 'running', 'waiting'].includes(r.status)){ tone = 'wait'; head = esc(PL.picked[r.id] ? `${PL.picked[r.id]} 하는 중…` : r.status === 'queued' ? '차례를 기다려요' : r.status === 'waiting' ? plRunLine(x, r) : `${s.name} 하는 중`);
       body = PL.picked[r.id] || r.status === 'waiting' ? '' : `<span>${r.status === 'queued' ? esc(plRunLine(x, r)) : `${r.steps.indexOf(s) + 1}/${r.steps.length} · ${plMin(s.started || r.updated)}분째`}</span>`; }
     else if (['input', 'done'].includes(r.status) && vd){
-      tone = vd.v.tone === 'bad' ? 'bad' : 'ok'; head = esc(vd.v.title || ''); body = `${vd.v.text ? `<span>${esc(vd.v.text)}</span>` : ''}${plFinds(vd.findings, id)}`;
+      tone = vd.v.tone === 'bad' ? 'bad' : 'ok'; head = esc(vd.v.title || ''); body = `${vd.v.text ? `<span>${esc(vd.v.text)}</span>` : ''}${plFinds(vd.findings, id, plFoldOf(r, vd))}`;
       const oc = vd.step.output.outcome;
       acts = r.status === 'done' ? `<span class="pl-outcome">✓ ${esc((oc && oc.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>${multi}`
         : s.ask && s.ask.inline ? plChoices(id, r, s) : `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`;
@@ -4704,8 +4712,8 @@ function plMissing(id){
    탭은 그 플러그인의 것만: 단계가 적어 둔 탭(step.tab)과 서버가 알려 준 로그인 탭(PL.web[id].login). 조각은 화면을 다시 그려도 남게 자리(#pl-web-slot · #plw-slot)로 옮겨 붙인다 */
 const PW = { el:null, view:null, login:null, state:null };
 function pwOf(id, r){
-  const s = r && plStepNow(r), hand = !!s && r.status === 'input' && !!s.ask && s.ask.type === 'handoff';
-  return s && s.kind === 'browser' && s.tab && (hand || ['running', 'waiting'].includes(r.status)) ? { id, r, s, hand } : null;
+  const s = r && plStepNow(r), asks = t => !!s && r.status === 'input' && !!s.ask && s.ask.type === t, hand = asks('handoff'), value = asks('value');   // value: AI가 모자란 값을 물었다 — 화면은 참고로 같이 보인다
+  return s && s.kind === 'browser' && s.tab && (hand || value || ['running', 'waiting'].includes(r.status)) ? { id, r, s, hand, value } : null;
 }
 function pwRun(){
   const m = (location.hash || '').match(/^#\/plugins\/([^/]+)\/run\/([^/]+)$/), x = m && PL.st && PL.st.plugins[m[1]];
@@ -4732,7 +4740,7 @@ function pwMount(){
       hand:() => { const run = now();
         return run && run.hand && !PL.sent[run.r.id] ? { message:run.s.ask.question, acts:plHandActs(run.id, run.r, run.s),
           sub:PW.state && PW.state.id === run.id && !PW.state.ok ? '돌리는 컴퓨터에 뜬 Chrome 창에서 하고 눌러 주세요.' : '아래 화면에서 하고 눌러 주세요. 여기 적은 글은 AI에게 보내지 않아요.' } : null; },
-      watch:() => { const run = now(); return !!run && !run.hand; }
+      watch:() => { const run = now(); return !!run && !run.hand && !run.value; }
     });
   }
   if (PW.el.parentElement !== to) to.appendChild(PW.el);
@@ -4797,7 +4805,7 @@ function vPluginRun(id, rid){
   const chk = r.steps.find(z => z.output && Array.isArray(z.output.commits)), co = chk ? chk.output : null;
   const wt = r.steps.map(z => z.output || {}).find(o => o.path && o.branch) || {};
   const here = plIsRunner(), sent = PL.sent[r.id], key = (r.item.vars && r.item.vars.key) || '', vd = plVerdictOf(r);
-  const hand = !sent && r.status === 'input' && !!s.ask && s.ask.type === 'handoff';   // 브라우저 단계에서 AI가 사람에게 넘긴 일
+  const hand = !sent && r.status === 'input' && !!s.ask && s.ask.type === 'handoff', given = !sent && r.status === 'input' && !!s.ask && s.ask.type === 'value';   // 브라우저 단계에서 AI가 사람에게 넘긴 일
   const btn = (act, label, cls = 'btn-ghost', extra = '') => `<button class="btn ${cls} btn-sm" type="button" data-pl="${act}" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" ${extra}>${label}</button>`;
   const cancel = ['done', 'canceled'].includes(r.status) ? '' : btn('cancel', '그만두기', 'btn-text');
   const restart = (cls = 'btn-ghost') => `<button class="btn ${cls} btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>`;
@@ -4815,6 +4823,7 @@ function vPluginRun(id, rid){
      ${rep && rep.pr ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="copy" data-text="${esc(rep.pr)}" data-msg="PR 설명을 복사했어요">PR 설명 복사</button>` : ''}
      ${agent ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="redo" data-id="${id}" data-run="${r.id}" data-step="${esc(agent.key)}">AI에게 다시 시키기</button>` : ''}
      <span class="pl-quiet">${btn('confirm', '끝난 것으로 옮기기', 'btn-text')}${cancel}</span>`];
+  else if (given) card = ['wait', `${i}/${n} ${esc(s.name)} — 알려 주세요`, s.ask.parked ? 'AI가 채우다가 모자란 내용을 물었어요. AI는 기다리다 쉬고 있어요. 적으면 이어서 해요.' : 'AI가 채우다가 모자란 내용을 물었어요. 적으면 멈추지 않고 이어서 해요.', ''];
   else if (hand) card = ['wait', `${i}/${n} ${esc(s.name)} — 내 차례예요`, s.ask.parked ? 'AI가 브라우저에서 할 일을 넘겼어요. AI는 기다리다 쉬고 있어요. 끝내고 누르면 이어서 해요.' : 'AI가 브라우저에서 할 일을 넘겼어요. 끝내고 [다 했어요]를 누르면 AI가 이어서 해요.', cancel];   // 부탁한 일과 [다 했어요]는 브라우저 화면 바로 위에(하는 곳 옆, 주요 버튼은 한 곳에만)
   else if (r.status === 'input' && vd && s.ask && s.ask.inline) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), `${plChoices(id, r, s)}${cancel}`];
   else if (r.status === 'input' && vd && s.ask) card = [vd.v.tone === 'bad' ? 'bad' : 'ok', esc(vd.v.title || s.ask.question || ''), esc(vd.v.text || ''), ''];   // 판정을 먼저 보이고, 묻는 말은 아래 폼에서
@@ -4845,7 +4854,7 @@ function vPluginRun(id, rid){
   ].join('');
   // 답하는 폼(고르기·적기)
   let form = '';
-  if (!sent && r.status === 'input' && s.ask && !['confirm', 'gate', 'handoff'].includes(s.ask.type) && !s.ask.inline){
+  if (!sent && r.status === 'input' && s.ask && !['confirm', 'gate', 'handoff', 'value'].includes(s.ask.type) && !s.ask.inline){
     const a = s.ask, choices = a.choices || [], quick = !a.free && choices.length && choices.length <= 3;   // 고를 것이 셋 이하면 버튼 하나로 바로
     form = quick ? `<form class="pl-answer" data-pl-form="answer" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
       ${vd ? `<h2 class="pl-ask-q">${esc(a.question)}</h2>${a.hint ? `<p class="faint" style="white-space:pre-line;margin:0">${esc(a.hint)}</p>` : ''}` : ''}
@@ -4858,9 +4867,14 @@ function vPluginRun(id, rid){
       <p class="err" id="pl-ans-err" hidden>${choices.length ? '하나를 골라 주세요' : '내용을 적어 주세요'}</p>
       <div class="dlg-actions" style="justify-content:flex-start"><button class="btn btn-primary" type="submit">${choices.length ? '이걸로 이어 하기' : '이 내용으로 이어 하기'}</button>${cancel}</div></form>`;
   }
+  // 값 묻기 — 질문 + 입력 줄. 적은 값은 AI에게 보이지 않고 그 칸에만 들어간다
+  if (given) form = `<form class="pl-answer" data-pl-form="give" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" novalidate>
+      <label class="field"><span>${esc(s.ask.question)} <span class="hint">${esc(s.ask.name)} · 적은 글은 AI에게 보이지 않고 그 칸에만 넣어요</span></span><input name="v" id="pl-give" autocomplete="off" spellcheck="false" aria-describedby="pl-give-err"></label>
+      <p class="err" id="pl-give-err" hidden>내용을 적어 주세요. 넣지 않으려면 [건너뛰기]를 눌러 주세요</p>
+      <div class="dlg-actions" style="justify-content:flex-start"><button class="btn btn-primary" type="submit">넣고 이어 하기</button><button class="btn btn-ghost" type="button" data-pl="give-skip" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}">건너뛰기</button>${cancel}</div></form>`;
   const steps = `<ol class="run-steps" aria-label="단계, ${n}개 중 ${i}번째 ${RUN_WORD[r.status] ? RUN_WORD[r.status][0] : ''}">${r.steps.map((z, k) => {
     const [sym, word] = { pending:['○', '대기'], running:['●', '하는 중'], waiting:['‖', '기다림'], input:['!', '내 차례'], failed:['!', '멈춤'], done:['✓', '완료'], skipped:['–', '건너뜀'] }[z.status] || ['○', '대기'];
-    const note = z.status === 'failed' ? String(z.error || '').split('\n')[0] : z.status === 'done' ? (z.output && (z.output.summary || z.output.how) ? z.output.summary || z.output.how : '') : z.status === 'running' ? `${plMin(z.started || r.updated)}분째` : z.status === 'input' ? (sent ? '답을 보냄' : z.ask && z.ask.type === 'gate' ? '내 확인을 기다려요' : z.ask && z.ask.type === 'confirm' ? '확인할 차례' : z.ask && z.ask.type === 'handoff' ? '브라우저에서 내가 할 일이 있어요' : '답이 필요해요') : '';
+    const note = z.status === 'failed' ? String(z.error || '').split('\n')[0] : z.status === 'done' ? (z.output && (z.output.summary || z.output.how) ? z.output.summary || z.output.how : '') : z.status === 'running' ? `${plMin(z.started || r.updated)}분째` : z.status === 'input' ? (sent ? '답을 보냄' : z.ask && z.ask.type === 'gate' ? '내 확인을 기다려요' : z.ask && z.ask.type === 'confirm' ? '확인할 차례' : z.ask && z.ask.type === 'handoff' ? '브라우저에서 내가 할 일이 있어요' : z.ask && z.ask.type === 'value' ? '알려 줄 것이 있어요' : '답이 필요해요') : '';
     return `<li class="rs-${z.status}" ${z === s && !['done', 'canceled'].includes(r.status) ? 'aria-current="step"' : ''}><span class="rs-sym" aria-hidden="true">${sym}</span><span><b>${k + 1} ${esc(z.name)}</b> <span class="sr-only">${word}</span>${note ? `<small>${esc(note)}</small>` : ''}${z.answer ? `<small>내 답: ${esc(z.answer_label || z.answer)}</small>` : ''}</span></li>`;
   }).join('')}</ol>`;
   const files = co && co.files && co.files.length ? section(`바뀐 파일 <span class="count">${co.files.length + (co.more_files || 0)}</span>`, plList(co.files.map(f => `<li><div class="row pl-file"><code>${esc(f.file)}</code><span class="num">+${f.add} −${f.del}</span></div></li>`), 15)) : '';
@@ -4870,9 +4884,10 @@ function vPluginRun(id, rid){
     <h1 tabindex="-1">${esc(r.item.title)}</h1>
     <div class="ai-state ${card[0]} pl-card" role="status"><b id="pl-card-h" tabindex="-1">${card[1]}</b>${card[2] ? `<span>${card[2]}</span>` : ''}${card[3] && card[3].trim() ? `<div class="pl-card-acts">${card[3]}</div>` : ''}</div>
     ${tools.trim() ? `<div class="pl-card-acts" style="margin:12px 0 0">${tools}</div>` : ''}
+    ${given ? form : ''}
     ${pwOf(id, r) ? '<div id="pl-web-slot"></div>' : ''}
-    ${vd && vd.findings.length ? section(`짚은 곳 <span class="count">${vd.findings.length}</span>`, plFinds(vd.findings, id)) : ''}
-    ${form}
+    ${vd && vd.findings.length ? section(`짚은 곳 <span class="count">${vd.findings.length}</span>`, plFinds(vd.findings, id, plFoldOf(r, vd))) : ''}
+    ${given ? '' : form}
     ${co && co.warnings && co.warnings.length ? `<ul class="pl-warn">${co.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
     ${rep && rep.summary ? section('AI 요약', plMd(rep.summary)) : ''}
     ${rep && rep.risks && !/^없음\.?$/.test(rep.risks) ? section('AI가 남긴 확인할 것', plMd(rep.risks, 800)) : ''}
@@ -5191,6 +5206,7 @@ document.addEventListener('click', async e => {
     }
     case 'confirm': plAct(id, { type:'confirm', run, step }, b.dataset.msg || '끝난 것으로 옮겼어요'); break;
     case 'hand': b.disabled = true; plAct(id, { type:'answer', run, step, value:b.dataset.value }, b.dataset.value === 'done' ? 'AI가 이어서 해요' : 'AI에게 못 했다고 알렸어요'); break;   // 브라우저에서 넘겨받은 일
+    case 'give-skip': b.disabled = true; plAct(id, { type:'answer', run, step, skip:true }, '건너뛰고 이어서 해요'); break;
     case 'login': pwLogin(id, b.dataset.url, b.dataset.name); break;
     case 'web-check': pwState(id, true); break;
     case 'reveal': { const k = b.dataset.key; PL.reveal[k] = ++PL.revealN; render(); focusEl($(`#pla-${PL.reveal[k]}`)); break; }   // 카드 안에서 정답을 펼친다
@@ -5291,6 +5307,11 @@ document.addEventListener('submit', async e => {
   const f = e.target, kind = f.dataset && f.dataset.plForm; if (!kind) return;
   e.preventDefault();
   const id = f.dataset.id;
+  if (kind === 'give'){   // 브라우저 단계의 값 묻기
+    const v = f.v.value.trim();
+    if (!v){ $('#pl-give-err').hidden = false; f.v.setAttribute('aria-invalid', 'true'); return focusEl(f.v); }
+    return plAct(id, { type:'answer', run:f.dataset.run, step:f.dataset.step, value:v }, 'AI가 이어서 해요');
+  }
   if (kind === 'answer'){
     const v = (e.submitter && e.submitter.name === 'v' && e.submitter.value) || (f.t && f.t.value.trim()) || (f.querySelector('input[name="v"]:checked') || {}).value || '';
     if (!v){ $('#pl-ans-err').hidden = false; focusEl(f.t || f.querySelector('input')); return; }
@@ -5818,10 +5839,11 @@ function webView(box, pre, o){
     <div class="cw-frame" id="${pre}-frame" tabindex="0" role="application" aria-roledescription="브라우저 화면">
       <img class="cw-img" alt="" draggable="false" hidden>
       <div class="cw-empty"></div>
+      <div class="cw-nav" role="group" aria-label="브라우저 화면 스크롤" hidden><button class="btn btn-sm" type="button" data-wv="scroll" data-dy="-400" aria-label="위로 스크롤">↑</button><button class="btn btn-sm" type="button" data-wv="scroll" data-dy="400" aria-label="아래로 스크롤">↓</button></div>
     </div>
     <form class="cw-type" data-wv-form="type" novalidate><label class="sr-only cw-in-l" for="${pre}-in">고른 칸에 넣을 글</label><input class="cw-in" id="${pre}-in" name="text" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="화면에서 칸을 누른 뒤 여기에 적어요"><button class="btn btn-ghost btn-sm" type="submit">넣기</button></form>
     <div class="cw-keys" role="group" aria-label="브라우저에서 누를 키">
-      <button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Enter">Enter</button><button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Tab" aria-label="Tab — 다음 칸으로">Tab</button><button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Backspace" aria-label="한 글자 지우기">지우기</button><button class="btn btn-text btn-sm" type="button" data-wv="scroll" data-dy="-500">위로</button><button class="btn btn-text btn-sm" type="button" data-wv="scroll" data-dy="500">아래로</button><button class="btn btn-text btn-sm" type="button" data-wv="act" data-type="back">뒤로</button><button class="btn btn-text btn-sm" type="button" data-wv="act" data-type="reload">새로고침</button>
+      <button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Enter">Enter</button><button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Tab" aria-label="Tab — 다음 칸으로">Tab</button><button class="btn btn-text btn-sm" type="button" data-wv="key" data-key="Backspace" aria-label="한 글자 지우기">지우기</button><button class="btn btn-text btn-sm" type="button" data-wv="act" data-type="back">뒤로</button><button class="btn btn-text btn-sm" type="button" data-wv="act" data-type="reload">새로고침</button>
     </div>`;
   const q = sel => box.querySelector(sel), frame = q('.cw-frame'), img = q('.cw-img'), inp = q('.cw-in');
   const W = { key:null, big:false, timer:null, info:null, infoAt:0, loaded:false, err:'', act:'', fails:0, focus:null, ticking:false, touch:false, wheel:0, dy:0 };
@@ -5897,6 +5919,7 @@ function webView(box, pre, o){
     frame.setAttribute('aria-label', see ? '브라우저 화면 — AI가 하는 일을 보여 줘요' : '브라우저 화면 — 누른 자리를 브라우저에서 눌러요. 글은 아래 입력 줄에 적어 넣어요');
     img.alt = open && i.title ? `${i.title} 화면` : '';
     box.classList.toggle('watch', see);
+    q('.cw-nav').hidden = !open || !W.loaded || (W.big && !(i && i.mobile));   // 스크롤은 지켜보는 중에도 된다(크게 보기는 그 칸이 스스로 스크롤)
     q('.cw-type').hidden = !open || see; q('.cw-keys').hidden = !open || see; q('.cw-addr button').hidden = see; url.readOnly = see;
     const bb = q('[data-wv="big"]'); bb.hidden = !open || !!i.mobile; bb.setAttribute('aria-pressed', String(W.big)); bb.textContent = W.big ? '맞춰 보기' : '크게 보기';   // 휴대폰 폭이면 이미 폭에 맞춰 보인다
   }
@@ -5946,11 +5969,23 @@ function webView(box, pre, o){
     if (k === 'go'){ const v = f.url.value.trim(); if (v && !seeing()){ f.url.blur(); open(v); } }
     else if (k === 'type'){ const v = f.text.value; if (!v) return f.text.focus(); f.text.value = ''; input({ type:'text', text:v }).then(() => f.text.focus()); }
   });
-  frame.addEventListener('wheel', e => {
-    if (W.big || !W.info || !W.info.open || seeing()) return;
-    e.preventDefault(); clearTimeout(W.wheel);
-    W.dy += e.deltaY; W.wheel = setTimeout(() => { const dy = W.dy; W.dy = 0; input({ type:'scroll', dy }); }, 120);
+  // 스크롤 — 마우스 휠·트랙패드와 손가락으로 밀기를 브라우저 탭의 스크롤로 보낸다(조금씩 모아서). 지켜보는 중에도 된다
+  const scrollBy = dy => { W.dy += dy; if (!W.wheel) W.wheel = setTimeout(() => { const d = Math.round(W.dy); W.dy = 0; W.wheel = 0; if (d) input({ type:'scroll', dy:d }); }, 120); };
+  const scrolls = () => !!(W.info && W.info.open) && !(W.big && !W.info.mobile);
+  frame.addEventListener('wheel', e => { if (!scrolls()) return; e.preventDefault(); scrollBy(e.deltaY); }, { passive:false });
+  // 화면(그림) 위에서 민 것은 스크롤, 짧게 톡 누른 것은 누르기 — 8px 넘게 움직였으면 밀기로 본다. 그림 밖(칸 가장자리·바깥)에서 민 것은 페이지가 스크롤한다
+  let touch = null;
+  img.addEventListener('touchstart', e => { touch = scrolls() && e.touches.length === 1 ? { y:e.touches[0].clientY, last:e.touches[0].clientY, drag:false } : null; }, { passive:true });
+  img.addEventListener('touchmove', e => {
+    if (!touch || e.touches.length !== 1) return;
+    const y = e.touches[0].clientY;
+    if (!touch.drag && Math.abs(y - touch.y) > 8) touch.drag = true;
+    if (!touch.drag) return;
+    e.preventDefault();
+    scrollBy((touch.last - y) / img.getBoundingClientRect().height * W.info.height); touch.last = y;
   }, { passive:false });
+  img.addEventListener('touchend', e => { if (touch && touch.drag) e.preventDefault(); touch = null; });   // 민 뒤에는 누르기로 보내지 않는다
+  img.addEventListener('touchcancel', () => { touch = null; });
   // 화면에 포커스가 있을 때 — 글자·Enter·지우기·화살표를 브라우저로. Tab과 Esc는 이 창의 키로 둔다(키보드가 갇히지 않게). 한글은 입력 줄로
   frame.addEventListener('keydown', e => {
     if (!W.info || !W.info.open || seeing() || e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.keyCode === 229) return;

@@ -46,6 +46,7 @@ const ai = http.createServer(async (req, res) => {
     const job = { id, status: 'running', agent: body.agent, pending: [], result: null };
     if (fake.hold){ jobs.set(id, job); return send(201, { job }); }
     if (fake.hand && body.agent.browser) job.pending = [{ id: `bh_${n}`, tool: 'BrowserHandoff', title: '브라우저에서 해 주세요', description: fake.hand, input: { message: fake.hand, tab: body.agent.browser.tab, url: 'https://apply.example.com/login', title: '로그인' }, at: new Date().toISOString() }];
+    else if (fake.value && body.agent.browser && !body.agent.session) job.pending = [{ id: `bv_${n}`, tool: 'BrowserValue', title: '알려 주세요', description: fake.value.question, input: { ...fake.value, tab: body.agent.browser.tab, url: 'https://apply.example.com/form', title: '접수' } }];
     else finish(job);
     if (/하지 못했다고 해요/.test(body.prompt)) job.result = { text: '', structured: { _result: { sent: 'no', proof: '본인 인증을 하지 못했어요' } }, session: 'sess-park' };
     jobs.set(id, job); return send(201, { job });
@@ -95,7 +96,7 @@ async function start(item, workflow = '내기'){
   const st = (await runner.act(P, ID, { type: 'start', feed: '낼 곳', item, workflow })).state;
   return st.runs[0].id;
 }
-const reset = () => Object.assign(fake, { approved: true, browser: true, hand: null, hold: false, gone: [], posts: [], answers: [], deleted: [], tabs: [] });
+const reset = () => Object.assign(fake, { approved: true, browser: true, hand: null, value: null, hold: false, gone: [], posts: [], answers: [], deleted: [], tabs: [] });
 const MINE = /홍길동|010-9999-8888/;
 
 test('브라우저 단계 — 계약대로 보낸다(브라우저 도구만 · 내 정보 · 갈 수 있는 곳 · 올릴 파일 · 탭 키)', async () => {
@@ -329,6 +330,83 @@ test('again — 스크립트가 앞 스크립트 단계로 되돌리면 사람�
   rid = await start('no-web', '되돌리기');
   r = await until(rid, r => r.status === 'stopped', '앞 스크립트 단계가 아니면 멈춘다');
   assert.match(stepOf(r, '확인').error, /again은 앞에 있는 스크립트 단계만 가리킬 수 있어요: 확인/);
+});
+
+test('값 묻기 — 입력창으로 멈추고, 적은 값은 서버에 보내고 끝나면 _given으로 뒤 단계에 넘긴다(상태 파일에는 남지 않는다)', async () => {
+  reset(); fake.value = { name: '소속', question: '소속(학교나 회사)을 알려 주세요' }; asked.length = 0;
+  const keep = fake.result; fake.result = { text: '', structured: { _result: { sent: 'yes', proof: '한빛대학교 소속으로 접수 완료' } } };
+  try {
+    const rid = await start('cm-2026');
+    let r = await until(rid, r => r.status === 'input', '입력창으로 멈춘다');
+    const s = stepOf(r, '브라우저'), job = s.job;
+    assert.deepEqual(s.ask, { type: 'value', name: '소속', question: '소속(학교나 회사)을 알려 주세요', request_id: s.ask.request_id, url: 'https://apply.example.com/form', title: '접수' });
+    assert.deepEqual(asked.map(a => [a.kind, a.question]), [['value', '소속(학교나 회사)을 알려 주세요']]);
+    assert.equal(V.runFeedback(r).text, '알려 주세요 · 소속(학교나 회사)을 알려 주세요');
+    await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: ' 한빛대학교 ' });
+    assert.deepEqual(fake.answers, [{ job, request_id: s.ask.request_id, allow: true, value: '한빛대학교' }]);
+    r = await until(rid, r => r.status === 'done' || stepOf(r, '결과').status === 'running', '같은 작업으로 이어 간다');
+    assert.equal(fake.posts.length, 1);
+    r = await until(rid, r => r.status === 'done', '끝난다');
+    assert.equal(stepOf(r, '결과').output.summary, 'sent=yes · {{소속}} 소속으로 접수 완료 · given=소속', '알려 준 값도 글에서는 이름으로, 값은 _given으로 뒤 단계에');
+    assert.doesNotMatch(stateFile(), /한빛대학교/, '끝난 뒤 상태 파일에 값이 없다');
+  } finally { fake.result = keep; }
+});
+
+test('값 묻기 — _given이 뒤 단계 인자로 가고, 건너뛰면 allow: false로 답한다', async () => {
+  reset(); fake.value = { name: '소속', question: '소속을 알려 주세요' };
+  let rid = await start('위비티:12/3');
+  let r = await until(rid, r => r.status === 'input', '멈춘다');
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: '한빛대학교' });
+  r = (await state()).runs.find(z => z.id === rid);
+  if (stepOf(r, '브라우저').status === 'done' && r.status !== 'done') assert.deepEqual(stepOf(r, '브라우저').output._given, { 소속: '한빛대학교' });
+  r = await until(rid, r => r.status === 'done', '끝난다');
+  assert.match(stepOf(r, '결과').output.summary, /given=소속/, '{브라우저._given}이 뒤 스크립트로 넘어간다');
+  assert.equal('_given' in stepOf(r, '브라우저').output, false);
+
+  rid = await start('cm-2026'); r = await until(rid, r => r.status === 'input', '멈춘다');
+  const req = stepOf(r, '브라우저').ask.request_id;
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', skip: true });
+  assert.deepEqual(fake.answers.at(-1), { job: stepOf(r, '브라우저').job, request_id: req, allow: false });
+  r = await until(rid, r => r.status === 'done', '끝난다');
+  assert.doesNotMatch(stepOf(r, '결과').output.summary, /given=/);
+  assert.doesNotMatch(stateFile(), /한빛대학교/);
+});
+
+test('멈춰 둔 값 묻기 — 같은 입력창으로 남고, 답하면 알려 준 값을 vars에 합쳐 이어 한다', async () => {
+  reset(); fake.value = { name: '소속', question: '소속을 알려 주세요' }; asked.length = 0;
+  const rid = await start('cm-2026');
+  let r = await until(rid, r => r.status === 'input', '멈춘다');
+  const j = jobs.get(stepOf(r, '브라우저').job);
+  parkJob(j, '소속을 알려 주세요'); Object.assign(j.parked, { kind: 'value', name: '소속', question: '소속을 알려 주세요' });
+  await runner.tick();
+  r = (await state()).runs.find(z => z.id === rid);
+  assert.deepEqual(stepOf(r, '브라우저').ask, { type: 'value', name: '소속', question: '소속을 알려 주세요', parked: true, url: 'https://apply.example.com/login', title: '로그인' });
+  assert.equal(asked.length, 1);
+  fake.value = null; fake.hand = '로그인해 주세요';   // 이어 한 작업이 또 사람에게 넘긴다
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: '한빛대학교' });
+  const [first, next] = fake.posts;
+  assert.equal(next.prompt, '사용자가 소속을(를) 알려 줬어요. {{소속}} 자리표시로 넣고 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.');
+  assert.deepEqual(next.agent, { ...first.agent, session: 'sess-park', browser: { ...first.agent.browser, vars: { ...first.agent.browser.vars, 소속: '한빛대학교' } } });
+  r = await until(rid, r => r.status === 'input', '이어 한 작업이 넘긴 일로 멈춘다');
+  parkJob(jobs.get(stepOf(r, '브라우저').job), '로그인해 주세요');
+  await runner.tick();
+  fake.hand = null;
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: 'done' });
+  assert.equal(fake.posts[2].agent.browser.vars.소속, '한빛대학교', '이후의 이어 하기에도 알려 준 값이 계속 간다');
+  r = await until(rid, r => r.status === 'done', '끝난다');
+  assert.match(stepOf(r, '결과').output.summary, /given=소속/);
+  assert.doesNotMatch(stateFile(), /한빛대학교/);
+
+  reset(); fake.value = { name: '소속', question: '소속을 알려 주세요' };
+  const rid2 = await start('cm-2026');
+  r = await until(rid2, r => r.status === 'input', '멈춘다');
+  const j2 = jobs.get(stepOf(r, '브라우저').job);
+  parkJob(j2, '소속을 알려 주세요'); Object.assign(j2.parked, { kind: 'value', name: '소속', question: '소속을 알려 주세요' });
+  await runner.tick(); fake.value = null;
+  await runner.act(P, ID, { type: 'answer', run: rid2, step: '브라우저', value: '' });
+  assert.match(fake.posts[1].prompt, /^사용자가 소속을\(를\) 건너뛰었어요\./);
+  assert.equal('소속' in fake.posts[1].agent.browser.vars, false);
+  await until(rid2, r => r.status === 'done', '끝난다');
 });
 
 test('사람이 보는 브라우저 — 이 플러그인의 탭만 중계한다', async () => {
