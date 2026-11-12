@@ -5478,7 +5478,7 @@ document.addEventListener('click', async e => {
     }
     case 'choose': {   // 목록 줄의 선택지 버튼 — 고른 자리에 '하는 중'을 두고 보낸다. 선택지에 confirm 말이 있으면 한 번 더 묻는다
       const send = () => { PL.picked[run] = b.dataset.label; render(); plAct(id, { type:'answer', run, step, value:b.dataset.value }); };
-      if (b.dataset.confirm) plAsk({ title:`${b.dataset.label}할까요?`, body:`<p>${esc(b.dataset.confirm)}</p>`, ok:b.dataset.label, danger:true }, send); else send();
+      if (b.dataset.confirm) plAsk({ title:`${b.dataset.label} — 진행할까요?`, body:`<p>${esc(b.dataset.confirm)}</p>`, ok:b.dataset.label, danger:true }, send); else send();
       break;
     }
     case 'confirm': plAct(id, { type:'confirm', run, step }, b.dataset.msg || '끝난 것으로 옮겼어요'); break;

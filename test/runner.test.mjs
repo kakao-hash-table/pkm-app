@@ -169,6 +169,7 @@ test('주기는 이 컴퓨터에서 바꾸고, 자동 시작한 작업은 내 �
   let r = (await state()).runs.find(x => x.item.id === 'A-3');
   assert.equal(r.by, 'auto'); assert.equal(r.status, 'input'); assert.equal(r.steps[0].ask.type, 'gate');
   assert.equal(r.steps[0].job, undefined);   // 아직 아무것도 실행하지 않았다
+  assert.match(r.steps[0].ask.question, / — 지금 할까요\?$/);   // 단계 이름 받침과 상관없이 깨지지 않는 문형
   await runner.act(P, ID, { type: 'confirm', run: r.id, step: '고르기' });
   await runner.tick();
   r = (await state()).runs.find(x => x.item.id === 'A-3');
@@ -205,4 +206,11 @@ test('돌리는 컴퓨터가 다른 컴퓨터로 옮겨지면 이 컴퓨터는 �
   const r = await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
   assert.equal(r.applied, false);
   assert.ok(fs.existsSync(path.join(DATA, P, '_플러그인/.state/flow-demo.inbox.회사맥.json')));
+});
+
+test('넘겨받기 알림 제목에는 항목 이름을 넣고, 없으면 플러그인 이름을 쓴다', async () => {
+  const { askTitle } = await import('../server/runner.js');
+  assert.equal(askTitle({ kind: 'value', name: '공모전 신청', title: '청주 사진 공모전' }), '알려 주세요 · 청주 사진 공모전');
+  assert.equal(askTitle({ kind: 'handoff', name: '공모전 신청', title: '' }), '브라우저에서 해 주세요 · 공모전 신청');
+  assert.equal(askTitle({ name: '공모전 신청' }), '브라우저에서 해 주세요 · 공모전 신청');
 });

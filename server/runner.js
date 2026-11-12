@@ -133,6 +133,8 @@ export async function connectLocalAI(){
 }
 
 /* ---------- 상태 파일 ---------- */
+// 넘겨받기 알림 제목 — 무엇(실행 대상 항목 이름)에 대한 일인지 보이게. 항목 이름이 없으면 플러그인 이름
+export const askTitle = m => `${m.kind === 'value' ? '알려 주세요' : '브라우저에서 해 주세요'} · ${String(m.title || m.name || '').trim().slice(0, 80) || m.name}`;
 export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = () => {} }){
   const stateDir = p => path.join(DATA, p, P.DIR, '.state');
   const statePath = (p, id) => path.join(stateDir(p), `${id}.json`);
@@ -336,7 +338,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           if (!v || v === d.when || v === '{}' || v === '[]' || v === 'false'){ Object.assign(step, { status: 'skipped', when_skipped: true, finished: now() }); run.updated = now(); continue; }
         }
         if (run.by === 'auto' && !step.gate_ok && conf.gates && conf.gates[gateKey(run.workflow, step.key)]){
-          Object.assign(step, { status: 'input', ask: { type: 'gate', question: `${step.name}을 할까요?` }, started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
+          Object.assign(step, { status: 'input', ask: { type: 'gate', question: `${step.name} — 지금 할까요?` }, started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
         }
         try { step.job = await startStep(conn, x, run, step, d, settings, p); Object.assign(step, { status: 'running', started: now(), error: null }); }
         catch (e) { Object.assign(step, { status: 'failed', error: clip(e.message, 500), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
