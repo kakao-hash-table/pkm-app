@@ -512,10 +512,12 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     switch (a.type){
       case 'refresh': { const feed = x.feeds.find(f => f.name === a.feed); if (!feed) throw fail(404, '없는 목록이에요'); await refreshFeed(p, x, conf, feed, st, conn); return; }
       case 'start': {
-        const feed = x.feeds.find(f => f.name === a.feed), it = feed && ((st.feeds[feed.name] || {}).items || []).find(i => i.id === a.item);
+        const feed = x.feeds.find(f => f.name === a.feed), wname = feed && (a.workflow || feed.start);
+        // 되돌리기는 이미 처리돼 목록에서 빠진 항목도 받는다 — 마지막으로 그 항목을 돌린 실행의 항목 그대로(카드는 누르자마자 빠지니 되돌릴 때는 목록에 없을 수 있다)
+        const it = feed && (((st.feeds[feed.name] || {}).items || []).find(i => i.id === a.item)
+          || (wname === feed.undo ? ([...st.runs].reverse().find(r => r.feed === feed.name && r.item && r.item.id === a.item) || {}).item : null));
         if (!it) throw fail(404, '목록에 없는 항목이에요. 목록을 새로 가져와 주세요');
-        const wname = a.workflow || feed.start;
-        if (!feed.starts.includes(wname)) throw fail(400, `이 목록에서 시작할 수 없는 워크플로우예요: ${wname}`);
+        if (!feed.starts.includes(wname) && wname !== feed.undo) throw fail(400, `이 목록에서 시작할 수 없는 워크플로우예요: ${wname}`);   // 되돌리기(undo)는 버튼이 아니라 알림의 [되돌리기]로 시작한다
         if (a.fork){   // 같은 항목을 다른 갈래로 하나 더 — 갈래가 겹치는지는 그 단계가 끝날 때 본다
           if (!x.workflows.find(w => w.name === wname)?.steps.some(s => s.key === a.fork.step)) throw fail(400, '없는 단계예요');
           newRun(st, x, feed, it, 'button', wname, null, { step: a.fork.step, value: a.fork.value }); return;

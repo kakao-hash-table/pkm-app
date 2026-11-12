@@ -4317,8 +4317,9 @@ function plFold(key){
 const plUndoable = (f, w) => !!f.undo && (!f.undo_for || PKMPlugin.startsOf(f.undo_for).includes(w));
 function plUndo(key, f){
   const t = PL.track[key]; if (!t) return toast('목록을 새로 가져와서 되돌릴 수 없어요');
+  if (t.optimistic && !t.doneAt){ Object.assign(t, { undoWanted:true, hidden:false, leaving:0 }); render(); return; }   // 아직 처리 중 — 끝나면 바로 되돌린다
   delete PL.track[key];
-  plStart(t.id, { type:'start', feed:t.feed, item:t.item, workflow:f.undo }, t.label);
+  plStart(t.id, { type:'start', feed:t.feed, item:t.item, workflow:f.undo, undo:true }, t.label);
   PL.track[key].stay = true;   // plStart가 첫 await 전에 만든 새 기록 — 끝나도 숨기지 않는다
 }
 const plTrackWait = t => t.leaving ? PL_LEAVE_MS - (Date.now() - t.leaving) : (t.doneMs || PL_DONE_MS) - (Date.now() - t.doneAt);
@@ -4345,6 +4346,15 @@ function plTrackUpdate(){
     else if (k.fb.text !== t.text){ const el = $(`#plt-${t.n} .pl-track-text`); if (el) el.textContent = k.fb.text; }
     t.text = k.fb.text;
     if (k.fb.phase === 'done' && !t.doneAt) t.doneAt = Date.now();
+    if (t.optimistic){   // 미리 뺀 카드 — 끝나면 조용히 지우고, 막히면 다시 보인다
+      if (['failed', 'error', 'input'].includes(k.fb.phase)){ Object.assign(t, { optimistic:false, hidden:false, leaving:0 }); repaint = true;
+        toast(k.fb.phase === 'input' ? `${t.label.slice(0, 16)} · 확인이 필요해서 카드를 다시 보였어요` : `${t.label.slice(0, 16)} · 처리하지 못해서 카드를 다시 보였어요`); continue; }
+      if (t.undoWanted && k.fb.phase === 'done'){ const fu = f; delete t.undoWanted; plUndo(key, fu); repaint = true; continue; }
+      if (k.fb.phase !== 'done') continue;
+      const items = (x.state.feeds[f.name] || {}).items || [], fed = Date.parse((x.state.feeds[f.name] || {}).at || 0) > Date.parse(k.run.finished || k.run.updated || 0);
+      if (fed || !items.some(i => i.id === t.item)){ delete PL.track[key]; repaint = true; }
+      continue;
+    }
     if (!plTrackDue(k)) continue;
     if (!plDoneLeaves(f) || t.stay){ delete PL.track[key]; repaint = true; continue; }   // 늘 남는 목록·되돌린 카드 — 결과 줄만 지운다
     if (!t.hidden){
@@ -4375,9 +4385,15 @@ async function plStart(id, a, label){
   const x = PL.st.plugins[id], f = x.feeds.find(z => z.name === a.feed), workflow = a.workflow || (f.starts || [])[0] || f.start, key = plTrackKey(id, a.feed, a.item);
   const t = PL.track[key] = { id, feed:a.feed, item:a.item, workflow, label, at:Date.now(), n:++PL.trackN, said:'busy', ...(f.view === 'cards' ? { doneMs:PL_CARD_DONE_MS } : {}),
     skip:(x.state.runs || []).filter(r => r.feed === a.feed && r.item && r.item.id === a.item).map(r => r.id) };   // 누르기 전에 있던 실행은 내 것이 아니다
-  render(); focusEl($(`#plt-${t.n}`));   // 누른 버튼은 잠기므로 그 자리의 상태 줄로
+  // 카드 보기는 누르자마자 다음 카드로 — 처리는 뒤에서 하고, 실패하거나 내 확인이 필요할 때만 카드를 다시 보인다(기다리게 하지 않는다)
+  if (f.view === 'cards' && !a.undo){
+    Object.assign(t, { optimistic:true, leaving:plCalm() ? 0 : Date.now(), hidden:plCalm() });
+    if (!t.hidden){ plFold(key); setTimeout(() => { if (PL.track[key] === t && t.optimistic){ t.hidden = true; render(); } }, PL_LEAVE_MS); }
+    if (plUndoable(f, workflow)) toast(`${workflow} · ${label.length > 16 ? label.slice(0, 15) + '…' : label}`, { label:'되돌리기', fn:() => plUndo(key, f) }, 'pl-undo');
+    render(); const next = $('.pl-ccard:not(.pl-leave) .pl-ctitle'); if (next) focusEl(next);
+  } else { render(); focusEl($(`#plt-${t.n}`)); }   // 누른 버튼은 잠기므로 그 자리의 상태 줄로
   try {
-    const r = await papi(`/plugins/${id}/act`, a);
+    const r = await papi(`/plugins/${id}/act`, { ...a, undo:undefined });
     if (!r.applied){ PL.sent[`item:${a.item}`] = Date.now(); t.sent = true; }
     else { const mine = PKMPlugin.runOf(r.state && r.state.runs, t); if (mine) t.run = mine.id; }   // 이 컴퓨터가 돌렸으면 응답에 든 새 실행으로 바로 잡는다
   } catch (e) { t.error = e.message; t.conflict = e.status === 409; }
