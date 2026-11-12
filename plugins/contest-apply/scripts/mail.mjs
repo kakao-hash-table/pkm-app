@@ -147,7 +147,7 @@ export async function send({ host = 'smtp.naver.com', port = 465, secure = true,
   const expect = async (ok, stage, who) => { const r = await s.read(); if (![].concat(ok).includes(r.code)) smtpFail(stage, r, who); return r; };
   const cmd = (line, ok, stage, who) => { s.write(line + '\r\n'); return expect(ok, stage, who); };
   const helo = (os.hostname() || '').replace(/[^A-Za-z0-9.-]/g, '') || 'localhost';
-  let quit = false;
+  let quit = false, body = false;   // body: 본문 끝(.)까지 보냈다 — 그 뒤에 끊기면 갔는지 알 수 없다
   try {
     await expect(220, 'hello');
     await cmd(`EHLO ${helo}`, 250, 'hello');
@@ -157,12 +157,14 @@ export async function send({ host = 'smtp.naver.com', port = 465, secure = true,
     await cmd(`MAIL FROM:<${addr}>`, 250, 'from');
     for (const r of rcpts) await cmd(`RCPT TO:<${r}>`, [250, 251], 'rcpt', r);
     await cmd('DATA', 354, 'data');
+    body = true;
     await cmd(dotStuff(raw) + '.', 250, 'data');   // raw는 CRLF로 끝나므로 CRLF.CRLF
     s.write('QUIT\r\n'); quit = true;
     await s.read().catch(() => {});
     return { ok: true, messageId, accepted: rcpts };
   } catch (e) {
-    if (e.user) throw e;
+    if (e.user) throw e;   // 서버가 거절한 것 — 보내지지 않았다
+    if (body) fail('메일 본문을 보낸 뒤 연결이 끊겨서 보내졌는지 알 수 없어요. 다시 보내면 두 번 갈 수 있으니 네이버 메일의 보낸메일함을 먼저 봐 주세요', { code: e.code === 'ETIMEDOUT' ? 'ETIMEDOUT' : 'ECONNECT', unknown: true });
     fail('네이버 메일 서버에 닿지 않아요. 인터넷 연결을 확인하고 다시 해 주세요', { code: e.code === 'ETIMEDOUT' ? 'ETIMEDOUT' : 'ECONNECT' });
   } finally {
     if (!quit) s.write('QUIT\r\n');

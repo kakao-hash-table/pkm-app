@@ -94,6 +94,13 @@ export function normalizeBrowse(a){
       options: (Array.isArray(x.options) ? x.options : []).map(o => str(o, 60)).filter(Boolean).slice(0, 20) })).filter((x, i, a) => x.name && a.findIndex(y => y.name === x.name) === i).slice(0, 12) };   // 양식이 요구했는데 없던 응모자 정보 이름
 }
 
+// 브라우저가 본 마지막 화면 글이 접수 완료를 보이는가 — 완료 문구나 접수 번호가 있고, 오류 문구가 없을 때만
+const DONE = [/(접수|제출|신청|응모|등록|참가|지원)\s*(?:이|가|을|를|은|는|의|도)?\s*(완료|되었|됐|성공)/, /(접수|신청|응모|등록|참가|지원|주문|예약)\s*번호/, /완료되었습니다/, /thank\s*you/i, /submitted/i, /received/i];
+const ERRS = /오류|에러|실패|error|fail|필수\s*(항목|입력)|올바르지\s*않|invalid/i;
+export function proofDone(text){ const t = String(text || ''); return DONE.some(re => re.test(t)) && !ERRS.test(t); }
+// 화면 원문에서 완료 문구·접수 번호가 든 줄만 — 증거 글로 보인다
+export function proofLines(screen, n = 300){ return text(String(screen || '').split(/\r?\n/).map(l => l.trim()).filter(l => l && DONE.some(re => re.test(l))).slice(0, 5).join('\n'), n); }
+
 /* 상태: new(정리 전) → ready | out(분야·조건) → submitted → won | lost. dropped는 사람이 뺀 것, dup은 다른 사이트에 같이 올라온 것 */
 export function statusOf(c, today){
   if (c.dup_of) return 'dup';

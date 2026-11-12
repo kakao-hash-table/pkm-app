@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as F from '../plugins/contest-apply/scripts/forms.mjs';
+import * as E from '../plugins/contest-apply/scripts/engine.mjs';
 import { FX_DIR, HAS_FX, NO_FX } from './contest-fixtures.mjs';
 
 if (!HAS_FX) test(NO_FX, { skip: true }, () => {});
@@ -89,5 +90,60 @@ test('구글 로그인이 필요한 폼 — 이 브라우저에서는 로그인�
   const r = run('submit', { cid: 'wevity:2', me: ME, full: 'true' });
   assert.equal(r.summary, '냈는지 묻기');
   assert.equal(r.ask.choices.some(c => c.value === 'browse'), false);
+});
+test('proofDone — 완료 문구·접수 번호가 있고 오류 문구가 없을 때만 낸 것으로 본다', () => {
+  for (const t of ['접수가 완료되었습니다', '응모 완료', '신청이 성공적으로 처리', '제출되었습니다', '접수번호 2026-0412', '참가 번호: 17', 'Thank you for your submission', 'Your response has been received'])
+    assert.equal(E.proofDone(t), true, t);
+  for (const t of ['', '제출 누름', '잠시 후 다시 시도', '필수 항목을 입력해 주세요', '접수가 완료되었습니다. 단, 첨부 오류', '제출 실패', 'Error: invalid email', '접수 기간입니다'])
+    assert.equal(E.proofDone(t), false, t);
+});
+
+test('브라우저 결과 — AI가 냈다고 해도 완료 문구·접수 번호가 없으면 냈어요로 적지 않는다', () => {
+  const d = db(); d.contests['wevity:3'] = base('wevity:3', fit('site', 'www.cmak.or.kr/reception/21-cm')); put(d);
+  let r = run('browsed', { cid: 'wevity:3', result: { sent: 'yes', reason: '', proof: '', did: ['제출 누름'] } });
+  assert.deepEqual([r.summary, r.sent], ['제출 확인 못 함', false]);
+  assert.equal(r.verdict.title, '제출됐는지 확인하지 못했어요');
+  assert.match(r.verdict.text, /완료 문구·접수 번호를 확인하지 못했어요/);
+  assert.equal(db().contests['wevity:3'].submitted, undefined);
+  assert.equal(db().contests['wevity:3'].sited.sent, 'unknown');
+  r = run('browsed', { cid: 'wevity:3', result: { sent: 'yes', reason: '', proof: '접수가 완료되었습니다', did: [] } });
+  assert.deepEqual([r.summary, r.sent], ['홈페이지에 냈어요', true]);
+  assert.ok(db().contests['wevity:3'].submitted);
+});
+
+test('폼 — 확인 화면 없이 끝난 제출(sure:false)은 냈어요로 적지 않고, 다시 보내는 선택지 없이 확인만 받는다', () => {
+  const d = db(); d.contests['wevity:4'] = { ...JSON.parse(JSON.stringify(d.contests['wevity:2'])), key: 'wevity:4', title: '안전보건공단 슬로건 모집', organizer: '안전보건공단', formed: { at: NOW, kind: 'google', id: '', sure: false } }; put(d);
+  let r = run('submit', { cid: 'wevity:4', me: ME, answer: 'form' });   // 이미 보낸 폼 — sendForm은 다시 보내지 않고 기록을 돌려준다
+  assert.equal(r.choice, 'form');
+  assert.equal(db().contests['wevity:4'].submitted, undefined, '확인 화면을 못 봤으면 낸 것으로 옮기지 않는다');
+  const fin = run('finish', { cid: 'wevity:4', choice: 'form' });
+  assert.deepEqual([fin.verdict.tone, fin.verdict.title, fin.outcome.title], ['bad', '제출됐는지 확인하지 못했어요', '확인 필요']);
+  r = run('submit', { cid: 'wevity:4', me: ME, full: 'true', fauto: 'true' });
+  assert.equal(r.summary, '냈는지 묻기', '완전 자동화여도 다시 내지 않는다');
+  assert.equal(where(r, '지난 시도')[0].title, '제출 요청은 받아들여졌지만 확인 화면은 못 봤어요');
+  assert.equal(r.ask.choices.some(c => ['form', 'browse'].includes(c.value)), false);
+  assert.deepEqual(r.ask.choices.find(c => c.value === 'yes'), { value: 'yes', label: '제출된 걸 확인했어요', recommended: true });
+  assert.ok(run('open-list').items.find(i => i.id === 'wevity:4').tags.includes('제출 확인 필요'));
+  run('submit', { cid: 'wevity:4', me: ME, answer: 'yes' });
+  assert.ok(db().contests['wevity:4'].submitted);
+});
+
+test('메일 — 보내는 중 기록(mail_sending)이 남아 있으면 다시 보내지 않고 보낸메일함부터 보게 한다', () => {
+  // 가짜 계정 — 이 시험은 보내기 전에 막히는지만 본다(메일 서버에 닿지 않는다)
+  const runM = (cmd, a = {}) => JSON.parse(execFileSync(process.execPath, [SCRIPT, cmd, `--profile=${profile}`, `--now=${NOW}`, ...Object.entries(a).map(([k, v]) => `--${k}=${v}`)],
+    { encoding: 'utf8', env: { ...process.env, PKM_HOME: HOME, NAVER_ID: 'tester', NAVER_APP_PASSWORD: 'fake-not-real' } }));
+  const d = db(); d.contests['wevity:5'] = { ...base('wevity:5', fit('email', 'contest@example.com')), title: '수원시 도서관 이름 짓기', organizer: '수원시', mail_sending: { at: NOW, to: 'contest@example.com' } }; put(d);
+  let r = runM('submit', { cid: 'wevity:5', me: ME, auto: 'true', full: 'true' });
+  assert.equal(r.summary, '냈는지 묻기', '켜 두어도 자동으로 보내지 않는다');
+  assert.equal(where(r, '지난 시도')[0].title, '메일이 보내졌는지 확인하지 못했어요');
+  assert.deepEqual(r.ask.choices.map(c => c.value).slice(0, 1), ['mailretry']);
+  assert.equal(r.ask.choices.some(c => c.value === 'mail'), false);
+  assert.ok(runM('open-list').items.find(i => i.id === 'wevity:5').tags.includes('제출 확인 필요'));
+  r = runM('submit', { cid: 'wevity:5', me: ME, answer: 'mail' });
+  assert.match(r.error, /지난번 메일이 보내졌는지 확인하지 못했어요/);
+  const c = db().contests['wevity:5'];
+  assert.deepEqual([c.mailed, c.submitted, c.mail_sending.to], [undefined, undefined, 'contest@example.com']);
+  runM('submit', { cid: 'wevity:5', me: ME, answer: 'yes' });
+  assert.deepEqual([!!db().contests['wevity:5'].submitted, db().contests['wevity:5'].mail_sending], [true, undefined], '직접 냈어요를 누르면 보내는 중 기록을 지운다');
 });
 }
