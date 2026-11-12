@@ -3545,12 +3545,28 @@ function aiLinkOut(p){
   return aiOut('AI가 찾은 연결 후보', list.length ? `<ul class="list">${list.map(x => `<li class="idea"><p><a href="#/knowledge/perm/${x.to.id}">${esc(x.to.title)}</a><br><span class="faint">${esc(x.reason)}</span></p><button class="btn btn-tonal btn-sm" type="button" data-act="ai-link-add" data-id="${p.id}" data-to="${x.to.id}" data-reason="${esc(x.reason)}">연결하기</button></li>`).join('')}</ul>` : '<p class="md none" style="margin:0">더 이을 노트를 찾지 못했어요</p>',
     `<button class="btn btn-text btn-sm" type="button" data-act="ai-clear" data-key="link:${p.id}">닫기</button>`);
 }
+// 임시노트를 다듬을 때 원래 메모를 잃지 않게 — 제목으로 간 첫 줄만 빼고 나머지를 내용 칸에 미리 넣는다
+function refineKeep(text){
+  const t = String(text || '').replace(/\r/g, '').trim(), L = t.split('\n'), first = L[0].trim();
+  const title = firstLine(t).split(/[.。]/)[0].slice(0, 60);
+  return { title, body:(title === first ? L.slice(1).join('\n') : t).trim() };   // 첫 줄이 제목에 다 못 들어갔으면 첫 줄도 남긴다
+}
+// 맥락노트 파일은 '# '로 칸을 나눈다 — 내용 안의 '# 제목'이 칸으로 읽혀 사라지지 않게 한 단계 내린다(코드 블록 안은 그대로)
+function ctxBodySafe(body){
+  let fence = null;
+  return String(body || '').split('\n').map(l => {
+    const f = l.match(/^\s*(```+|~~~+)/);
+    if (f){ if (!fence) fence = f[1][0]; else if (f[1][0] === fence) fence = null; return l; }
+    return !fence && /^# /.test(l) ? '#' + l : l;
+  }).join('\n');
+}
 function vRefine(kind, id, idx){
   const D = db(); let srcText = '', srcLabel = '', back = '#/knowledge/fleeting', backLabel = '임시노트';
   let tbx = null;
   if (kind === 'fleeting'){ const f = find('fleeting', id); if (!f) return vNotFound(); srcText = f.text; srcLabel = `임시노트 · ${relTime(f.created)}`; }
   else if (kind === 'tb'){ tbx = tbOfId(id); if (!tbx) return vNotFound(); srcText = tbx.title; srcLabel = `교과서 · ${tbName(tbx.book).title}${tbx.chapter ? ` · ${tbx.chapter}` : ''}`; back = tbHref(tbx); backLabel = tbx.title.length > 24 ? tbx.title.slice(0, 24) + '…' : tbx.title; WL_BOOK = tbx.book; }
   else { const r = find('refs', id); if (!r || !r.ideas[idx]) return vNotFound(); srcText = r.ideas[idx].text; srcLabel = `참조노트 · ${r.title}`; back = `#/knowledge/ref/${r.id}`; backLabel = r.title; }
+  const keep = kind === 'fleeting' ? refineKeep(srcText) : null;
   const words = srcText.split(/\s+/).filter(w => w.length > 1);
   const sugg = D.perms.filter(p => words.some(w => p.title.includes(w.slice(0, 2)))).slice(0, 4);
   // 교과서 본문이 링크한 영구노트를 연결 후보 맨 앞에
@@ -3566,9 +3582,10 @@ function vRefine(kind, id, idx){
         <label><input type="radio" name="to" value="ctx"><span><b>맥락노트</b><small>아니요, 특정 회사·시스템·시점에 묶여 있어요</small></span></label>
       </fieldset>
       <label class="field"><span id="rf-label">한 문장으로 쓴 생각 <span class="hint">${tbx ? '제목이 돼요. 교과서 문장 대신 내 말로 써요.' : '제목이 돼요. 제목만 읽어도 무슨 말인지 알 수 있게요.'}</span></span>
-        <input name="title" id="rf-title" value="${tbx ? '' : esc(firstLine(srcText).split(/[.。]/)[0].slice(0, 60))}" aria-describedby="rf-err"></label>
+        <input name="title" id="rf-title" value="${tbx ? '' : esc(keep ? keep.title : firstLine(srcText).split(/[.。]/)[0].slice(0, 60))}" aria-describedby="rf-err"></label>
       <p class="err" id="rf-err" hidden>한 문장을 적어 주세요</p>
-      <label class="field"><span id="rf-body">내 말로 풀어 쓰기 <span class="hint">선택</span></span><textarea name="body"></textarea></label>
+      <label class="field"><span id="rf-body">내 말로 풀어 쓰기 <span class="hint">선택</span></span><textarea name="body"${keep && keep.body ? ` rows="${Math.min(24, Math.max(6, keep.body.split('\n').length + 1))}" aria-describedby="rf-keep"` : ''}>${keep ? esc(keep.body) : ''}</textarea></label>
+      ${keep && keep.body ? '<p class="faint" id="rf-keep" style="margin:0">원래 메모를 그대로 넣어 뒀어요. 저장하면 임시노트는 지워지니, 남길 내용은 여기에 두세요.</p>' : ''}
       ${pool.length ? `<fieldset class="choice" data-only="perm"><legend>이어지는 생각 <span class="faint">— 고르면 서로 연결해요</span></legend>
         ${pool.map(p => `<label><input type="checkbox" name="links" value="${p.id}"><span>${esc(p.title)}</span></label>`).join('')}</fieldset>${autoTag('연결 후보를 의미 기준으로 추천')}` : ''}
       <div class="dlg-actions" style="justify-content:flex-start"><button class="btn btn-primary" type="submit" id="rf-submit">영구노트로 저장하기</button><a class="btn btn-text" href="${back}">나중에 할게요</a></div>
@@ -6754,7 +6771,7 @@ document.addEventListener('submit', e => {
     const title = f.elements.title.value.trim(); if (!title) return invalid(f.elements.title, 'rf-err');
     const toCtx = f.to.value === 'ctx', col = toCtx ? 'ctxs' : 'perms', name = toCtx ? '맥락노트' : '영구노트';
     const links = toCtx ? [] : [...f.querySelectorAll('input[name=links]:checked')].map(x => x.value);
-    const p = toCtx ? { id:uid('c'), title, created:TODAY, updated:TODAY, sources:[], summary:'', body:f.body.value.trim(), history:[{ date:TODAY, what:'처음 정리', why:'' }] }
+    const p = toCtx ? { id:uid('c'), title, created:TODAY, updated:TODAY, sources:[], summary:'', body:ctxBodySafe(f.body.value.trim()), history:[{ date:TODAY, what:'처음 정리', why:'' }] }
       : { id:uid('p'), title, created:TODAY, links, sources:[], body:f.body.value.trim() || title };
     let undo;
     if (f.dataset.kind === 'fleeting'){ const i = D.fleeting.findIndex(x => x.id === f.dataset.id); const [gone] = D.fleeting.splice(i, 1); undo = () => D.fleeting.splice(i, 0, gone); }
