@@ -1,0 +1,187 @@
+{
+ "type": "object",
+ "properties": {
+  "_fit": {
+   "type": "object",
+   "properties": {
+    "contests": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "i": {
+        "type": "integer"
+       },
+       "unreadable": {
+        "type": "boolean",
+        "description": "요강이 그림뿐이라 낼 것·조건을 읽지 못했으면 true"
+       },
+       "is_target": {
+        "type": "boolean"
+       },
+       "kinds": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "target_why": {
+        "type": "string",
+        "description": "30자 안"
+       },
+       "prize_text": {
+        "type": "string",
+        "description": "80자 안, 마크다운 기호 없이"
+       },
+       "prize_total": {
+        "type": "integer"
+       },
+       "prize_first": {
+        "type": "integer"
+       },
+       "first_is_goods": {
+        "type": "boolean",
+        "description": "1등 상이 상품권·상품이면 true"
+       },
+       "awards": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "상 이름과 금액, 예: 대상 · 100만원"
+       },
+       "deadline": {
+        "type": "string"
+       },
+       "announce": {
+        "type": "string"
+       },
+       "announce_text": {
+        "type": "string"
+       },
+       "submit_what": {
+        "type": "string",
+        "description": "40자 안"
+       },
+       "allow": {
+        "type": "integer",
+        "description": "1인 응모 가능 건수, 모르면 1"
+       },
+       "desc_limit": {
+        "type": "integer",
+        "description": "의미·설명 글자 제한, 없으면 0"
+       },
+       "form_note": {
+        "type": "string",
+        "description": "40자 안 — 신청서 양식·저작권·미발표작 같은 주의"
+       },
+       "submit_fields": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       },
+       "method": {
+        "type": "string",
+        "enum": [
+         "email",
+         "form",
+         "site",
+         "youtube",
+         "sns",
+         "post",
+         "visit",
+         "etc"
+        ]
+       },
+       "submit_to": {
+        "type": "string"
+       },
+       "submit_how": {
+        "type": "string",
+        "description": "80자 안"
+       },
+       "mail_subject": {
+        "type": "string",
+        "description": "이메일 접수일 때 메일 제목 규칙. 사람 정보 자리는 <이름> <연락처> <작품명>"
+       },
+       "eligibility_text": {
+        "type": "string",
+        "description": "30자 안"
+       },
+       "eligible": {
+        "type": "string",
+        "enum": [
+         "yes",
+         "no",
+         "unsure"
+        ]
+       },
+       "eligible_why": {
+        "type": "string",
+        "description": "15자 안"
+       },
+       "doubt": {
+        "type": "string",
+        "description": "30자 안. 본문이 다른 공모전·다른 해 글 같거나 날짜가 이상할 때만. 없으면 빈 글"
+       },
+       "ai_rule": {
+        "type": "string",
+        "enum": [
+         "none",
+         "limited",
+         "banned"
+        ],
+        "description": "생성형 AI 사용 규칙"
+       },
+       "ai_rule_text": {
+        "type": "string",
+        "description": "30자 안, 요강 문구 그대로"
+       }
+      },
+      "required": [
+       "i",
+       "unreadable",
+       "is_target",
+       "kinds",
+       "target_why",
+       "prize_text",
+       "prize_total",
+       "prize_first",
+       "first_is_goods",
+       "awards",
+       "deadline",
+       "announce",
+       "announce_text",
+       "submit_what",
+       "allow",
+       "desc_limit",
+       "form_note",
+       "submit_fields",
+       "method",
+       "submit_to",
+       "submit_how",
+       "mail_subject",
+       "eligibility_text",
+       "eligible",
+       "eligible_why",
+       "doubt",
+       "ai_rule",
+       "ai_rule_text"
+      ]
+     }
+    },
+    "note": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "contests",
+    "note"
+   ]
+  }
+ },
+ "required": [
+  "_fit"
+ ]
+}

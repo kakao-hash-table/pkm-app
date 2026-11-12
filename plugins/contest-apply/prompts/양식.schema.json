@@ -1,0 +1,124 @@
+{
+ "type": "object",
+ "properties": {
+  "_plan": {
+   "type": "object",
+   "properties": {
+    "docs": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "doc": {
+        "type": "integer",
+        "description": "문서 번호"
+       },
+       "use": {
+        "type": "string",
+        "enum": [
+         "per_pick",
+         "once",
+         "skip"
+        ],
+        "description": "per_pick: 응모작마다 한 부씩(신청서·제안서), once: 한 부만(동의서·서약서), skip: 낼 문서가 아님(공고문·안내문·다른 부문 전용)"
+       },
+       "title": {
+        "type": "string",
+        "description": "문서 이름 12자 안, 예: 국민제안서, 개인정보 동의서"
+       },
+       "fills": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "text"
+         ]
+        }
+       },
+       "drop": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "한 파일에 양식이 여럿일 때 이 응모에 안 쓰는 양식의 맨 위 블록 id"
+       },
+       "hand": {
+        "type": "boolean",
+        "description": "자필 서명·도장·스캔이 꼭 필요하다고 문서나 요강에 적혀 있으면 true"
+       },
+       "manual": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "사람이 손으로 해야 하는 일, 각 30자 안"
+       }
+      },
+      "required": [
+       "doc",
+       "use",
+       "title",
+       "fills",
+       "drop",
+       "hand",
+       "manual"
+      ]
+     }
+    },
+    "extras": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "cand": {
+        "type": "integer"
+       },
+       "values": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "value": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "value"
+         ]
+        }
+       }
+      },
+      "required": [
+       "cand",
+       "values"
+      ]
+     }
+    },
+    "note": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "docs",
+    "extras",
+    "note"
+   ]
+  }
+ },
+ "required": [
+  "_plan"
+ ]
+}

@@ -17,7 +17,8 @@
   const HOURS_RE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
   const ignored = p => p.split('/').some(s => s.startsWith('.')) || /(^|\/)(node_modules|__pycache__)\//.test(p);
 
-  /* 워크플로우 문서: "## 이름" 아래 (설명 줄) "- [키] 단계명 · 종류 [when {단계.필드}] [in 폴더]: 내용" (종류 = manual | ask | script | ai | agent(read|auto|full)). ask는 사람에게 글을 받는다(내용 = 예시 문구) */
+  /* 워크플로우 문서: "## 이름" 아래 (설명 줄) "- [키] 단계명 · 종류 [when {단계.필드}] [in 폴더]: 내용" (종류 = manual | ask | script | ai | agent(read|auto|full) | browser({단계.필드})). ask는 사람에게 글을 받는다(내용 = 예시 문구).
+     browser는 브라우저 도구만 가진 에이전트 단계 — 괄호 안은 앞 스크립트 단계가 낸 옵션 객체({ vars, allow, files, tab })의 자리, 비우면 옵션 없음 */
   function parseWorkflows(text){
     const out = []; let cur = null, step = null;
     for (const line of String(text || '').split('\n')){
@@ -25,8 +26,8 @@
       if (h){ cur = { name: h[1], steps: [] }; out.push(cur); step = null; continue; }
       const ok = line.match(/^-\s+ok:\s*(.+?)\s*$/);   // 시작할 때 묻는 창의 확인 버튼 글자(첫 단계 앞에서만)
       if (ok && cur && !cur.steps.length){ cur.ok = ok[1].slice(0, 20); continue; }
-      const m = line.match(/^-\s+\[([^\]]+)\]\s+(.+?)\s+·\s+(manual|ask|script|ai|agent)(?:\((read|auto|full)\))?(?:\s+when\s+(\{[^{}\s]+\}))?(?:\s+in\s+(\S+?))?\s*(?::\s*(.*))?$/);
-      if (m && cur){ step = { key: m[1].trim(), name: m[2].trim(), kind: m[3], mode: m[4] || null, when: m[5] || null, cwd: m[6] || null, body: (m[7] || '').trim() }; cur.steps.push(step); continue; }
+      const m = line.match(/^-\s+\[([^\]]+)\]\s+(.+?)\s+·\s+(?:(manual|ask|script|ai|agent)(?:\((read|auto|full)\))?|(browser)(?:\(\s*(\{[^{}\s]+\})?\s*\))?)(?:\s+when\s+(\{[^{}\s]+\}))?(?:\s+in\s+(\S+?))?\s*(?::\s*(.*))?$/);
+      if (m && cur){ step = { key: m[1].trim(), name: m[2].trim(), kind: m[3] || m[5], mode: m[4] || null, ...(m[5] ? { browser: m[6] || null } : {}), when: m[7] || null, cwd: m[8] || null, body: (m[9] || '').trim() }; cur.steps.push(step); continue; }
       if (step && /^\s{2,}\S/.test(line)) step.body += (step.body ? '\n' : '') + line.trim();   // 두 칸 들여 쓴 줄은 앞 단계 내용에 이어 붙인다
       else if (cur && !cur.steps.length && line.trim() && !/^-\s/.test(line)) cur.note = (cur.note ? cur.note + ' ' : '') + line.trim();   // 단계 앞 줄은 설명 — 시작할 때 묻는 창에 보인다
     }
@@ -34,7 +35,7 @@
   }
 
   /* 피드 문서: "## 이름" 아래 "- 키: 값" 줄. 키 = run(필수) · every(분) · days(weekdays|daily) · hours(09:00-18:00) · start(워크플로우) · start_mode(auto|button)
-     · view(sections|inline|cards — inline이면 항목 자리에서 진행 상태를, cards면 항목마다 카드 한 장에 다 보이고 끝나면 사라진다) · reveal(cards에서 [이 kind 보기]를 누른 뒤에 보일 detail kind) · undo·undo_for(cards에서 끝난 뒤 토스트 [되돌리기]로 돌릴 워크플로우와 그 대상) · start_label(시작 버튼 글자) · search(검색 칸 안내 글 — 적으면 목록 위에 찾는 칸) · dismiss(yes — 확인하고 닫기) · count · notify(yes — 사이드바 알림) · empty. 다른 줄은 설명 */
+     · view(sections|inline|cards — inline이면 항목 자리에서 진행 상태를, cards면 항목마다 카드 한 장에 다 보이고 끝나면 사라진다) · reveal(cards에서 [이 kind 보기]를 누른 뒤에 보일 detail kind) · undo·undo_for(cards에서 끝난 뒤 토스트 [되돌리기]로 돌릴 워크플로우와 그 대상) · start_label(시작 버튼 글자) · sort(이름=키, 이름=-키 — 설명 아래 정렬 칩, 항목 sort[키]로 브라우저에서 정렬) · reask(yes — 항목 version이 바뀌면 내 확인을 기다리던 스크립트 단계를 다시 돌려 새로 묻는다) · search(검색 칸 안내 글 — 적으면 목록 위에 찾는 칸) · dismiss(yes — 확인하고 닫기) · count · notify(yes — 사이드바 알림) · empty. 다른 줄은 설명 */
   function parseFeeds(text){
     const out = []; let cur = null;
     for (const line of String(text || '').split('\n')){
@@ -52,7 +53,11 @@
   const parseSearches = parseFeeds, parseEditors = parseFeeds, parseChats = parseFeeds, parseLinks = parseFeeds;
   const CHAT_SCOPES = ['profile', 'card', 'project'];
   const startsOf = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+  /* 정렬: "마감 임박=deadline, 상금 큰=-prize" → [{ label, key, desc }]. 값은 항목 vars[key]에서 읽는다. 틀린 조각은 bad에 */
+  const sortsOf = v => startsOf(v).map(x => { const m = x.match(/^(.{1,12}?)\s*=\s*(-?)([a-z_][a-z0-9_]{0,40})$/); return m ? { label: m[1].trim(), key: m[3], desc: !!m[2] } : { bad: x }; });
   const reOk = v => { try { new RegExp(v); return true; } catch { return false; } };
+  const LOGINS_MAX = 6;
+  const httpsUrl = v => { try { return new URL(String(v)).protocol === 'https:' && String(v).length <= 500; } catch { return false; } };
   /* 편집기 고를 값: "진행상태=진행 예정|진행중|중단됨|진행 완료; 하이라이트=체크|없음" → { 진행상태: [...], 하이라이트: [...] } */
   function parseChoices(v){
     const out = {};
@@ -106,9 +111,12 @@
     const scripts = (Array.isArray(perm.scripts) ? perm.scripts : []).map(String);
     for (const s of scripts) if (!NAME_RE.test(s)) err(`permissions.scripts 이름 형식이 맞지 않아요: ${s}`);
     const bundled = (Array.isArray(perm.bundled) ? perm.bundled : []).map(String);
+    if (perm.browser != null && typeof perm.browser !== 'boolean') err('permissions.browser는 true나 false예요');
+    const browser = perm.browser === true;   // 에이전트가 이 컴퓨터의 브라우저(로그인이 남는 전용 프로필)를 쓴다
+    if (browser && !ai.includes('agent')) err('permissions.browser를 쓰려면 permissions.ai에 agent가 있어야 해요');
     const secretsDecl = (Array.isArray(perm.secrets) ? perm.secrets : []).map(x => typeof x === 'string' ? { name: x } : x && typeof x === 'object' ? x : {});
     for (const x of secretsDecl) if (!SECRET_RE.test(String(x.name || ''))) err(`permissions.secrets 이름은 영문 대문자·숫자·_예요: ${x.name || JSON.stringify(x)}`);
-    const secrets = secretsDecl.filter(x => SECRET_RE.test(String(x.name || ''))).map(x => ({ name: String(x.name), label: String(x.label || x.name), hint: x.hint ? String(x.hint) : '', url: /^https:\/\//.test(String(x.url || '')) ? String(x.url) : '' }));
+    const secrets = secretsDecl.filter(x => SECRET_RE.test(String(x.name || ''))).map(x => ({ name: String(x.name), label: String(x.label || x.name), hint: x.hint ? String(x.hint) : '', url: /^https:\/\//.test(String(x.url || '')) ? String(x.url) : '', ...(x.optional === true ? { optional: true } : {}), ...(x.plain === true ? { plain: true } : {}) }));   // optional: 그 기능을 쓸 때만 넣는 값 — 비어도 '준비가 남았어요'에 세지 않는다. plain: 계정 이름처럼 비밀이 아닌 값 — 스크립트 출력에서 가리지 않는다
     for (const b of bundled){
       if (!/^scripts\//.test(b) || !SCRIPT_EXT.test(b) || b.split('/').includes('..')) err(`가져오는 스크립트는 scripts/ 아래 .mjs·.js·.sh·.py여야 해요: ${b}`);
       else if (!byPath[b]) err(`선언한 스크립트 파일이 없어요: ${b}`);
@@ -120,6 +128,14 @@
       if (s.type === 'pairs' && (pairColumns(s).length !== 2 || pairColumns(s).some(c => !c.label))) err(`settings ${s.key}: pairs는 columns에 label이 있는 칸 두 개를 적어요`);
     }
     const collects = fm.collects && typeof fm.collects === 'object' ? { tag: fm.collects.tag ? String(fm.collects.tag) : null, area: fm.collects.area ? String(fm.collects.area) : null } : null;
+    // 브라우저 로그인 — 미리 로그인해 둘 곳. 화면이 [로그인하러 가기]로 그 주소를 pkm 전용 브라우저에 연다(로그인 여부는 보지 않는다)
+    if (fm.logins != null && !Array.isArray(fm.logins)) err('logins는 { name, url } 목록이에요');
+    const loginsDecl = Array.isArray(fm.logins) ? fm.logins : [];
+    if (loginsDecl.length && !browser) err('logins를 쓰려면 permissions.browser: true가 있어야 해요');
+    if (loginsDecl.length > LOGINS_MAX) err(`logins는 ${LOGINS_MAX}개까지예요`);
+    const loginOk = x => !!x && typeof x === 'object' && !!String(x.name || '').trim() && String(x.name).length <= 20 && httpsUrl(x.url);
+    for (const x of loginsDecl) if (!loginOk(x)) err(`logins 항목은 name(20자까지)과 https:// 주소(url)예요: ${JSON.stringify(x)}`);
+    const logins = loginsDecl.filter(loginOk).slice(0, LOGINS_MAX).map(x => ({ name: String(x.name).trim(), url: String(x.url) }));
 
     // 파일 종류 — 문서·이미지·선언한 스크립트만
     for (const f of list){
@@ -141,7 +157,15 @@
           }
           if ((s.kind === 'ai' || s.kind === 'agent') && !ai.includes(s.kind === 'ai' ? 'chat' : 'agent')) err(`${where}: permissions.ai에 ${s.kind === 'ai' ? 'chat' : 'agent'}가 없어요`);
           if (s.kind === 'agent' && MODES.indexOf(s.mode || 'read') > MODES.indexOf(mode)) err(`${where}: 에이전트 모드 ${s.mode}가 상한 ${mode}보다 높아요`);
-          if ((s.kind === 'ai' || s.kind === 'agent') && /^prompts\/\S+\.md$/.test(s.body) && !byPath[s.body]) err(`${where}: 프롬프트 파일이 없어요 ${s.body}`);
+          if (s.kind === 'browser'){
+            if (!browser) err(`${where}: browser 단계를 쓰려면 permissions.browser: true가 있어야 해요`);
+            if (!ai.includes('agent')) err(`${where}: browser 단계를 쓰려면 permissions.ai에 agent가 있어야 해요`);
+            if (s.cwd) err(`${where}: browser 단계에는 in 폴더를 쓰지 않아요(브라우저 도구만 써요)`);
+            // 옵션(내 정보·갈 수 있는 곳·올릴 파일)은 승인한 스크립트가 낸 값만 — AI가 낸 값으로 정하지 않는다
+            const from = s.browser && w.steps.slice(0, w.steps.indexOf(s)).find(z => z.key === s.browser.slice(1, -1).split('.')[0]);
+            if (s.browser && (!s.browser.includes('.') || !from || from.kind !== 'script')) err(`${where}: browser(${s.browser})는 앞 스크립트 단계의 결과({단계.필드})여야 해요`);
+          }
+          if (['ai', 'agent', 'browser'].includes(s.kind) && /^prompts\/\S+\.md$/.test(s.body) && !byPath[s.body]) err(`${where}: 프롬프트 파일이 없어요 ${s.body}`);
           if (!['manual', 'ask'].includes(s.kind) && !s.body) err(`${where}: 내용이 비어 있어요`);
           if (s.when && !w.steps.slice(0, w.steps.indexOf(s)).some(z => z.key === s.when.slice(1, -1).split('.')[0])) err(`${where}: when의 ${s.when}는 앞 단계 결과여야 해요`);
         }
@@ -173,9 +197,15 @@
         if (d.dismiss && d.dismiss !== 'yes') err(`${where}: dismiss는 yes만 써요`);
         if (d.dismiss && d.start) err(`${where}: dismiss는 start가 없는 목록에만 써요`);
         if (d.notify && !['yes', 'no'].includes(d.notify)) err(`${where}: notify는 yes 또는 no`);
+        if (d.reask && (d.reask !== 'yes' || !d.start)) err(`${where}: reask는 yes만, start가 있는 목록에 써요`);
+        const sorts = sortsOf(d.sort);
+        for (const x of sorts.filter(x => x.bad)) err(`${where}: sort는 "이름=키" 또는 "이름=-키"(큰 것부터)를 쉼표로 이어 써요: ${x.bad}`);
+        if (sorts.length > 4) err(`${where}: sort는 4개까지예요`);
+        if (sorts.length && ['inline', 'cards'].includes(d.view)) err(`${where}: sort는 view: ${d.view}에서 쓰지 않아요(항목 자리가 고정이에요)`);
+        if (d.tab != null && (!String(d.tab).trim() || String(d.tab).length > 20)) err(`${where}: tab은 탭 이름 20자까지예요`);   // 플러그인 화면에서 이 목록을 따로 볼 탭(없으면 첫 탭 '할 일')
         if (feeds.some(x => x.name === d.name)) err(`${where}: 피드 이름이 겹쳐요`);
         feeds.push({ name: d.name, file: f.path, description: d.description, run: String(d.run || ''), every: every || 60, days: d.days || 'daily', hours: d.hours || null,
-          start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null, notify: d.notify === 'yes' });
+          ...(d.tab ? { tab: String(d.tab).trim().slice(0, 20) } : {}), start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null, notify: d.notify === 'yes' });
       }
     }
     // 검색 — 찾기 화면에서 사람이 누를 때만. {q}가 찾는 말
@@ -267,7 +297,7 @@
 
     const manifest = { spec: SPEC, id: String(fm.id || ''), name: String(fm.name || ''), version: String(fm.version || ''), description: String(fm.description || doc.pre || '').slice(0, 500),
       author: fm.author ? String(fm.author) : null, homepage: fm.homepage ? String(fm.homepage) : null, requires: fm.requires || {},
-      collects, permissions: { ai, agent_mode: mode, scripts, bundled, secrets: secrets.map(x => x.name) }, secrets,
+      collects, permissions: { ai, agent_mode: mode, scripts, bundled, secrets: secrets.map(x => x.name), ...(secrets.some(x => x.plain) ? { plain: secrets.filter(x => x.plain).map(x => x.name) } : {}), browser }, secrets, logins,
       settings: settings.map(s => ({ key: String(s.key), label: String(s.label), hint: s.hint ? String(s.hint) : '', type: SETTING_TYPES.includes(String(s.type)) ? String(s.type) : 'text',
         default: s.default == null ? (s.type === 'toggle' ? false : '') : s.type === 'toggle' ? s.default === true : String(s.default), placeholder: s.placeholder ? String(s.placeholder) : '',
         ...(s.type === 'pairs' ? { columns: pairColumns(s) } : {}) })) };
@@ -287,11 +317,11 @@
     const line = v => String(v || '').trim().split('\n')[0].slice(0, 160);
     if (['queued', 'running', 'waiting'].includes(r.status)){
       if (r.status === 'waiting') return { phase: 'ai', text: cur.reason === 'limit' ? 'AI 한도라 기다리는 중 · 풀리면 이어서 해요' : cur.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중 · 이어서 해요' };
-      if (!['ai', 'agent'].includes(cur.kind)) return { phase: 'busy', text: '처리하는 중…' };
+      if (!['ai', 'agent', 'browser'].includes(cur.kind)) return { phase: 'busy', text: '처리하는 중…' };
       const min = cur.started ? Math.floor((now - Date.parse(cur.started)) / 60000) : 0;
       return { phase: 'ai', text: `AI가 하는 중 · ${min >= 1 ? `${min}분째` : '몇 분 걸려요'}` };
     }
-    if (r.status === 'input') return { phase: 'input', text: '내 확인이 필요해요', step: cur.key };
+    if (r.status === 'input'){ const q = cur.ask && cur.ask.type !== 'confirm' && line(cur.ask.question); return { phase: 'input', text: `${cur.ask && cur.ask.type === 'value' ? '알려 주세요' : '내 확인이 필요해요'}${q ? ` · ${q}` : ''}`, step: cur.key }; }   // 무엇을 묻는지 목록 줄에서 바로 보이게
     if (r.status === 'stopped'){ const why = line(cur.status === 'failed' ? cur.error : r.note || cur.error); return { phase: 'failed', text: `멈췄어요${why ? ` · ${why}` : ''}`, step: cur.key }; }
     if (r.status === 'canceled') return { phase: 'canceled', text: '그만뒀어요' };
     for (let i = steps.length - 1; i >= 0; i--){
@@ -303,7 +333,7 @@
     return { phase: 'done', tone: 'ok', text: '끝났어요' };
   }
 
-  const api = { SPEC, DIR, MODES, LIMITS, validate, runOf, runFeedback, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, parseLinks, parseLinkRules, parseChoices, parseLintRules, startsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
+  const api = { SPEC, DIR, MODES, LIMITS, validate, runOf, runFeedback, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, parseLinks, parseLinkRules, parseChoices, parseLintRules, startsOf, sortsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMPlugin = api;
 })(typeof self !== 'undefined' ? self : this);

@@ -22,7 +22,11 @@
 // GET  /api/profile/:p/plugins/:id/machine 이 컴퓨터의 승인·비밀값 상태     POST …/approve  승인     POST …/secret {name, value|null}
 // POST /api/profile/:p/plugins/:id/local {settings, auto}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
 // GET  /api/profile/:p/plugins/:id/scripts  가져오는 스크립트 내용(승인 전에 보여 준다)
+// GET  /api/profile/:p/plugins/:id/file?name=  플러그인이 만든 파일(<프로필>/_플러그인/.data/<id>/files/ — 프로필 데이터와 함께 동기화. 없으면 예전 자리 ~/.pkm-app/plugin-files/<프로필>/<id>/) · &download=1이면 내려받기
 // POST /api/profile/:p/plugins/:id/search {name, q}   플러그인 검색 한 번(이 컴퓨터의 pkm-ai-server, 60초까지) → { items, note }
+// GET  /api/profile/:p/plugins/:id/browser?tab=  플러그인의 브라우저 탭(tab을 비우면 쓸 수 있는지와 로그인 탭 키만) · GET …/browser/frame?tab=  지금 화면(JPEG)
+// POST …/plugins/:id/browser/open?tab= {url?} · POST …/browser/input?tab= {type, …}  누르기·적기(server/runner.js browser — tab은 그 플러그인의 탭만)
+// GET  /api/ai/local                     같은 컴퓨터에 켠 pkm-ai-server를 찾았는지 { found, ok, url, connected } · POST  연결 코드 없이 그곳에 연결(server/runner.js)
 // GET  /api/profile/:p/gcal              구글 캘린더 연결 상태
 // GET  /api/profile/:p/gcal/connect      구글 로그인으로 보낸다(302) — 돌아오는 곳은 /api/gcal/callback
 // POST /api/profile/:p/gcal/sync         지금 맞추기 · POST …/gcal/disconnect 연결 끊기
@@ -33,6 +37,7 @@
 // POST …/chats/:room/send {id, text, provider, model?, effort?}  말 보내기 · …/cancel  그만두기 · …/reset  새 대화 · …/answer {request_id, allow}  확인 요청에 답하기(server/chats.js)
 // POST …/chats/:room/memo {text}  방 메모 적기(빈 글이면 지운다) · …/read  끝난 답을 읽었다고 적기(카드의 '새 답'을 지운다)
 // POST …/chats/:room/cwd {cwd|null}  카드 세션의 작업 폴더 고르기·비우기 · GET …/chats/_dirs?path=  폴더 고르기 화면의 하위 폴더 목록
+// GET  …/chats/:room/browser  이 방의 브라우저 탭 · GET …/browser/frame  지금 화면(JPEG) · POST …/browser/open {url?} · POST …/browser/input {type, …}  누르기·적기
 // GET  /api/profile/:p/push?endpoint=   휴대폰 알림 서명 키와 이 기기의 구독 · POST …/push {subscription, kinds}  켜기·종류 바꾸기
 // POST …/push/off {endpoint}  끄기 · …/push/test {endpoint}  테스트 알림 · …/push/seen {dev, visible}  이 기기로 앱을 보는 중(그동안은 안 보낸다)(server/push.js)
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
@@ -47,7 +52,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
-import { createRunner, readConf } from './runner.js';
+import { createRunner, readConf, localAI, connectLocalAI } from './runner.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
 import { createPush } from './push.js';
@@ -222,7 +227,9 @@ setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다
 }, 120000).unref();
 
 /* ---------- 플러그인 실행기: 이 컴퓨터에서 돌리기를 켠 프로필만 ---------- */
-const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p, 30000); } });
+const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p, 30000); },
+  // 브라우저 단계에서 AI가 사람에게 넘긴 일 — 채팅의 넘겨받기와 같은 알림(내 답이 필요할 때)으로
+  onAsk:(p, m) => push.notify(p, { kind:'ask', title:`${m.kind === 'value' ? '알려 주세요' : '브라우저에서 해 주세요'} · ${m.name}`, body:String(m.question).slice(0, 160), tag:`plugin:${m.plugin}:${m.run}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}/run/${m.run}` }) });
 /* ---------- AI 예약 작업: 돌리는 컴퓨터가 정한 때에 AI에 맡기고 결과를 인박스로 ---------- */
 const jobs = createJobs({ DATA, listProfiles, settingsOf, here:p => runner.here(p), onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p); } });
 
@@ -352,6 +359,10 @@ async function api(req, res, url){
     if (cross) return send(res, 403, { error:'다른 사이트에서 온 요청이에요' });
   }
   if (parts[0] === 'ai' && parts[1] === 'v1') return aiProxy(req, res, parts.slice(2).join('/'), url);
+  if (parts[0] === 'ai' && parts[1] === 'local' && !parts[2]){
+    if (req.method === 'GET') return send(res, 200, await localAI());
+    if (req.method === 'POST') return send(res, 200, await connectLocalAI());
+  }
   if (parts[0] === 'plugins' && parts[1] === 'bundled' && req.method === 'GET') return send(res, 200, { plugins:await plugins.bundled(path.join(ROOT, 'plugins')) });
   if (parts[0] === 'plugins' && parts[1] === 'inspect' && req.method === 'POST') return send(res, 200, await plugins.inspect(await body(req)));
   if (parts[0] === 'gcal'){
@@ -399,6 +410,12 @@ async function api(req, res, url){
       if (rid && req.method === 'POST' && act === 'read') return send(res, 200, chats.markRead(p, rid));
       if (rid && req.method === 'POST' && act === 'memo'){ const b = await body(req); return send(res, 200, await chats.setMemo(p, rid, b.text)); }
       if (rid && req.method === 'POST' && act === 'cwd'){ const b = await body(req); return send(res, 200, await chats.setCwd(p, rid, b.cwd ? String(b.cwd) : null)); }
+      if (rid && act === 'browser'){   // 이 방의 브라우저 탭 — 화면(JPEG)·열기·누르기·적기(server/chats.js)
+        const ba = parts[5] || '';
+        if (req.method === 'GET' && !ba) return send(res, 200, await chats.browser(p, rid, 'info'));
+        if (req.method === 'GET' && ba === 'frame') return send(res, 200, await chats.browser(p, rid, 'frame', { q:url.searchParams.get('q') }), 'image/jpeg');
+        if (req.method === 'POST' && (ba === 'open' || ba === 'input')) return send(res, 200, await chats.browser(p, rid, ba, await body(req)));
+      }
     }
     if (sub === 'push'){
       const act = parts[3] || '';
@@ -411,12 +428,29 @@ async function api(req, res, url){
     if (sub === 'plugins' && parts[3] && parts[4]){
       const id = parts[3], what = parts[4];
       if (what === 'machine' && req.method === 'GET') return send(res, 200, await runner.machine(p, id));
-      if (what === 'approve' && req.method === 'POST') return send(res, 200, { plugin:await runner.approve(p, id) });
+      if (what === 'approve' && req.method === 'POST'){ const r = await runner.approve(p, id); chats.forget(); return send(res, 200, { plugin:r }); }   // 채팅과 브라우저 단계가 승인(브라우저 권한)을 바로 다시 본다
       if (what === 'secret' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.setSecret(p, id, String(b.name || ''), b.value == null ? null : String(b.value))); }
       if (what === 'local' && req.method === 'POST') return send(res, 200, await runner.setLocal(p, id, await body(req)));
       if (what === 'act' && req.method === 'POST') return send(res, 200, await runner.act(p, id, await body(req)));
+      if (what === 'browser'){   // 이 플러그인의 브라우저 탭 — 상태·화면(JPEG)·열기·누르기·적기
+        const ba = parts[5] || '', tab = url.searchParams.get('tab') || '';
+        if (req.method === 'GET' && !ba) return send(res, 200, await runner.browser(p, id, 'info', tab));
+        if (req.method === 'GET' && ba === 'frame') return send(res, 200, await runner.browser(p, id, 'frame', tab, { q:url.searchParams.get('q') }), 'image/jpeg');
+        if (req.method === 'POST' && (ba === 'open' || ba === 'input')){ const b = await body(req); return send(res, 200, await runner.browser(p, id, ba, tab || b.tab, b)); }
+      }
       if (what === 'search' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.search(p, id, b.name, b.q)); }
       if (what === 'update' && req.method === 'POST') return send(res, 200, await plugins.inspectUpdate(path.join(DATA, p), id));   // 출처에서 다시 가져와 검사만 — 설치는 POST …/plugins {stage}
+      // 플러그인이 만든 파일(예: 내 정보를 채운 신청서) — 프로필 데이터의 _플러그인/.data/<id>/files/에 둔다(프로필과 함께 동기화). 예전 자리(~/.pkm-app/plugin-files)도 본다. 이름 하나만, 하위 폴더 없이
+      if (what === 'file' && req.method === 'GET'){
+        const name = String(url.searchParams.get('name') || '');
+        if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(id) || !name || name !== path.basename(name) || name.startsWith('.')) return send(res, 400, { error:'파일 이름이 올바르지 않아요' });
+        const home = process.env.PKM_HOME ? path.resolve(process.env.PKM_HOME) : path.join(os.homedir(), '.pkm-app');
+        const buf = await fs.readFile(path.join(DATA, p, '_플러그인', '.data', id, 'files', name)).catch(() => null) || await fs.readFile(path.join(home, 'plugin-files', p, id, name)).catch(() => null);
+        if (!buf) return send(res, 404, { error:'파일이 없어요. 아직 동기화되지 않았을 수 있어요' });
+        const type = { hwp:'application/x-hwp', hwpx:'application/hwp+zip', pdf:'application/pdf', txt:'text/plain; charset=utf-8' }[path.extname(name).slice(1).toLowerCase()] || 'application/octet-stream';
+        res.writeHead(200, { ...SEC(req), 'content-type':type, 'content-length':buf.length, 'cache-control':'no-store', 'content-disposition':`${url.searchParams.get('download') ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(name)}` });
+        return res.end(buf);
+      }
       if (what === 'scripts' && req.method === 'GET'){
         const x = (await plugins.list(path.join(DATA, p))).find(x => x.id === id);
         if (!x) return send(res, 404, { error:'설치된 플러그인이 아니에요' });

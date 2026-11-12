@@ -17,7 +17,7 @@ test('예시 플러그인을 받는다', () => {
   const r = P.validate(base());
   assert.equal(r.ok, true, r.errors.join('\n'));
   assert.equal(r.manifest.id, 'deploy-loop');
-  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'], secrets: [] });
+  assert.deepEqual(r.manifest.permissions, { ai: ['chat', 'agent'], agent_mode: 'read', scripts: ['jira'], bundled: ['scripts/pr-body.mjs'], secrets: [], browser: false });
   assert.equal(r.workflows[0].steps.length, 5);
   assert.equal(r.workflows[0].steps[3].body, '이 카드의 경로에서 바뀐 파일을 읽고\n위험한 부분만 짧게 알려 줘');
 });
@@ -208,6 +208,7 @@ test('누른 항목의 진행 — 누른 뒤에 만든 실행을 찾고, 상태�
   assert.equal(P.runFeedback(run({}, [agent]), at + 185000).text, 'AI가 하는 중 · 3분째');
   assert.match(P.runFeedback(run({ status: 'waiting' }, [{ ...agent, status: 'waiting', reason: 'limit' }])).text, /풀리면 이어서/);
   assert.deepEqual(P.runFeedback(run({ status: 'input' }, [{ key: 'done1', status: 'done' }, { key: 'res', kind: 'script', status: 'input' }])), { phase: 'input', text: '내 확인이 필요해요', step: 'res' });
+  assert.equal(P.runFeedback(run({ status: 'input' }, [{ key: 'res', kind: 'script', status: 'input', ask: { type: 'choice', question: '냈나요? · 마감 D-8' } }])).text, '내 확인이 필요해요 · 냈나요? · 마감 D-8');
   assert.deepEqual(P.runFeedback(run({ status: 'stopped' }, [{ key: 'end', kind: 'script', status: 'failed', error: '카드를 찾지 못했어요\n자세한 내용' }])), { phase: 'failed', text: '멈췄어요 · 카드를 찾지 못했어요', step: 'end' });
   assert.equal(P.runFeedback(run({ status: 'stopped', note: '워크플로우가 사라졌어요' }, [{ key: 'a', status: 'pending' }])).text, '멈췄어요 · 워크플로우가 사라졌어요');
   assert.deepEqual(P.runFeedback(run({ status: 'done' }, [{ key: 'end', status: 'done', output: { verdict: { tone: 'ok', title: '했어요', text: '예시 할 일' }, outcome: { title: '했어요' } } }])), { phase: 'done', tone: 'ok', text: '했어요 · 예시 할 일' });
@@ -264,4 +265,13 @@ test('누른 항목 자리 — 실행이 사라지면 추적을 지우고, 글�
   T.plTrackUpdate(); assert.equal(toasts.length, 1);   // 되돌릴 수 없는 워크플로우는 토스트 없이
   setup(cards, [run(cards, done)], { run: 'r1', said: 'done', doneAt: now - 1300, doneMs: 1200, stay: true });   // 되돌린 카드는 끝나도 남는다
   assert.equal(T.plTrackUpdate(), true); assert.deepEqual(PL.track, {});
+});
+
+test('목록의 tab — 탭 이름을 받고 20자를 넘으면 막는다', () => {
+  const files = tab => [{ path: 'plugin.md', size: 1, text: '---\npkm_plugin: 1\nid: tab-demo\nname: 탭\nversion: 0.1.0\npermissions:\n  bundled: [scripts/a.mjs]\n---\n탭' }, { path: 'scripts/a.mjs', size: 1, text: '' },
+    { path: 'feeds/f.md', size: 1, text: `## 낼 것\n- run: scripts/a.mjs\n\n## 낸 것\n- run: scripts/a.mjs\n- tab: ${tab}\n` }];
+  const ok = P.validate(files('낸 것·뺀 것'));
+  assert.equal(ok.ok, true, ok.errors.join());
+  assert.deepEqual(ok.feeds.map(f => f.tab), [undefined, '낸 것·뺀 것']);
+  assert.match(P.validate(files('가'.repeat(21))).errors.join('\n'), /낸 것: tab은 탭 이름 20자까지예요/);
 });

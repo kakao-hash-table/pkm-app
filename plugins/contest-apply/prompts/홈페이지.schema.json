@@ -1,0 +1,73 @@
+{
+ "type": "object",
+ "properties": {
+  "_result": {
+   "type": "object",
+   "properties": {
+    "sent": {
+     "type": "string",
+     "enum": [
+      "yes",
+      "no",
+      "unknown"
+     ],
+     "description": "yes: 접수 완료 화면·문구를 직접 봤다. no: 제출하지 않았거나 서버가 거절했다. unknown: 제출을 눌렀지만 접수됐는지 확인하지 못했다"
+    },
+    "reason": {
+     "type": "string",
+     "description": "no·unknown이면 이유 한두 문장(어느 칸·어느 화면에서 왜). yes면 빈 글"
+    },
+    "proof": {
+     "type": "string",
+     "description": "마지막으로 본 화면의 핵심 글(완료 문구·접수 번호, 또는 오류 문구) 300자 안"
+    },
+    "did": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     },
+     "description": "한 일을 순서대로 짧게(칸 이름과 넣은 것 — 내 정보는 자리표시로, 넘긴 일, 누른 버튼)"
+    },
+    "need": {
+     "type": "array",
+     "description": "필수인데 정할 수 없고 자리표시에도 없는 칸들 — 한꺼번에",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string",
+        "description": "자리표시로 쓸 짧은 이름, 예: 주소"
+       },
+       "question": {
+        "type": "string",
+        "description": "사용자에게 물을 한 줄"
+       },
+       "options": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "description": "고르는 칸이면 보기 글 그대로, 아니면 빈 배열"
+       }
+      },
+      "required": [
+       "name",
+       "question",
+       "options"
+      ]
+     }
+    }
+   },
+   "required": [
+    "sent",
+    "reason",
+    "proof",
+    "did",
+    "need"
+   ]
+  }
+ },
+ "required": [
+  "_result"
+ ]
+}

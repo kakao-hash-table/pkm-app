@@ -18,6 +18,9 @@ const posted = [], answers = [], jobs = new Map(), subs = new Map();
 let delayedStop = false, finishDelayedStop = null, rejectStop = false;
 let n = 0, me = { host: os.hostname(), user: os.userInfo().username }, full = true, claudeAvailable = true, startOnCancel = false, legacyCancel = false, finishLegacyCancel = null;
 const view = j => ({ id: j.id, provider: j.provider, model: j.model, status: j.status, session: j.session, pending: j.pending, result: j.result || null, error: null });
+// 브라우저 — 서버 지원(agent.browser), 이 컴퓨터의 승인 목록(/v1/plugins), 탭 경로
+let browserOn = true, approvals = [];
+const tabHits = [];
 const push = (j, ev) => { for (const w of subs.get(j.id) || []) w(ev); };
 function finish(j){
   push(j, { type: 'text', text: '하는 중이에요' });
@@ -32,10 +35,17 @@ const ai = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'), m = u.pathname.match(/^\/v1\/jobs\/(\w+)(?:\/(\w+))?$/);
   if (u.pathname === '/v1/me') return send(200, me);
   if (u.pathname === '/v1/providers') return send(200, { providers: [
-    { id: 'claude', input_images: true, installed: claudeAvailable, logged_in: claudeAvailable, models: [{ id: 'default' }, { id: 'fable' }], efforts: ['high'], agent: { modes: full ? ['read', 'auto', 'full'] : ['read', 'auto'], approvals: true, concurrency: 2 } },
+    { id: 'claude', input_images: true, installed: claudeAvailable, logged_in: claudeAvailable, models: [{ id: 'default' }, { id: 'fable' }], efforts: ['high'], agent: { modes: full ? ['read', 'auto', 'full'] : ['read', 'auto'], approvals: true, concurrency: 2, browser: browserOn } },
     { id: 'codex', input_images: true, installed: true, logged_in: true, models: [{ id: 'default' }, { id: 'gpt-test' }], efforts: ['high', 'ultra'], agent: { modes: ['read', 'auto'], approvals: false, concurrency: 2 } },
   ] });
-  if (u.pathname === '/v1/plugins') return send(req.method === 'POST' ? 201 : 200, { plugins: [] });
+  if (u.pathname === '/v1/plugins') return send(req.method === 'POST' ? 201 : 200, { plugins: approvals });
+  const bt = u.pathname.match(/^\/v1\/browser\/tabs\/([^/]+)(?:\/(\w+))?$/);
+  if (bt){
+    tabHits.push({ key: decodeURIComponent(bt[1]), act: bt[2] || '', body });
+    if (bt[2] === 'frame'){ res.writeHead(200, { 'content-type': 'image/jpeg' }); return res.end(Buffer.from('JPEGDATA')); }
+    if (bt[2] === 'input') return send(200, { open: true, url: 'https://shop.example/login', focus: { editable: true, password: body.type === 'click' } });
+    return send(200, { open: true, key: decodeURIComponent(bt[1]), url: 'https://shop.example/login', title: '로그인', width: 1280, height: 800 });
+  }
   if (u.pathname === '/v1/jobs' && req.method === 'POST'){
     posted.push(body);
     const j = { id: `job${++n}`, provider: body.provider, model: body.model, status: 'running', session: body.agent.session || `sess-${n}`, pending: [], prompt: body.prompt };
@@ -43,6 +53,7 @@ const ai = http.createServer(async (req, res) => {
     if (body.prompt.startsWith('대기제어:')) {} // 개별 취소·우선 반영 테스트의 진행 중 작업
     else if (body.prompt.startsWith('진행 중인 응답을 중지하고')) setTimeout(() => finish(j), 30);
     else if (body.provider === 'claude' && /전환시험대기/.test(body.prompt)) setTimeout(() => { j.status = 'waiting'; push(j, { type: 'status', job: view(j) }); }, 30);
+    else if (/브라우저로/.test(body.prompt)) setTimeout(() => { j.pending = [{ id: 'bh-1', tool: 'BrowserHandoff', title: '브라우저에서 해 주세요', description: '쇼핑몰에 로그인해 주세요', input: { message: '쇼핑몰에 로그인해 주세요', tab: body.agent.browser && body.agent.browser.tab } }]; push(j, { type: 'status', job: view(j) }); }, 30);
     else if (/물어봐/.test(body.prompt)) setTimeout(() => { j.pending = [{ id: 'req-1', tool: 'Write', title: 'Write', description: 'a.txt', input: { file_path: '/tmp/a.txt', content: 'hi' } }]; push(j, { type: 'status', job: view(j) }); }, 30);
     else setTimeout(() => finish(j), 30);
     return send(202, { job: view(j) });
@@ -89,6 +100,8 @@ before(async () => {
   const ins = await plugins.inspect({ local: new URL('../plugins/ai-chat/', import.meta.url).pathname });
   assert.equal(ins.ok, true, ins.errors.join());
   await plugins.install(path.join(DATA, P), ins.stage);
+  const root = (await plugins.list(path.join(DATA, P))).find(x => x.id === 'ai-chat').path;
+  approvals = [{ id: 'ai-chat', root, permissions: { ai: ['agent'], agent_mode: 'full', browser: true } }];
   const { createChats } = await import('../server/chats.js');
   const project = { id: 'pabc123', title: '쉐어링크 월 10만', goal: '하루 10분으로 월 10만원', status: 'running', file: '/x/pabc123.json', hub: '/x/설계.md', work: T,
     cards: [{ id: 't1', title: '쉐어링크 월 10만 · 오퍼 — 니치 정하기', status: '진행', path: '03_행동/단기보드/a.md', open: ['🙋 니치 고르기 (3분)'] }] };
@@ -543,4 +556,47 @@ test('실시간 현황 — 하는 중인 방은 시작 시각·보낸 말·지�
   await until(() => lastTurn('data').status === 'done');
   const e = (await chats.status(P)).rooms.find(r => r.id === 'data');
   assert.equal(e.asked, undefined); assert.equal(e.doing, undefined);
+});
+
+test('브라우저 — 승인에 브라우저가 있으면 방마다 탭 하나를 붙이고, 사람에게 넘긴 일은 방에 띄워 [다 했어요]로 잇는다', async () => {
+  const st = await chats.status(P);
+  assert.equal(st.browser.ok, true);
+  await chats.open(P, {});
+  await chats.send(P, 'data', { id: 'browser-msg-01', text: '브라우저로 주문 내역 봐 줘' });
+  const t = await until(() => { const x = lastTurn('data'); return x.pending.length ? x : null; });
+  const tab = posted[posted.length - 1].agent.browser.tab;
+  assert.match(tab, /^chat:[0-9a-f]{10}:data$/);
+  assert.equal(t.pending[0].tool, 'BrowserHandoff');
+  const ask = pushed.filter(m => m.tag === 'data:browser-msg-01' && m.kind === 'ask')[0];
+  assert.equal(ask.body, '브라우저에서 해 주세요 — 쇼핑몰에 로그인해 주세요');
+  // 사람이 채팅 창에서 같은 탭을 보고 누르고 적는다 — 이 방의 탭 키로 중계
+  assert.equal((await chats.browser(P, 'data', 'info')).title, '로그인');
+  assert.equal(String(await chats.browser(P, 'data', 'frame')), 'JPEGDATA');
+  const r = await chats.browser(P, 'data', 'input', { type: 'click', x: 10, y: 20 });
+  assert.equal(r.focus.password, true);
+  assert.ok(tabHits.slice(-3).every(h => h.key === tab));
+  assert.deepEqual(tabHits[tabHits.length - 1].body, { type: 'click', x: 10, y: 20 });
+  await chats.answer(P, 'data', { request_id: 'bh-1', allow: true });
+  assert.equal(answers[answers.length - 1].message, '');
+  const done = await until(() => lastTurn('data').status === 'done' ? lastTurn('data') : null);
+  assert.ok(done.log.some(x => x.kind === 'note' && x.text === '다 했어요 · 쇼핑몰에 로그인해 주세요'));
+});
+
+test('브라우저 — 못 했다고 하면 그 말이 가고, 승인에 브라우저가 없으면 브라우저 없이 하고 다시 승인하라고 남긴다', async () => {
+  await chats.send(P, 'data', { id: 'browser-msg-02', text: '브라우저로 다시' });
+  await until(() => lastTurn('data').pending.length);
+  await chats.answer(P, 'data', { request_id: 'bh-1', allow: false, message: '인증 문자가 안 와요' });
+  assert.equal(answers[answers.length - 1].message, '인증 문자가 안 와요');
+  await until(() => lastTurn('data').status === 'done');
+  const keep = approvals;
+  approvals = [{ ...keep[0], permissions: { ai: ['agent'], agent_mode: 'full' } }]; chats.forget();
+  assert.equal((await chats.status(P)).browser.reason, 'approve');
+  await chats.send(P, 'data', { id: 'browser-msg-03', text: '그냥 해 줘' });
+  const t = await until(() => lastTurn('data').status === 'done' ? lastTurn('data') : null);
+  assert.equal(posted[posted.length - 1].agent.browser, undefined);
+  assert.ok(t.log.some(x => x.kind === 'note' && /브라우저 없이 해요 — .*다시 승인/.test(x.text)));
+  approvals = keep; browserOn = false; chats.forget();
+  assert.equal((await chats.status(P)).browser.reason, 'old');
+  await assert.rejects(chats.browser(P, 'data', 'info'), /옛 버전/);
+  browserOn = true; chats.forget();
 });

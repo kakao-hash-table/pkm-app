@@ -1,4 +1,4 @@
-// 서비스 워커 — 알림만 맡는다(화면은 늘 서버에서 새로 받는다). 알림을 누르면 열린 창을 앞으로 가져와 그 채팅을 열고, 없으면 새로 연다
+// 서비스 워커 — 알림만 맡는다(화면은 늘 서버에서 새로 받는다). 알림을 누르면 열린 창을 앞으로 가져와 그 채팅(채팅이 아니면 알림에 적힌 화면)을 열고, 없으면 새로 연다
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('push', e => {
@@ -15,7 +15,7 @@ self.addEventListener('notificationclick', e => {
     const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const mine = wins.filter(c => new URL(c.url).origin === self.location.origin);
     const w = mine.find(c => c.focused) || mine.find(c => c.visibilityState === 'visible') || mine[0];
-    if (w){ await w.focus().catch(() => {}); w.postMessage({ type: 'pkm-open-chat', room: d.room, profile: d.profile }); return; }
+    if (w){ await w.focus().catch(() => {}); w.postMessage({ type: 'pkm-open-chat', room: d.room, profile: d.profile, url: d.url }); return; }
     await self.clients.openWindow(url);
   })());
 });
