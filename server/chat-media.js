@@ -12,6 +12,8 @@ const TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'im
 const FORMATS = { 'image/png':'png_pipe', 'image/jpeg':'jpeg_pipe', 'image/webp':'webp_pipe', 'image/gif':'gif', 'image/heic':'mov', 'image/heif':'mov', 'video/mp4':'mov', 'video/quicktime':'mov', 'video/webm':'matroska', 'video/ogg':'ogg', 'video/x-matroska':'matroska' };
 const hash = s => crypto.createHash('sha256').update(s).digest('hex').slice(0, 32);
 const scale = 'scale=1568:1568:force_original_aspect_ratio=decrease';
+// AI가 답에 넣은 이 컴퓨터의 파일 — 화면에서 바로 보이는 종류만 그림·영상으로, 나머지는 내려받는 파일로 다룬다
+const SHOWN = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', webp:'image/webp', gif:'image/gif', svg:'image/svg+xml', mp4:'video/mp4', webm:'video/webm', mov:'video/quicktime' };
 export function createChatMedia(root){
   let processing = 0;
   const dir = (p, room) => path.join(root, hash(p), hash(room));
@@ -67,15 +69,32 @@ export function createChatMedia(root){
   function resolve(p, room, ids){
     if (!Array.isArray(ids) || ids.length > 8 || new Set(ids).size !== ids.length) throw fail(400, '첨부는 한 번에 서로 다른 파일 8개까지 가능해요');
     const media = ids.map(id => read(p, room, id));
+    if (media.some(m => m.from === 'ai')) throw fail(400, 'AI가 보여 준 파일은 다시 첨부할 수 없어요. 파일을 직접 첨부해 주세요');
     if (media.reduce((n, m) => n + m.images.length, 0) > 24) throw fail(400, '한 번에 사진·영상 장면 24장까지 보낼 수 있어요. 영상을 나누어 보내 주세요');
     return { attachments:media.map(view), images:media.flatMap(m => m.images), text:media.map(m => m.kind === 'video'
       ? `영상 ${JSON.stringify(m.name)} (${m.duration.toFixed(2)}초): ${m.images.map(x => x.at.toFixed(2) + '초').join(', ')} 순서로 추출한 ${m.images.length}장면. 음성은 포함되지 않았으며 장면 사이의 사건은 확인할 수 없습니다.`
       : `사진 ${JSON.stringify(m.name)}: 이미지 1장${m.mime === 'image/gif' ? ' (GIF 첫 프레임)' : ''}`).join('\n') };
   }
+  // AI 답의 파일 — 이 컴퓨터의 경로를 방 보관함에 복사하고 id로 돌려준다(브라우저에는 경로가 아니라 id만 나간다). 못 읽으면 null
+  function attach(p, room, file){
+    let st; try { file = fs.realpathSync(file); st = fs.statSync(file); } catch { return null; }
+    const mime = SHOWN[path.extname(file).slice(1).toLowerCase()] || 'application/octet-stream', kind = mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'file';
+    if (!st.isFile() || !st.size || st.size > (kind === 'image' ? IMAGE_MAX : VIDEO_MAX)) return null;
+    const id = crypto.randomBytes(16).toString('hex'), base = folder(p, room, id);
+    try {
+      fs.mkdirSync(base, { recursive:true, mode:0o700 });
+      fs.copyFileSync(file, path.join(base, 'original')); fs.chmodSync(path.join(base, 'original'), 0o600);
+      const m = { id, name:path.basename(file).replace(/[\x00-\x1f]/g, '').slice(0, 200), mime, kind, size:st.size, duration:null, images:[], from:'ai' };
+      fs.writeFileSync(path.join(base, 'meta.json'), JSON.stringify(m), { mode:0o600 });
+      return view(m);
+    } catch { fs.rmSync(base, { recursive:true, force:true }); return null; }
+  }
   function serve(p, room, id, req, res){
-    const m = read(p, room, id), file = path.join(folder(p, room, id), req.url.includes('preview=1') ? '0.jpg' : 'original');
+    const m = read(p, room, id), ai = m.from === 'ai', file = path.join(folder(p, room, id), req.url.includes('preview=1') && !ai ? '0.jpg' : 'original');
     const size = fs.statSync(file).size, preview = file.endsWith('.jpg');
     const h = { 'content-type':preview ? 'image/jpeg' : m.mime, 'cache-control':'private, no-store', 'x-content-type-options':'nosniff', 'accept-ranges':'bytes' };
+    // AI가 고른 파일은 내용을 믿지 않는다 — 새 탭으로 열어도 스크립트가 돌지 않게 하고(SVG), 그림·영상이 아니면 내려받게 한다
+    if (ai) Object.assign(h, { 'content-security-policy':"sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; media-src 'self'" }, m.kind === 'file' ? { 'content-disposition':`attachment; filename*=UTF-8''${encodeURIComponent(m.name)}` } : {});
     let start = 0, end = size - 1, status = 200;
     if (req.headers.range){
       const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
@@ -89,5 +108,5 @@ export function createChatMedia(root){
     const stream = fs.createReadStream(file, { start, end });
     stream.on('error', () => res.destroy()); res.on('close', () => stream.destroy()); stream.pipe(res);
   }
-  return { upload, resolve, serve };
+  return { upload, attach, resolve, serve };
 }

@@ -1022,6 +1022,8 @@ dialog .cw-addr,dialog .cw-type{padding:0;flex-direction:row;gap:6px}
 .ch-media-item span{overflow-wrap:anywhere;min-width:0}
 .ch-media-item a{color:inherit}
 .ch-media-item video{max-width:240px;max-height:160px}
+.ch-out{display:block;max-width:100%}.ch-out .embed-img{max-height:480px;width:auto;margin:8px 0;border:1px solid var(--line)}video.ch-out{max-height:360px;margin:8px 0}
+.ch-file{display:inline-block;padding:2px 8px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);overflow-wrap:anywhere}
 .ch-media-note{margin:0;font-size:.75rem;color:var(--text-2)}
 #chat-attachments{max-height:144px;overflow-y:auto}
 .chat-send{flex-wrap:wrap}
@@ -2011,6 +2013,7 @@ function wikilink(t, alias){
 }
 
 /* ---------------- 마크다운 (지원: 제목·목록(중첩)·인용·표·코드·[[링크]]·![[첨부]]·**굵게**·`코드`·[링크](url)) ---------------- */
+let MD_FILES = null;   // 채팅 답을 그리는 동안만: (id, 글, 그림 자리인지) → HTML(chMd)
 function inline(s){
   let out = esc(s);
   out = out.replace(/^\[( |x)\]\s/, (m, c) => c === 'x' ? '☑ ' : '☐ ');
@@ -2019,6 +2022,7 @@ function inline(s){
     ? `<img class="embed-img" src="/api/profile/${encodeURIComponent(S.profile)}/image?name=${encodeURIComponent(n.replace(/&amp;/g,'&'))}" alt="${alt || n.replace(/\.\w+$/, '')}" loading="lazy">`
     : `<span class="embed">첨부 · ${n}</span>`);
   out = out.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (m, t, a) => wikilink(t.replace(/&amp;/g,'&'), a));
+  if (MD_FILES) out = out.replace(/(!?)\[([^\]]*)\]\(pkm-file:([a-f0-9]{32})\)/g, (m, bang, label, id) => MD_FILES(id, label, !!bang) || m);   // AI 답의 그림·파일(채팅에서만)
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   out = out.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1<span class="sr-only"> (새 창)</span></a>');
   return out;
@@ -5800,6 +5804,18 @@ function chMediaHTML(p, room, files, draft = false){
     : `<a href="${chMediaURL(p, room, a)}" target="_blank" rel="noopener"><img src="${chMediaURL(p, room, a, true)}" alt="${esc(a.name)}" loading="lazy"></a>`}
     <span>${esc(a.name)}${a.kind === 'video' && !a.loading ? `<br>${Math.round(a.duration)}초 · ${a.frames}장면` : ''}</span>${draft && !a.loading ? `<button class="btn btn-text btn-sm" type="button" data-ch="detach" data-index="${i}" aria-label="${esc(a.name)} 첨부 취소">×</button>` : ''}</div>`).join('');
 }
+// AI 답 — 답 안의 pkm-file:<id>(서버가 이 컴퓨터의 파일을 방 보관함에 복사해 둔 것)를 그림·영상·내려받기 링크로 그린다
+function chMd(room, t){
+  const files = new Map((t.files || []).map(a => [a.id, a])), p = S.profile;
+  MD_FILES = (id, label, shown) => {
+    const a = files.get(id); if (!a) return '';
+    const url = chMediaURL(p, room, a), name = label || esc(a.name);
+    if (shown && a.kind === 'image') return `<a class="ch-out" href="${url}" target="_blank" rel="noopener"><img class="embed-img" src="${url}" alt="${name}" loading="lazy"><span class="sr-only"> (새 창에서 크게 보기)</span></a>`;
+    if (shown && a.kind === 'video') return `<video class="ch-out" controls preload="metadata" src="${url}" aria-label="${name}"></video>`;
+    return `<a class="ch-file" href="${url}"${a.kind === 'file' ? ` download="${esc(a.name)}"` : ' target="_blank" rel="noopener"'}>${name}<span class="faint"> · ${a.kind === 'file' ? '내려받기' : '열기'}</span></a>`;
+  };
+  try { return md(t.reply); } finally { MD_FILES = null; }
+}
 function chMediaPaint(){
   const files = chMediaDraft(), box = $('#chat-attachments'), html = chMediaHTML(S.profile, CH.room, files, true);
   if (box.dataset.sig !== html){ box.innerHTML = html; box.dataset.sig = html; }
@@ -6055,7 +6071,7 @@ function chTurn(room, t){
   const live = st !== 'done' ? (t.log || []).filter(x => x.kind === 'text').slice(-1)[0] : null;   // 하는 동안은 마지막 말을 보인다
   const proc = n ? `<details class="ch-proc" data-turn="${esc(t.id)}" ${CH.procOpen.has(t.id) ? 'open' : ''}><summary>진행 과정 ${n}</summary><ol>${t.log.map(x => `<li>${x.kind === 'tool' ? `<span class="tool">${esc(x.tool)}</span> ${esc(x.text)}` : esc(x.text)}</li>`).join('')}</ol></details>` : '';
   return `<div class="ch-me" data-turn="${esc(t.id)}" tabindex="-1">${esc(t.text)}${t.attachments?.length ? `<div class="ch-media">${chMediaHTML(S.profile, room, t.attachments)}</div>` : ''}</div>
-    <div class="ch-ai" data-turn="${esc(t.id)}"><p class="faint">${esc(AI_NAME[t.provider || 'claude'] || t.provider)}${t.model && t.model !== 'default' ? ` · ${esc(t.model)}` : ''}</p>${(t.pending || []).map(q => chAsk(room, q)).join('')}${t.reply ? `<div class="md">${md(t.reply)}</div>` : live ? `<div class="md">${md(live.text)}</div>` : ''}${line}${chQueueActions(room, t)}${chHandoffHTML(room, t)}${proc}</div>`;
+    <div class="ch-ai" data-turn="${esc(t.id)}"><p class="faint">${esc(AI_NAME[t.provider || 'claude'] || t.provider)}${t.model && t.model !== 'default' ? ` · ${esc(t.model)}` : ''}</p>${(t.pending || []).map(q => chAsk(room, q)).join('')}${t.reply ? `<div class="md">${chMd(room, t)}</div>` : live ? `<div class="md">${md(live.text)}</div>` : ''}${line}${chQueueActions(room, t)}${chHandoffHTML(room, t)}${proc}</div>`;
 }
 /* 요약 보기 — 말마다 무엇을(어떤 조건까지) 물었고 무엇이 왔는지 한두 줄씩, 날짜별 차례로. 다음 날 이어 할 때 훑는 용도.
    AI가 답 끝에 붙인 요약(server/chats.js splitSummary)을 쓰고, 없는 말(옛 대화·멈춘 말)은 앞부분을 잘라 보여 준다 */

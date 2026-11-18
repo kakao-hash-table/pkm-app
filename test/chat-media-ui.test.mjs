@@ -40,3 +40,19 @@ test('업로드 중 전송을 막고 완료 후 다시 허용한다',async()=>{
   release({ok:true,json:async()=>({id:'uploaded',name:'사진.png',kind:'image',frames:1})});await upload;
   assert.equal(node('#chat-go').disabled,false);
 });
+test('AI 답의 pkm-file:<id>는 그림·영상·내려받기 링크로 그리고, 모르는 id와 채팅 밖에서는 글 그대로 둔다',()=>{
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ctx=vm.createContext({Map,S:{profile:'회사'},STORE:null,esc,wikilink:t=>t});
+  vm.runInContext(source.slice(source.indexOf('let MD_FILES = null;'),source.indexOf('function mdList(')),ctx);
+  vm.runInContext('const md = inline;'+source.slice(source.indexOf('const chMediaURL ='),source.indexOf('function chMediaHTML(')),ctx);
+  vm.runInContext(source.slice(source.indexOf('function chMd('),source.indexOf('function chMediaPaint(')),ctx);
+  const id=n=>String(n).repeat(32), files=[{id:id(1),name:'a.png',kind:'image'},{id:id(2),name:'b"<.zip',kind:'file'},{id:id(3),name:'c.mp4',kind:'video'}];
+  const html=ctx.chMd('card-x',{files,reply:`![그림 <1>](pkm-file:${id(1)}) [묶음](pkm-file:${id(2)}) ![영상](pkm-file:${id(3)}) [그림 링크](pkm-file:${id(1)}) ![없음](pkm-file:${id(9)})`});
+  const url=n=>`/api/profile/${encodeURIComponent('회사')}/chats/card-x/attachments/${id(n)}`;
+  assert.ok(html.includes(`<img class="embed-img" src="${url(1)}" alt="그림 &lt;1&gt;"`));
+  assert.ok(html.includes(`<a class="ch-file" href="${url(2)}" download="b&quot;&lt;.zip">묶음`));
+  assert.ok(html.includes(`<video class="ch-out" controls preload="metadata" src="${url(3)}"`));
+  assert.ok(html.includes(`<a class="ch-file" href="${url(1)}" target="_blank" rel="noopener">그림 링크`));
+  assert.ok(html.includes(`![없음](pkm-file:${id(9)})`));
+  assert.equal(ctx.inline(`![그림](pkm-file:${id(1)})`),`![그림](pkm-file:${id(1)})`,'채팅 밖(노트)에서는 그리지 않는다');
+});
