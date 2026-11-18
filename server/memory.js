@@ -20,18 +20,23 @@ function write(m){
   fs.renameSync(tmp, FILE);
 }
 
-export function remember(p, name, value, from){
+// 한 번만 쓰는 값·비밀은 기억하지 않는다(인증번호·OTP·비밀번호·보안코드·PIN 등) — 다음에 지난 값을 넣으면 틀리거나 새어 나간다
+const ONCE = /인증|otp|비밀\s*번호|비번|패스워드|password|passcode|passwd|보안\s*코드|확인\s*코드|인증\s*코드|verification|code|pin|cvc|cvv|토큰|token|secret/i;
+export const rememberable = name => !ONCE.test(String(name || ''));
+export function remember(p, name, value, from, shared = true){
   const k = norm(name), v = String(value ?? '').trim().slice(0, 4000);
-  if (!k || !v) return;
+  if (!k || !v || !rememberable(name)) return;
   const m = read(), box = (m.profiles[p] ||= {});
-  box[k] = { name: String(name).slice(0, 60), value: v, at: new Date().toISOString(), from: from || null, used: box[k] ? box[k].used || 0 : 0 };
+  box[k] = { name: String(name).slice(0, 60), value: v, at: new Date().toISOString(), from: from || null, shared: !!shared, used: box[k] ? box[k].used || 0 : 0 };
   const keys = Object.keys(box).sort((a, b) => String(box[b].at).localeCompare(String(box[a].at)));
   for (const old of keys.slice(MAX)) delete box[old];
   write(m);
 }
-export function recall(p, name){
-  const k = norm(name), m = read(), it = k && m.profiles[p] && m.profiles[p][k];
+// 꺼내 쓰기 — pkm에 들어 있는 플러그인끼리는 나눠 쓰고(shared), 다른 데서 받은 플러그인은 자기가 받은 값만
+export function recall(p, name, plugin, trusted = true){
+  const k = norm(name), m = read(), it = k && rememberable(name) && m.profiles[p] && m.profiles[p][k];
   if (!it) return null;
+  if (!(it.from === plugin || (trusted && it.shared !== false))) return null;
   it.used = (it.used || 0) + 1; it.last_used = new Date().toISOString(); write(m);
   return it;
 }

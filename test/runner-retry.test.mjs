@@ -99,6 +99,9 @@ test('목록에서 빠진 지 오래된 대기는 알아서 닫고, 닫은 것�
   assert.equal(r.status, 'canceled'); assert.equal(r.closed_gone, true); assert.match(r.note, /자동으로 닫았어요/);
   await runner.act(P, ID, { type: 'retry', run: rid, step: '확인' }); await runner.tick();
   assert.equal((await run(rid)).status, 'input', '[다시 하기]로 살린다');
+  assert.equal((await run(rid)).closed_gone, undefined);
+  await refresh();
+  assert.equal((await run(rid)).status, 'input', '살린 작업은 빠진 때를 새로 세서 곧바로 다시 닫지 않는다');
 
   await runner.setLocal(P, ID, { features: { close_gone: false } });
   try {
@@ -125,6 +128,10 @@ test('같은 설정은 한 번만 — 비어 있는 플러그인은 다른 플�
   await runner.setLocal(P, 'share-a', { settings: { jira_url: 'https://third.atlassian.net' } });
   b = await local('share-b');
   assert.equal(b.settings.jira_url, 'https://mine.atlassian.net/browse/', '직접 넣은 값은 덮지 않는다'); assert.equal(b.borrowed.jira_url, undefined);
+  // 폼은 모든 칸을 보낸다 — 비운 칸·기본값 칸을 저장해도 계속 빌려 쓴다
+  await runner.setLocal(P, 'share-b', { settings: { jira_url: '', github_api: 'https://github.example.com/api/v3', repos: '' } });
+  await runner.setLocal(P, 'share-a', { settings: { jira_url: 'https://fourth.atlassian.net' } });
+  assert.equal((await local('share-b')).settings.jira_url, 'https://fourth.atlassian.net/browse/', '비운 칸은 다시 빌린다');
   await runner.setLocal(P, 'share-b', { features: { share_settings: false } });
   assert.equal((await local('share-b')).features.share_settings, false);
 });
@@ -204,6 +211,12 @@ test('pkm에 들어 있는 플러그인은 새 버전이 오면 알아서 업데
   older(); fs.appendFileSync(path.join(dir, 'plugin.md'), '\n손으로 고침');   // 설치본을 손으로 고쳤으면 두고 사람이 본다
   await runner.tick();
   assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, '0.0.1');
+  // 다른 컴퓨터가 더 새 버전을 설치해 둔 경우 — 이 앱의 옛 버전으로 되돌리지 않는다
+  const md = path.join(dir, 'plugin.md'), t = fs.readFileSync(md, 'utf8').replace(/version: .+/, 'version: 99.0.0').replace('\n손으로 고침', '');
+  fs.writeFileSync(md, t);
+  const rec = JSON.parse(fs.readFileSync(recF, 'utf8')); rec.version = '99.0.0'; rec.files['plugin.md'] = crypto.createHash('sha256').update(t).digest('hex'); fs.writeFileSync(recF, JSON.stringify(rec));
+  await runner.tick();
+  assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, '99.0.0', '내려가는 업데이트는 하지 않는다');
 });
 
 test('하루 AI 상한 — 넘으면 AI 단계를 내일까지 기다리고 한 번 알린다(끄면 그대로 한다)', async () => {
