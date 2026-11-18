@@ -38,7 +38,13 @@ const att = (name, url, opt, more) => ({ name, url, ...(opt ? { opt } : {}), ...
 const docLinks = (html, base) => links(html, base).filter(l => l.url && (DOC.test(l.url) || DOC.test(l.name))).map(l => att(l.name || l.url.split('/').pop(), l.url));
 const uniq = xs => xs.filter((x, i) => xs.findIndex(y => y.url === x.url && y.opt?.body === x.opt?.body) === i);
 const item = (site, id, o) => ({ source: SITES[site].name, site, key: `${site}:${id}`, title: '', url: '', organizer: '', deadline: '', category: '', ...o });
-const detail = o => ({ text: '', deadline: '', start: '', announce: '', prize: '', eligibility: '', method: '', homepage: '', organizer: '', category: '', attachments: [], ...o });
+const detail = o => ({ text: '', deadline: '', start: '', announce: '', prize: '', eligibility: '', method: '', homepage: '', organizer: '', category: '', attachments: [], images: [], poster: '', ...o });
+// 본문에 든 그림(포스터·요강 그림). 사이트 단추·아이콘은 주소로 거르고, 남은 작은 그림은 받은 뒤 크기로 거른다
+const UI_IMG = /\/(images?|img)\/(btn|icon|sub|common|bg)|\.svg(\?|$)/i;
+const bodyImages = (html, base) => uniq([...String(html || '').matchAll(/<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi)].map(m => abs(m[1], base))
+  .filter(u => /^https?:/i.test(u) && !UI_IMG.test(u)).map(u => att(decode(u.split('/').pop().split('?')[0]) || '그림', u))).slice(0, 6);
+// 대표 포스터(og:image) — 본문에 그림이 없을 때 쓴다
+const ogImage = (html, base) => abs(pick(/<meta\b[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i, html) || pick(/<meta\b[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i, html), base);
 const fail = site => { throw new Error(`모르는 사이트: ${site}`); };
 const nextData = html => JSON.parse(pick(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/, html) || 'null');
 
@@ -90,7 +96,7 @@ const DETAIL = {
       const ix = pick(/fDown\(\s*'?(\d+)/, a), name = pick(/<!--\s*([\s\S]*?)\s*-->/, t) || one(t);
       return ix ? att(name, `${SITES.wevity.base}/common/modules/filedown_contest.php`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: `ix=${ix}` }) : att(name, abs(pick(/href="([^"]*)"/, a), SITES.wevity.base));
     }).filter(x => x.url);
-    return detail({ text: htmlText(body), start, deadline, prize, eligibility: one(byLabel(rs, /응모대상/)),
+    return detail({ text: htmlText(body), images: bodyImages(body, SITES.wevity.base), poster: ogImage(b, SITES.wevity.base), start, deadline, prize, eligibility: one(byLabel(rs, /응모대상/)),
       organizer: one(byLabel(rs, /주최/)).replace(/\s*\/\s*$/, ''), category: one(byLabel(rs, /^분야/)), homepage: links(byLabel(rs, /홈페이지/), SITES.wevity.base)[0]?.url || '',
       attachments: uniq([...files, ...docLinks(body, SITES.wevity.base)]) });
   },
@@ -106,7 +112,7 @@ const DETAIL = {
       const contains = htmlText(pick(/<span class="tooltiptext[^"]*">([\s\S]*?)<\/span>/, cell)).split('\n').map(x => x.replace(/^-\s*/, '').trim()).filter(Boolean);
       return pk && att(`${zipName || name.replace(/\.zip$/i, '')}.zip`, `${SITES.thinkcontest.base}/thinkgood/common/zipfiledown.do?zipfile_nm=${encodeURIComponent(zipName)}&page_gubun=contest&gubun_fk=${pk}`, null, contains.length ? { contains } : {});
     }).filter(Boolean);
-    return detail({ text: htmlText(body), start, deadline, prize: list(/시상금|총상금/) && `${byLabel(rs, /1등/) ? '1등 ' : ''}${list(/시상금|총상금/)}`,
+    return detail({ text: htmlText(body), images: bodyImages(body, SITES.thinkcontest.base), poster: ogImage(b, SITES.thinkcontest.base), start, deadline, prize: list(/시상금|총상금/) && `${byLabel(rs, /1등/) ? '1등 ' : ''}${list(/시상금|총상금/)}`,
       eligibility: list(/참가자격|응모자격/), method: list(/접수방법/), homepage: links(byLabel(rs, /홈페이지/), SITES.thinkcontest.base)[0]?.url || '', organizer: list(/^주최$/), category: list(/응모분야/),
       attachments: uniq([...files, ...docLinks(body, SITES.thinkcontest.base)]) });
   },
@@ -115,7 +121,7 @@ const DETAIL = {
     const area = pick(/<div class="view_detail_area">([\s\S]*?)<!-- \/\/세부요강 -->/, b), box = pick(/<div class="attachments">([\s\S]*?)<\/div>/, area);
     const body = area.replace(/<div class="attachments">[\s\S]*?<\/div>/, '').replace(/<h2 class="tip\d"[\s\S]*?<\/h2>/g, '').replace(/<p class="tip_box\d"[\s\S]*?<\/p>/g, '');
     const files = links(box, `${SITES.contestkorea.base}/sub/`).filter(l => l.url).map(l => att(l.name, l.url));
-    return detail({ text: htmlText(body), start, deadline, announce: ymd(byLabel(rs, /발표/)), prize: one(byLabel(rs, /시상/)), eligibility: one(byLabel(rs, /참가대상|응모대상/)).replace(/\s*,\s*/g, ', ').replace(/,\s*$/, ''),
+    return detail({ text: htmlText(body), images: bodyImages(body, `${SITES.contestkorea.base}/sub/`), poster: ogImage(b, SITES.contestkorea.base), start, deadline, announce: ymd(byLabel(rs, /발표/)), prize: one(byLabel(rs, /시상/)), eligibility: one(byLabel(rs, /참가대상|응모대상/)).replace(/\s*,\s*/g, ', ').replace(/,\s*$/, ''),
       method: one(byLabel(rs, /접수방법/)), homepage: links(byLabel(rs, /홈페이지/) || byLabel(rs, /접수하기/), SITES.contestkorea.base)[0]?.url || '',
       organizer: one(byLabel(rs, /주최/)), category: one(byLabel(rs, /분야/)), attachments: uniq([...files, ...docLinks(body, SITES.contestkorea.base)]) });
   },
@@ -124,7 +130,7 @@ const DETAIL = {
     const a = ref(Object.entries(st.ROOT_QUERY || {}).find(([k]) => k.startsWith('activity('))?.[1]), names = xs => (xs || []).map(x => ref(x).name).filter(Boolean).join(', ');
     const prize = (a.integers || []).map(ref).map(i => { const t = ref(i.type); return i.integer && `${t.name || ''} ${i.integer}${t.unit || ''}`.trim(); }).filter(Boolean).join(' · ');
     const files = (a.files || []).map(ref).filter(f => f.url && ref(f.type).name !== '썸네일');
-    return detail({ text: htmlText(ref(a.detailText).text), start: kst(a.recruitStartAt), deadline: kst(a.recruitCloseAt), prize, eligibility: names(a.targets), method: names(a.applyTypes),
+    return detail({ text: htmlText(ref(a.detailText).text), images: bodyImages(ref(a.detailText).text, SITES.linkareer.base), poster: ogImage(b, SITES.linkareer.base), start: kst(a.recruitStartAt), deadline: kst(a.recruitCloseAt), prize, eligibility: names(a.targets), method: names(a.applyTypes),
       homepage: a.homepageURL || (/^https?:\/\//.test(a.applyDetail || '') ? a.applyDetail : ''), organizer: a.organizationName || '', category: names(a.categories),
       attachments: uniq([...files.map(f => att(f.filename || ref(f.type).name || 'file', f.url, null, ref(f.type).name ? { label: ref(f.type).name } : {})), ...docLinks(ref(a.detailText).text, SITES.linkareer.base)]) });
   },
@@ -225,6 +231,21 @@ export async function fetchHomeAttachments(pageUrl, { fetchText = defaultFetchTe
   const list = parseHomeAttachments(await fetchText(url), url).filter(a => isPublicUrl(a.url));
   for (const a of list) if (!(await robotsOk(a.url, fetchText))) a.blocked = true;
   return list;
+}
+
+// 주최 홈페이지 공고의 글 — 요강 본문이 짧을 때 AI가 함께 읽는다. robots.txt가 막았거나 내부 주소면 빈 글
+export async function fetchPageText(pageUrl, { fetchText = defaultFetchText, max = 6000 } = {}){
+  const url = noHash(pageUrl);
+  if (!isPublicUrl(url) || !(await robotsOk(url, fetchText))) return '';
+  return pageText(await fetchText(url), max);
+}
+// 공고 본문만 — 머리말·메뉴·꼬리말을 걷어내고, 짧은 메뉴 줄을 빼고, '공모·접수·응모' 같은 말이 처음 나오는 곳부터
+const CHROME = /<(header|nav|footer|aside)\b[\s\S]*?<\/\1>|<(div|ul|section)\b[^>]*(?:id|class)=["'][^"']*\b(gnb|lnb|snb|menu|nav|header|footer|sitemap|quick|skip)[^"']*["'][^>]*>[\s\S]*?<\/\2>/gi;
+export function pageText(html, max = 6000){
+  const body = pick(/<body\b[^>]*>([\s\S]*)<\/body>/i, String(html || '')) || String(html || '');
+  const lines = htmlText(body.replace(CHROME, ''), 60000).split('\n').filter(l => l.length > 2 && !(/^-\s/.test(l) && l.length <= 22) && !/^[\d\s.:\/~()-]+$/.test(l));   // 메뉴 줄·숫자와 날짜뿐인 줄(게시판 목록)은 뺀다
+  const at = lines.findIndex(l => /공모|응모|접수|시상|상금|모집/.test(l));
+  return lines.slice(Math.max(0, at - 2)).join('\n').replace(/\n{3,}/g, '\n\n').slice(0, max);
 }
 
 // 페이지 안의 구글 폼·네이버 폼 주소(링크와 글 어디에 있든). 요강에 폼 주소가 빠진 공모전의 접수 폼을 찾을 때 쓴다 — 어느 폼이 이 공모전 것인지는 부르는 쪽이 가린다

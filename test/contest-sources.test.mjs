@@ -59,6 +59,20 @@ test('사이트별 상세 표의 값을 그대로 옮긴다', () => {
   assert.ok(l.attachments.every(a => a.url.startsWith('https://')));
 });
 
+test('요강 그림: 본문 그림은 절대 주소로, 사이트 단추·아이콘은 빼고, 대표 포스터(og:image)는 따로', () => {
+  const w = S.parseDetail('wevity', read('wevity-detail.html'));
+  assert.deepEqual(w.images.map(i => i.url), ['https://www.wevity.com/upload/contest/20261104124816_b38fe06a.png']);
+  assert.equal(w.images[0].kind, 'image');
+  assert.equal(w.poster, 'https://www.wevity.com/upload/contest/20261104174332_77bbfa53.jpg');
+  const t = S.parseDetail('thinkcontest', read('thinkcontest-detail.html'));
+  assert.deepEqual(t.images, []);
+  assert.match(t.poster, /^https:\/\/www\.thinkcontest\.com(:443)?\/thinkgood\/common\/display\.do\?filepath=contest_poster\/image\/&filename=\w+\.png$/, '&amp;는 풀어서');
+  assert.match(S.parseDetail('contestkorea', read('contestkorea-detail.html')).poster, /^http:\/\/www\.contestkorea\.com\/admincenter\/files\/meet\/\d+\.jpg$/);
+  assert.deepEqual(S.parseDetail('linkareer', read('linkareer-detail.html')).images.map(i => i.url), ['https://media-cdn.linkareer.com/se2editor/image/980009', 'https://media-cdn.linkareer.com/se2editor/image/980010']);
+  const ck = S.parseDetail('contestkorea', '<div class="view_detail_area"><img src="/img/sub/online2.png"><img src="../admincenter/files/meet/1.jpg"><img src="data:image/png;base64,AAAA"><img src="/x/logo.svg"><!-- //세부요강 -->');
+  assert.deepEqual(ck.images.map(i => i.url), ['https://www.contestkorea.com/admincenter/files/meet/1.jpg']);
+});
+
 test('목록 요청은 사이트마다 페이지 수만큼, 같은 글은 한 번만', async () => {
   for (const site of Object.keys(S.SITES)) assert.equal(S.listUrls(site, 2).length, 2);
   assert.throws(() => S.listUrls('nope'));
@@ -213,6 +227,14 @@ Allow: /board/view.gyeong?boardId=BBS_0000060&menuCd=DOM_000000135002001000*
 #Disallow: /tour.gyeongnam.go.kr/
 `;
 const UA = 'pkm-contest-apply/0.1 (personal use)';
+
+test('fetchPageText: 공고 글을 읽되 robots.txt가 막았거나 내부 주소면 요청하지 않는다', async () => {
+  const calls = [], stub = robots => async url => { calls.push(url); if (url.endsWith('/robots.txt')) return robots; return '<html><head><title>x</title><script>a()</script></head><body><div>네이밍 공모</div><p>접수: <b>naming@city.go.kr</b></p></body></html>'; };
+  assert.equal(await S.fetchPageText('https://www.city.go.kr/notice/1#top', { fetchText: stub('') }), '네이밍 공모\n접수: naming@city.go.kr');
+  assert.equal(await S.fetchPageText('https://www.block.go.kr/notice/1', { fetchText: stub('User-agent: *\nDisallow: /notice') }), '');
+  assert.ok(!calls.includes('https://www.block.go.kr/notice/1'), '막힌 공고는 받지 않는다');
+  assert.equal(await S.fetchPageText('http://192.168.0.1/a', { fetchText: stub('') }), '');
+});
 
 test('robotsAllowed: 가장 길게 맞는 규칙이 이기고, 우리 이름의 묶음이 * 묶음보다 먼저', () => {
   const ok = (txt, p) => S.robotsAllowed(txt, UA, p);

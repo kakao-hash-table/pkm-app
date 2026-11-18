@@ -43,7 +43,7 @@ export function normalizeFit(a){
   return { note: str(a && a.note, 300), contests: list.map(c => {
     const how = cut(c.submit_how, 120), to = str(c.submit_to, 300);
     return {
-      i: Number.isInteger(c.i) ? c.i : -1, unreadable: c.unreadable === true, doubt: cut(c.doubt, 30),
+      i: Number.isInteger(c.i) ? c.i : -1, unreadable: c.unreadable === true, doubt: cut(c.doubt, 30), seen: text(c.image_text, 1500),
       target: c.is_target === true, target_why: cut(c.target_why, 40),
       kinds: (Array.isArray(c.kinds) ? c.kinds : []).map(k => str(k, 20)).filter(Boolean).slice(0, 4),
       prize: { text: cut(c.prize_text, 120), total: int(c.prize_total), first: int(c.prize_first), goods: c.first_is_goods === true,
@@ -87,8 +87,9 @@ export function normalizeFormPlan(a, form, nCands){
 
 // 브라우저 에이전트가 돌려준 제출 결과 — 낸 것이 확실할 때만 yes. 모르는 값은 unknown(냈다고 적지 않는다)
 export function normalizeBrowse(a){
-  const r = (a && a._result) || a || {};
+  const r = (a && a._result) || a || {}, fd = r.found && typeof r.found === 'object' ? r.found : {};
   return { sent: ['yes', 'no'].includes(r.sent) ? r.sent : 'unknown', reason: str(r.reason, 300), proof: text(r.proof, 500),
+    found: { method: ['site', 'form', 'email', 'post', 'visit', 'etc'].includes(fd.method) ? fd.method : '', to: str(fd.to, 300), how: cut(fd.how, 120) },
     did: (Array.isArray(r.did) ? r.did : []).map(x => str(x, 120)).filter(Boolean).slice(0, 20),
     need: (Array.isArray(r.need) ? r.need : []).map(x => typeof x === 'string' ? { name: x } : x || {}).map(x => ({ name: str(x.name, 30).replace(/[{}:：]/g, '').trim(), question: str(x.question, 160),
       options: (Array.isArray(x.options) ? x.options : []).map(o => str(o, 60)).filter(Boolean).slice(0, 20) })).filter((x, i, a) => x.name && a.findIndex(y => y.name === x.name) === i).slice(0, 12) };   // 양식이 요구했는데 없던 응모자 정보 이름

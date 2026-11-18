@@ -7,6 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { readBlocks, editBlocks } from './hwp.mjs';
+import { execFile } from 'node:child_process';
+
+// PDF 글 — macOS의 PDFKit(osascript)로 뽑는다(요강·계획서 첨부를 AI가 읽게). 다른 OS·스캔한 PDF는 빈 글
+const PDF_JS = 'function run(a){ ObjC.import("PDFKit"); const d = $.PDFDocument.alloc.initWithURL($.NSURL.fileURLWithPath(a[0])); return d.isNil() ? "" : ObjC.unwrap(d.string) || ""; }';
+export const pdfText = file => process.platform !== 'darwin' ? Promise.resolve('') : new Promise(ok => execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', PDF_JS, path.resolve(file)], { timeout: 30000, maxBuffer: 8 << 20 }, (e, out) => ok(e ? '' : String(out).trim())));
 
 const NOT_DOC = '이 양식은 .hwp·.hwpx가 아니라 직접 채워야 해요';
 const BROKEN = '양식을 읽지 못했어요. 파일이 깨졌을 수 있으니 원본을 다시 받아 주세요';

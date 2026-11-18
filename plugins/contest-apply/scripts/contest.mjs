@@ -3,7 +3,7 @@
 // 목록(피드)
 //   find-list --sites=켬,켬,켬,켬 · open-list · sent-list · out-list
 // 워크플로우
-//   find --sites [--limit]                 사이트 목록·상세 → 새 공모전 저장, AI에게 줄 요강(_pages)
+//   find --sites [--limit]                 사이트 목록·상세 → 새 공모전 저장, AI에게 줄 요강(_pages)과 요강 그림(_images — 이 컴퓨터의 .cache에만)
 //   sort-out --keys --fit --seen --left --sites --failed   AI 정리 → 상금·낼 것·조건·발표일, 낼 것/뺀 것으로 나누기
 //   prep --cid [--answer=regen]            양식 문서(.hwp·.hwpx) 받아 두기, AI 안이 있으면 건너뛰게(need_ai)
 //   papers --cid --draft · info --cid --plan --me [--answer] · fill --cid --me   양식 읽기 → (AI 계획) → 모자란 내용 묻기 → 채우기
@@ -20,6 +20,7 @@ import * as E from './engine.mjs';
 import * as S from './sources.mjs';
 import * as M from './mail.mjs';
 import * as F from './forms.mjs';
+import * as I from './images.mjs';
 import os from 'node:os';
 import crypto from 'node:crypto';
 
@@ -64,7 +65,9 @@ const SEND = { email: '이메일로 내요', form: '구글 폼으로 내요', nf
 const item = c => ({ id: c.key, title: titleOf(c.title), url: c.url, at: c.added, vars: { cid: c.key }, sort: E.sortOf(c),
   version: `${c.fit ? 'f' : ''}${c.draft ? `d${c.draft.at}` : ''}${c.submitted ? 's' : ''}${c.result || ''}` });
 // 제출 화면이 달라지는 값만 — 날짜(D-day)·접수 방법·접수처·메일 계정. 이 값이 바뀌면 기다리던 '냈나요?'를 새로 묻는다(reask). AI 안처럼 실행이 스스로 바꾸는 값은 넣지 않는다
-const ver = (c, db) => crypto.createHash('sha1').update(['8', TODAY, c.fit.submit.method, c.fit.submit.to, mailReady(c.fit) ? 'm' : '', c.refit_at || '', FULL ? 'auto' : '', ...Object.keys(FORM).filter(k => tested(db, k))].join('|')).digest('hex').slice(0, 12);
+// 모자란 정보 중 지금 채울 수 있게 된 것 — '알려 줄 정보'에서 답하면 version이 바뀌어 기다리던 단계가 다시 돈다(reask)
+const needSig = (c, me) => (c.need || []).map(n => (knownOf(me, n.name) || readJSON(ANSWERS(c), {})[n.name] || (c.skipped || []).includes(n.name) ? '1' : '0')).join('');
+const ver = (c, db, me = []) => crypto.createHash('sha1').update([needSig(c, me), '8', TODAY, c.fit.submit.method, c.fit.submit.to, mailReady(c.fit) ? 'm' : '', c.refit_at || '', FULL ? 'auto' : '', ...Object.keys(FORM).filter(k => tested(db, k))].join('|')).digest('hex').slice(0, 12);
 const aiTop = c => c.draft ? c.draft.items.slice(0, Math.min(c.fit ? c.fit.submit.allow : 1, c.draft.items.length)) : [];   // AI가 추천한 안(응모 건수만큼)
 // 낼 안 — 내가 골랐으면 그것, 아니면 AI 추천
 const top = c => { const it = c.draft ? c.draft.items : [], p = (c.picks || []).filter(i => it[i]); return p.length ? p.map(i => it[i]) : aiTop(c); };
@@ -77,19 +80,19 @@ function findList(){
     meta: [...(stats ? [`제출 방식 · ${stats}`] : []), sent ? `낸 것 ${sent} · 당선 ${won}` : '아직 낸 것 없음', ...(off.length ? [`${off.join('·')} 꺼 둠`] : [])] }] };
 }
 function openList(){
-  const db = load();
+  const db = load(), me = meOf();
   if (E.mergeDups(all(db).filter(c => !c.deadline || c.deadline >= TODAY))) save(db);   // 전에 가져온 기록의 중복도 여기서 하나로
   const list = all(db).filter(c => st(c) === 'ready').sort(byDate('deadline'));
   return { items: list.map(c => {
     const f = c.fit, n = E.ddays(c.deadline, TODAY), d = [];
-    if (f.unreadable) d.push({ who: '요강', text: '요강이 그림이라 읽지 못했어요. 원문에서 낼 것과 조건을 확인해 주세요' });
+    if (f.unreadable) d.push({ who: '요강', text: browsable(c) ? '요강을 다 읽지 못했어요. [제출 준비]를 누르면 AI가 공고 화면을 직접 읽고 내요' : '요강을 다 읽지 못했어요. 다음 찾기 때 첨부·주최 홈페이지까지 한 번 더 읽어요' });
     else d.push({ who: '요강', text: [
       `낼 것 · ${f.submit.what || '요강 확인'}${f.submit.allow > 1 ? ` · 1인 ${f.submit.allow}건까지` : ''}`,
       `조건 · ${f.eligibility.text || '요강에 없음'} → ${E.verdictWord(f.eligibility.ok)}${f.eligibility.why && !(f.eligibility.ok === 'yes' && /제한\s*없|누구나|전\s*국민|국민 누구/.test(f.eligibility.why)) ? `(${f.eligibility.why})` : ''}`,
-      ...(aiLine(f) ? [`AI · ${aiLine(f)}`] : []), ...(f.submit.note ? [`양식 · ${f.submit.note}`] : []), ...(f.doubt ? [`확인 · ${f.doubt} — 원문을 봐 주세요`] : [])].join('\n') });
+      ...(aiLine(f) ? [`AI · ${aiLine(f)}`] : []), ...(f.submit.note ? [`양식 · ${f.submit.note}`] : []), ...(f.doubt ? [`확인 · ${f.doubt}${c.reread_at ? '' : ' — 다음 찾기 때 첨부·홈페이지까지 다시 읽어요'}`] : [])].join('\n') });
     if (c.draft) d.push({ who: `AI 안 ${c.draft.items.length}개 · 추천 ${aiTop(c).length}`, text: E.cut(E.names(c.draft), 120) });
     const flag = n === 0 ? '오늘 마감' : f.ai && f.ai.rule === 'banned' ? 'AI 작품 제한' : f.eligibility.ok === 'unsure' ? '조건 확인' : f.unreadable || f.doubt ? '요강 확인' : '';
-    return { ...item(c), version: ver(c, db), tags: [E.kindLabel(f), mailReady(f) ? '메일로 바로 보내기' : SEND[f.submit.method] ? E.METHODS[f.submit.method] : '방식 확인', c.draft ? '' : 'AI 안 없음', flag, c.mail_sending || (c.formed && !c.formed.sure) ? '제출 확인 필요' : c.sited && c.sited.sent !== 'yes' ? (c.sited.sent === 'unknown' ? '제출 확인 필요' : '브라우저 제출 멈춤') : ''].filter(Boolean),
+    return { ...item(c), version: ver(c, db, me), tags: [E.kindLabel(f), mailReady(f) ? '메일로 바로 보내기' : SEND[f.submit.method] ? E.METHODS[f.submit.method] : '방식 확인', c.draft ? '' : 'AI 안 없음', flag, c.mail_sending || (c.formed && !c.formed.sure) ? '제출 확인 필요' : c.sited && c.sited.sent !== 'yes' ? (c.sited.sent === 'unknown' ? '제출 확인 필요' : '브라우저 제출 멈춤') : ''].filter(Boolean),
       meta: [...(c.sited && c.sited.sent !== 'yes' && c.sited.reason ? [`멈춘 이유 · ${E.cut(c.sited.reason, 90)}`] : []), E.prizeLine(f), E.deadlineLine(c.deadline, TODAY), E.announceLine(f, TODAY), host(c)].filter(Boolean), detail: d };
   }) };
 }
@@ -101,15 +104,98 @@ function proofOf(c){
   if (c.sited && c.sited.sent === 'yes') return [{ who: '증거 · 접수 화면', text: `${kst(c.sited.at)} · ${c.sited.proof || '완료 화면을 봄'}` }];
   return [{ who: '증거', text: '직접 냈다고 적은 것이에요(프로그램이 확인한 증거는 없어요)' }];
 }
+// 사후 추적 — 낸 공모전의 발표일이 오면 한 번 알린다(오래 지난 것은 알리지 않고 표시만)
+function announceDue(db, list){
+  const due = list.filter(c => c.fit && c.fit.announce && c.fit.announce <= TODAY && !c.announce_told);
+  if (!due.length) return null;
+  for (const c of due) c.announce_told = TODAY;
+  save(db);
+  const fresh = due.filter(c => E.ddays(c.fit.announce, TODAY) >= -3);
+  return fresh.length ? { title: fresh.length === 1 ? `오늘 발표 · ${titleOf(fresh[0].title)}` : `발표일이 된 공모전 ${fresh.length}개`,
+    text: `${fresh.length > 1 ? `${fresh.map(c => titleOf(c.title)).join(' · ')} — ` : ''}주최 홈페이지·메일에서 결과를 확인하고 '결과 기다리는 공모전'에서 [결과 적기]를 눌러 주세요` } : null;
+}
 function sentList(){
   const db = load(), list = all(db).filter(c => st(c) === 'submitted').sort((a, b) => (E.sortOf(a).announce || '9999').localeCompare(E.sortOf(b).announce || '9999'));
-  return { items: list.map(c => {
+  const notify = announceDue(db, list);
+  return { ...(notify ? { notify } : {}), items: list.map(c => {
     const f = c.fit, past = f && f.announce && f.announce < TODAY, sent = c.sent_names && c.sent_names.length ? c.sent_names : top(c).map(x => x.text);
     return { ...item(c), tags: [f ? E.kindLabel(f) : '', past ? '발표 지남' : ''].filter(Boolean),
       meta: [E.announceLine(f, TODAY, true), E.prizeLine(f), `${E.kday(c.submitted.slice(0, 10))}에 냄`, host(c)].filter(Boolean),
       detail: [...(sent.length ? [{ who: '낸 안', text: sent.join(' · ') }] : []), ...proofOf(c)] };
   }) };
 }
+/* ---------- 알려 줄 정보: 여러 공모전에서 모자란 내 정보를 한 곳에서 한 번만 묻는다 ---------- */
+// 같은 정보는 하나로 — '응모자 주소'·'주소'처럼 같은 뜻 칸(KIND)이면 한 줄
+function needGroups(db, me){
+  const groups = new Map();
+  for (const c of all(db)){
+    if (st(c) !== 'ready' || c.submitted) continue;
+    const ans = readJSON(ANSWERS(c), {});
+    for (const n of c.need || []){
+      if (!keepMine(n.name) || knownOf(me, n.name) || ans[n.name] || (c.skipped || []).includes(n.name)) continue;
+      const name = kindOf(n.name) || n.name, k = loose(name), g = groups.get(k) || { name, names: new Set(), questions: new Set(), options: new Set(), cs: [] };
+      g.names.add(n.name); if (n.question) g.questions.add(n.question); for (const o of n.options || []) g.options.add(o);
+      if (!g.cs.includes(c)) g.cs.push(c);
+      groups.set(k, g);
+    }
+  }
+  return [...groups.values()].sort((a, b) => b.cs.length - a.cs.length || (a.cs[0].deadline || '9999').localeCompare(b.cs[0].deadline || '9999'));
+}
+function needList(){
+  const db = load(), me = meOf();
+  return { items: needGroups(db, me).map(g => ({ id: `need-${sha(loose(g.name)).slice(0, 10)}`, title: g.name, vars: { key: g.name }, version: String(g.cs.length),
+    tags: [`공모전 ${g.cs.length}개`], meta: [E.deadlineLine(g.cs.map(c => c.deadline).filter(Boolean).sort()[0], TODAY)],
+    detail: [{ who: '쓰는 곳', text: g.cs.map(c => titleOf(c.title)).join(' · ') }, ...(g.questions.size ? [{ who: '묻는 말', text: [...g.questions].slice(0, 3).join('\n') }] : []), ...(g.options.size ? [{ who: '보기', text: [...g.options].slice(0, 12).join(' / ') }] : [])] })) };
+}
+function needAnswer(){
+  const key = String(args.key || '').trim() || fail('어느 정보인지 몰라요. 목록을 새로 고쳐 주세요');
+  const db = load(), me = meOf(), g = needGroups(db, me).find(x => loose(x.name) === loose(key));
+  const a = blank(args.answer) ? '' : String(args.answer).trim();
+  if (!a){
+    if (!g) return { summary: '이미 채워졌어요', done: true };
+    const opts = [...g.options].slice(0, 12);
+    return { summary: `${key} 묻기`, verdict: { tone: 'ok', title: `${key} — 공모전 ${g.cs.length}개에 필요해요`, text: g.cs.map(c => titleOf(c.title)).join(' · ') },
+      ask: { question: [...g.questions][0] || `${key}을(를) 알려 주세요`, free: true, placeholder: key,
+        hint: `한 번 적으면 내 정보로 기억해서 지금 기다리는 공모전 ${g.cs.length}개와 다음 공모전에 모두 써요. '내 정보'에서 고치거나 지울 수 있어요. AI에게는 보내지 않아요`,
+        choices: [...opts.map(o => ({ value: `opt:${o}`, label: o })), { value: 'skip', label: '알려 주지 않을래요', hint: '그 칸을 비워 두고 이어서 해요' }] } };
+  }
+  const cs = g ? g.cs : [];
+  if (a === 'skip'){
+    for (const c of cs){ c.skipped = [...new Set([...(c.skipped || []), ...(c.need || []).filter(n => loose(kindOf(n.name) || n.name) === loose(key)).map(n => n.name)])]; delete c.filled; }
+    save(db);
+    return { summary: `${key} · 비워 두기`, ...refreshLists() };
+  }
+  const v = a.replace(/^opt:/, '').slice(0, 400), kept = readKept();
+  remember(kept, {}, key, v); writeLocal(KEPT, kept); noteGot([key]);
+  for (const c of cs) delete c.filled;   // 새 값으로 서류를 다시 채운다
+  save(db);
+  return { summary: `${key} 기억 · 공모전 ${cs.length}개가 이어서 해요`, ...refreshLists() };
+}
+// 내 정보 — 기억한 것을 한 곳에서 보고 고친다. 값은 실행 기록·목록 상태(동기화됨)에 남기지 않게 첫 글자만 보인다
+const masked = v => { const t = String(v); return t.length <= 1 ? '*' : `${t[0]}${'*'.repeat(Math.min(t.length - 1, 6))} (${t.length}자)`; };
+function meList(){
+  const set = new Map(String(args.me || '').split('\n').map(l => l.split('\t').map(x => x.trim())).filter(([a, b]) => a && b)), kept = readKept(), k = kept.제출용, got = readJSON(GOT(), {}).제출용 || {};
+  const keys = [...new Set([...set.keys(), ...Object.keys(k).filter(x => k[x])])];
+  return { items: [...keys.map(key => ({ id: `me-${sha(key).slice(0, 10)}`, title: key, vars: { key },
+    tags: [set.has(key) ? '설정에 적음' : '내 정보', ...(BANK.test(key) ? ['요구할 때만 메일에'] : [])], meta: [masked(set.get(key) || k[key]), got[key] ? `${E.kday(got[key])}에 받음` : ''].filter(Boolean) })),
+    ...factsOf().map(([key, v]) => ({ id: `me-${sha(key).slice(0, 10)}`, title: key, vars: { key }, tags: ['고른 답'], meta: [E.cut(v, 40), got[key] ? `${E.kday(got[key])}에 받음` : ''].filter(Boolean) }))] };
+}
+function meEdit(){
+  const key = String(args.key || '').trim() || fail('어느 정보인지 몰라요. 목록을 새로 고쳐 주세요');
+  const inSet = String(args.me || '').split('\n').some(l => { const [a, b] = l.split('\t').map(x => x.trim()); return a === key && b; });
+  if (inSet) return { summary: '설정에 적힌 값', verdict: { tone: 'ok', title: `${key}${eun(key)} 설정에 적혀 있어요`, text: "플러그인 '준비와 설정'의 '제출용 내 정보'에서 고치거나 지워 주세요. 설정에 적은 값이 먼저예요" } };
+  const a = blank(args.answer) ? '' : String(args.answer).trim(), kept = readKept();
+  if (!a) return { summary: `${key} 고치기`, ask: { question: `${key}을(를) 무엇으로 바꿀까요?`, free: true, placeholder: key, hint: '새 값을 적으면 다음 공모전부터 그 값으로 채워요. 이미 낸 공모전은 바뀌지 않아요',
+    choices: [{ value: 'delete', label: '지우기', confirm: `${key}${eun(key)} 지우면 필요할 때 다시 물어요` }] } };
+  if (a === 'delete'){ delete kept.제출용[key]; delete kept.답[key]; } else { remember(kept, {}, key, a.slice(0, 400)); noteGot([key]); }
+  writeLocal(KEPT, kept);
+  return { summary: a === 'delete' ? `${key} 지움` : `${key} 고침`, ...refreshLists() };
+}
+// 설정을 바꾸지 않은 채 목록만 다시 가져오게 — 완전 자동화 칸을 그대로 다시 적는다(값이 같아도 다시 가져온다)
+const refreshLists = () => ({ settings_patch: { full_auto: FULL } });
+// 적은 값은 실행 기록에서 지운다(설정과 내 데이터에만 남는다)
+const needDone = () => ({ summary: '기억했어요', forget: ['적기'] });
+const meDone = () => ({ summary: '정리했어요', forget: ['고치기'] });
 function outList(){
   const db = load(), list = all(db).filter(c => ['out', 'dropped'].includes(st(c)) && (!c.deadline || c.deadline >= TODAY)).sort(byDate('deadline'));
   return { items: list.slice(0, 60).map(c => {
@@ -128,6 +214,48 @@ async function altDetail(c){
     try { return { source: a.source, d: await S.fetchDetail({ site: site(a), url: a.url }) }; } catch { /* 다음 사이트로 */ }
   }
   return null;
+}
+// 요강 그림 — 본문이 짧거나(포스터뿐) 전에 그림이라 못 읽은 공모전만 AI에게 그림도 보인다. 그림 조각은 한 번에 SHOT_MAX장, 공모전마다 SHOT_EACH장까지
+const SHOT_MAX = 20, SHOT_EACH = 6, THIN = 1000;
+const shotDir = () => path.join(STORE, '.cache', '요강그림');   // 동기화하지 않는 이 컴퓨터만의 자리 — 찾을 때마다 비운다
+const thin = d => E.text(d.text, THIN + 1).length <= THIN;
+const unsureFit = f => !!(f.unreadable || f.doubt);   // 다 못 읽었거나 앞뒤가 안 맞는 요강 — 사람에게 원문을 보라고 하지 않고 한 번 더 깊이 읽는다
+const shotsWanted = (c, d) => (c.fit ? unsureFit(c.fit) : thin(d)) && !!((d.images || []).length || (d.attachments || []).some(a => a.kind === 'image') || d.poster);
+// 깊이 읽기 — 첨부 요강(hwp·hwpx)과 주최 홈페이지 공고 글. 본문이 짧거나, 다 못 읽었거나, 접수 방법을 모를 때만(한 번에 DEEP_MAX자까지)
+const DEEP_MAX = 30000, DEEP_EACH = 5000;
+const READABLE = /\.(hwpx?|pdf)$/i;
+async function deepOf(c, d, o = {}){
+  const out = [], D = await docsLib().catch(() => null), dir = path.join(STORE, '.cache', '요강첨부');
+  const home = E.urlOf(String(d.homepage || o.homepage || c.homepage || '').split('#')[0]), web = home && !F.kindOf(home) ? home : '';
+  // 첨부 요강·계획서를 먼저(가장 자세하다), 주최 홈페이지 글은 남는 자리에 — 모음 사이트의 첨부, 없으면 주최 공고의 첨부(robots.txt가 막은 것은 받지 않는다)
+  let files = (d.attachments || []).filter(a => READABLE.test(a.name || ''));
+  if (!files.length && web) files = (await S.fetchHomeAttachments(web).catch(() => [])).filter(a => !a.blocked && READABLE.test(a.name || ''));
+  files.sort((a, b) => /요강|계획|공고|안내/.test(b.name) - /요강|계획|공고|안내/.test(a.name));   // 요강·계획서를 신청서보다 먼저
+  for (const [i, a] of files.slice(0, 2).entries()){
+    try {
+      const got = await S.fetchFile(a), ext = (path.extname(got.name || a.name) || '').toLowerCase(), f = path.join(dir, `${base(c)}-${i + 1}${ext}`);
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); fs.writeFileSync(f, got.bytes);
+      const t = E.text(ext === '.pdf' ? await D.pdfText(f) : (await D.readDoc(f)).text, 2500);
+      if (t.length > 40) out.push(`첨부 「${E.cut(a.name, 40)}」:\n${t}`);
+    } catch { /* 못 받거나 못 읽는 첨부는 건너뛴다 */ }
+  }
+  const room = DEEP_EACH - out.join('\n\n').length;
+  if (web && room > 300) try { const t = E.text(await S.fetchPageText(web), Math.min(room - 60, out.length ? 1200 : 2500)); if (t.length > 80) out.push(`주최 홈페이지(${hostOf(web)}) 글:\n${t}`); } catch { /* 닿지 않으면 건너뛴다 */ }
+  return E.text(out.join('\n\n'), DEEP_EACH);
+}
+async function shotsOf(c, d, room){
+  const cands = [...(d.images || []), ...(d.attachments || []).filter(a => a.kind === 'image')], seen = new Set(), out = [];
+  if (!cands.length && d.poster) cands.push({ name: '포스터', url: d.poster });
+  for (const a of cands.slice(0, 6)){
+    if (out.length >= room) break;
+    try {
+      const got = await S.fetchFile(a), hash = crypto.createHash('sha1').update(got.bytes).digest('hex');
+      if (seen.has(hash)) continue;
+      seen.add(hash);
+      out.push(...await I.cut(got.bytes, shotDir(), `${base(c)}-${seen.size}`, { max: Math.min(SHOT_EACH, room - out.length) }));
+    } catch { /* 못 받은 그림은 건너뛴다 */ }
+  }
+  return out.slice(0, room);
 }
 async function find(){
   const keys = sitesOn(args.sites), limit = Math.max(1, Math.min(30, Number(args.limit) || 20));
@@ -148,34 +276,61 @@ async function find(){
     known.push(db.contests[c.key]);
   }
   // 요강을 아직 정리하지 못한 것(새것 + 지난번 AI가 멈춘 것)을 마감이 가까운 순으로 limit개.
-  // 자리가 남으면 접수 방법·접수처를 모르는 낼 공모전도 다른 사이트 요강과 함께 한 번 더 읽힌다(이메일 접수인지 알아내려고)
+  // 자리가 남으면 그림이라 못 읽은 낼 공모전은 그림과 함께 한 번 더(reread), 접수 방법·접수처를 모르는 낼 공모전은 다른 사이트 요강과 함께 한 번 더 읽힌다(이메일 접수인지 알아내려고)
   const wait = known.filter(c => !c.fit && (!c.deadline || c.deadline >= TODAY)).sort(byDate('deadline'));
-  const again = known.filter(c => c.fit && !c.refit_at && !c.dup_of && st(c) === 'ready' && E.weak(c.fit) && (c.also || []).length).sort(byDate('deadline'));
-  const todo = [...wait, ...again].slice(0, limit), pages = [];
+  const reread = known.filter(c => c.fit && unsureFit(c.fit) && !c.reread_at && !c.dup_of && !c.submitted && st(c) === 'ready').sort(byDate('deadline'));
+  const again = known.filter(c => c.fit && !unsureFit(c.fit) && !c.refit_at && !c.dup_of && st(c) === 'ready' && E.weak(c.fit) && (c.also || []).length).sort(byDate('deadline'));
+  const todo = [...wait, ...reread, ...again].slice(0, limit), pages = [], images = [];
+  let later = 0, deepUsed = 0;
+  fs.rmSync(path.join(STORE, '.cache'), { recursive: true, force: true });
   for (const c of todo){
     try {
       const d = await S.fetchDetail(c);
+      // 그림 — 자리가 없으면 다음 찾기로 미룬다(마감이 이틀 안이면 글만으로)
+      let shots = [];
+      if (shotsWanted(c, d)){
+        if (images.length < SHOT_MAX) shots = await shotsOf(c, d, SHOT_MAX - images.length);
+        else if (!c.fit && (!c.deadline || E.ddays(c.deadline, TODAY) > 2)){ later++; continue; }
+      }
       // 같이 올라온 다른 사이트의 요강 — 위비티는 접수 방법 칸이 없어서, 그 칸이 있는 사이트 것을 함께 읽힌다
       const alt = (c.also || []).length && (c.fit || c.site === 'wevity' || !d.method) ? await altDetail(c) : null, o = alt ? alt.d : {};
+      let deep = '';
+      if ((c.fit ? unsureFit(c.fit) || E.weak(c.fit) : thin(d)) && deepUsed < DEEP_MAX){ deep = await deepOf(c, d, o); deepUsed += deep.length; }
+      if (c.fit && unsureFit(c.fit) && !shots.length && !deep){ if (images.length < SHOT_MAX && deepUsed < DEEP_MAX) c.reread_at = AT; continue; }   // 다시 읽어도 새로 볼 것이 없다
+      if (deep) c.extra = deep;
       if (!c.deadline && d.deadline) c.deadline = E.day(d.deadline);
       if (d.organizer && !c.organizer) c.organizer = E.str(d.organizer, 60);
-      if (c.fit) c.refit = true;
+      if (c.fit) c[unsureFit(c.fit) ? 'reread' : 'refit'] = true;
       else { c.homepage = d.homepage || o.homepage || ''; c.attachments = (d.attachments || []).filter(a => a.name).slice(0, 5); c.brief = E.text(d.text, 3500); }
       const table = [['접수', [d.start, d.deadline].filter(Boolean).join(' ~ ')], ['발표', d.announce || o.announce], ['시상', d.prize || o.prize], ['응모 대상', d.eligibility || o.eligibility], ['접수 방법', d.method || o.method], ['홈페이지', d.homepage || o.homepage], ['주최', d.organizer || c.organizer],
         ['첨부', (c.attachments || []).map(a => a.name).join(', ')]].filter(([, v]) => v).map(([k, v]) => `${k}: ${E.str(v, 300)}`).join('\n');
-      pages.push({ key: c.key, text: `[${pages.length}] (${c.source}) ${c.title}\n${table}\n${c.brief || E.text(d.text, 3500)}${alt ? `\n같은 공모전의 ${alt.source} 요강:\n${E.text(o.text, 1200)}` : ''}` });
+      const pic = shots.length ? `\n그림: ${images.length + 1}${shots.length > 1 ? `~${images.length + shots.length}` : ''}번째 그림이 이 공모전의 요강 그림이에요` : '';
+      images.push(...shots);
+      pages.push({ key: c.key, text: `[${pages.length}] (${c.source}) ${c.title}${pic}\n${table}\n${c.brief || E.text(d.text, 3500)}${alt ? `\n같은 공모전의 ${alt.source} 요강:\n${E.text(o.text, 1200)}` : ''}${deep ? `\n추가로 읽은 글:\n${deep}` : ''}` });
     } catch { /* 요강을 못 받은 것은 다음 찾기 때 다시 */ }
   }
   save(db);
-  return { summary: `읽을 요강 ${pages.length}개 · 있던 것 ${seen.size}개${failed.length ? ` · 못 읽은 사이트 ${failed.join('·')}` : ''}`,
-    has: pages.length > 0, today: TODAY, keys: JSON.stringify(pages.map(p => p.key)), seen: seen.size, left: Math.max(0, wait.length - limit), sites: keys.length, failed: failed.join('·'), _pages: pages.map(p => p.text).join('\n\n') };
+  return { summary: `읽을 요강 ${pages.length}개${images.length ? ` · 그림 ${images.length}장` : ''} · 있던 것 ${seen.size}개${failed.length ? ` · 못 읽은 사이트 ${failed.join('·')}` : ''}`,
+    has: pages.length > 0, today: TODAY, keys: JSON.stringify(pages.map(p => p.key)), seen: seen.size, left: Math.max(0, wait.length - limit) + later, sites: keys.length, failed: failed.join('·'),
+    _pages: pages.map(p => p.text).join('\n\n'), _images: images };
 }
 function sortOut(){
   const keys = blank(args.keys) ? [] : json(args.keys, '공모전 목록'), a = blank(args.fit) ? { contests: [], note: '' } : E.normalizeFit(json(args.fit, 'AI가 정리한 것')), db = load();
-  let fixed = 0;
+  let fixed = 0, reread = 0;
   for (const f of a.contests){
     const c = db.contests[keys[f.i]];
     if (!c) continue;
+    const seen = f.seen; delete f.seen;   // 그림(포스터)에서 읽은 요강 글 — 안 만들기·양식 계획에도 요강 원문으로 보인다
+    if (c.fit && c.reread){   // 그림이라 못 읽었던 것을 그림과 함께 다시 읽었다 — 읽었으면 정리를 새것으로, AI 안은 요강을 모르고 만든 것이라 다시 만들게
+      delete c.reread; c.reread_at = AT;
+      if (f.unreadable) continue;
+      if (seen) c.poster = seen;
+      if (f.deadline && c.deadline && f.deadline !== c.deadline && !f.doubt) f.doubt = `요강의 마감일(${E.kday(f.deadline)})이 사이트와 달라요`;
+      if (!f.submit.to && f.submit.method === 'site' && c.homepage) f.submit.to = c.homepage;
+      c.fit = f; reread++;
+      if (c.draft){ delete c.draft; delete c.filled; delete c.picks; delete c.plan; delete c.fplan; }
+      continue;
+    }
     if (c.fit){   // 다시 읽힌 것 — 접수 방법·접수처·발표일만 고친다(낼 수 있는지 판정과 AI 안은 그대로)
       if (!c.refit) continue;
       delete c.refit; c.refit_at = AT;
@@ -187,6 +342,7 @@ function sortOut(){
     if (!c.deadline && f.deadline) c.deadline = f.deadline;
     else if (f.deadline && c.deadline && f.deadline !== c.deadline && !f.doubt) f.doubt = `요강의 마감일(${E.kday(f.deadline)})이 사이트와 달라요`;
     if (!f.submit.to && f.submit.method === 'site' && c.homepage) f.submit.to = c.homepage;
+    if (seen) c.poster = seen;
     c.fit = f; c.fitted = AT;
   }
   E.mergeDups(all(db).filter(c => c.fit && (!c.deadline || c.deadline >= TODAY)));
@@ -196,19 +352,30 @@ function sortOut(){
   const n = ready + out, failed = args.failed || '', seen = Number(args.seen) || 0, left = Number(args.left) || 0;
   const title = n ? `새 공모전 ${n}개를 찾았어요${failed ? ` · ${failed}${eun(failed)} 못 읽었어요` : ''}` : `새 공모전이 없어요${failed ? ` · ${failed}${eun(failed)} 못 읽었어요` : ''}`;
   const text = [n ? `낼 공모전 ${ready} · 조건이 안 맞아 뺀 것 ${out}${seen ? ` · 이미 있던 것 ${seen}` : ''}` : `${Number(args.sites) - (failed ? failed.split('·').length : 0)}개 사이트를 모두 읽었어요`,
-    unread ? `요강을 못 읽은 것 ${unread}개('요강 확인' 표시)` : '', fixed ? `접수 방법을 새로 알아낸 공모전 ${fixed}개` : '', left ? `아직 못 읽은 ${left}개는 다음 찾기 때 읽어요` : '', failed ? `${failed} 화면이 바뀐 것 같아요. 다음 찾기 때 다시 해요. 계속 안 되면 플러그인을 업데이트해 주세요` : '', a.note].filter(Boolean).join(' · ');
-  return { summary: n ? `낼 것 ${ready} · 뺀 것 ${out}` : '새 공모전 없음', outcome: { title: '찾음', text: '' }, verdict: { tone: 'ok', title, text } };
+    unread ? `요강을 못 읽은 것 ${unread}개('요강 확인' 표시)` : '', reread ? `그림이라 못 읽었던 요강을 그림으로 다시 읽은 것 ${reread}개` : '', fixed ? `접수 방법을 새로 알아낸 공모전 ${fixed}개` : '', left ? `아직 못 읽은 ${left}개는 다음 찾기 때 읽어요` : '', failed ? `${failed} 화면이 바뀐 것 같아요. 다음 찾기 때 다시 해요. 계속 안 되면 플러그인을 업데이트해 주세요` : '', a.note].filter(Boolean).join(' · ');
+  return { summary: [n ? `낼 것 ${ready} · 뺀 것 ${out}` : '새 공모전 없음', reread ? `다시 읽음 ${reread}` : ''].filter(Boolean).join(' · '), outcome: { title: '찾음', text: '' }, verdict: { tone: 'ok', title, text } };
 }
 
 /* ---------- 제출 준비: 양식 문서(.hwp·.hwpx) 채우기 · 네이버 메일 ---------- */
 const STORE = path.dirname(DB);   // <프로필>/_플러그인/.data/contest-apply — 내 정보·서류도 여기에 둔다(프로필 데이터와 함께 동기화. 공개 저장소에는 올라가지 않는다)
 const FILES = path.join(STORE, 'files');   // 받아 둔 양식·채운 서류·도장. 앱이 …/plugins/contest-apply/file로 보인다
 const base = c => c.key.replace(/[^\w-]/g, '-');
+const briefOf = (c, n = 5000) => E.text([c.brief, c.poster && `[포스터 그림에서 읽은 글]\n${c.poster}`, c.extra && `[첨부 요강·주최 홈페이지에서 읽은 글]\n${c.extra}`].filter(Boolean).join('\n'), n);   // 요강 원문 — 본문과 그림에서 읽은 글
 const safe = t => String(t || '').replace(/[\\/:*?"<>|\s.]+/g, '_').slice(0, 30);
 const fileName = t => String(t || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
-const PERSONAL = /이름|성명|연락|전화|휴대|핸드폰|이메일|e-?mail|메일|주소|생년|생일|나이|소속|직업|직장|학교|학과|성별/i;   // 다음 공모전에도 쓸 내 정보
-const BANK = /계좌|은행|예금주/;   // 상금 계좌는 민감해서 그 공모전의 답으로만 기억하고, 요강이 요구할 때만 메일에 넣는다
-const keepMine = k => PERSONAL.test(k) && !BANK.test(k);
+const PERSONAL = /이름|성명|연락|전화|휴대|핸드폰|이메일|e-?mail|메일|주소|생년|생일|나이|소속|직업|직장|학교|학과|성별/i;   // 내 정보로 보이는 칸 — 브라우저에는 값 대신 자리표시로만   // 다음 공모전에도 쓸 내 정보
+const BANK = /계좌|은행|예금주/;   // 상금 계좌 — 기억은 하되 요강·양식이 요구할 때만 메일에 넣는다(wantsBank)
+// 이 공모전에만 쓰는 답 — 작품·응모에 관한 것. 나머지는 모두 내 정보(내정보.json)로 기억해서, 한 번 답한 것은 다른 공모전에서 다시 묻지 않는다
+const ONLY_HERE = /작품|응모작|부문|의도|동기|설명|제목|생성형|\bAI\b|인공지능|활용|기획|팀원|추천인|기대\s*효과|소감|의견|경험|만족|참여\s*횟수/i;
+const keepMine = k => !ONLY_HERE.test(k);   // 다른 공모전에도 쓰는 답인가
+const secret = k => PERSONAL.test(k) || BANK.test(k);   // AI에게 값 대신 자리표시로만 넘기는 내 정보
+// 받은 답을 어디에 기억할지 — 내 정보(제출용), 고른 답(답: 민감하지 않은 사실, AI가 보기를 고를 때 본다), 이 공모전 답
+function remember(kept, ans, k, v){
+  if (!keepMine(k)){ ans[k] = v; return 'here'; }
+  delete ans[k];
+  if (secret(k)){ kept.제출용[k] = v; delete kept.답[k]; return 'mine'; }
+  kept.답[k] = v; delete kept.제출용[k]; return 'fact';
+}
 // 받은 날 — 내정보.json·답 파일의 꼴은 그대로 두고 같은 폴더의 받은날.json에 { 제출용: {항목: 날}, 답: {공모전: {항목: 날}} }로 적는다
 const GOT = () => path.join(STORE, '받은날.json');
 function noteGot(mine = [], c = null, own = []){
@@ -220,7 +387,9 @@ function noteGot(mine = [], c = null, own = []){
 }
 // 내 정보 — 프로필 데이터의 내정보.json { 조건: 생년·성별·사는 곳…, 제출용: 이름·연락처… }. 설정에 적은 것이 먼저이고, 설정과 서로 맞춘다(syncMe)
 const KEPT = path.join(STORE, '내정보.json');
-const readKept = () => { const k = readJSON(KEPT, {}), flat = !k.조건 && !k.제출용; return { 조건: { ...(k.조건 || {}) }, 제출용: { ...(flat ? k : k.제출용 || {}) } }; };   // 예전 꼴(항목: 값)은 제출용으로 읽는다
+const readKept = () => { const k = readJSON(KEPT, {}), flat = !k.조건 && !k.제출용 && !k.답; return { 조건: { ...(k.조건 || {}) }, 제출용: { ...(flat ? k : k.제출용 || {}) }, 답: { ...(flat ? {} : k.답 || {}) } }; };
+const factsOf = () => Object.entries(readKept().답).filter(([, v]) => v);   // 다른 공모전에서 고른 답
+const knownOf = (me, k) => mine(me, k) || mine(factsOf(), k);   // 예전 꼴(항목: 값)은 제출용으로 읽는다
 const WHO = ['birth', 'gender', 'home', 'work', 'status'];
 // 설정 ↔ 데이터: 설정에 적은 값은 데이터에 옮겨 다른 기기와 맞추고, 설정이 빈 기기에서는 데이터의 값으로 설정을 채운다
 function syncMe(){
@@ -240,11 +409,18 @@ function syncMe(){
   return Object.keys(patch).length ? { settings_patch: patch } : {};
 }
 const readJSON = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
-const writeLocal = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true, mode: 0o700 }); fs.writeFileSync(f, JSON.stringify(v, null, 1), { mode: 0o600 }); };
+const writeLocal = (f, v) => { if (f === KEPT && v.답 && !Object.keys(v.답).length){ v = { ...v }; delete v.답; }   // 고른 답이 없으면 예전 꼴 그대로
+  fs.mkdirSync(path.dirname(f), { recursive: true, mode: 0o700 }); fs.writeFileSync(f, JSON.stringify(v, null, 1), { mode: 0o600 }); };
+// 모자란 정보 — 공모전마다 [{ name, question, options }]. '알려 줄 정보' 목록이 모아 한 번만 묻는다
+function setNeed(c, list){
+  const seen = new Set(), out = list.filter(n => n && n.name && !seen.has(loose(n.name)) && seen.add(loose(n.name))).slice(0, 12).map(n => ({ name: E.str(n.name, 30), question: E.str(n.question || '', 160), options: (n.options || []).slice(0, 12) }));
+  if (out.length) c.need = out; else delete c.need;
+}
 const meOf = () => { const set = String(args.me || '').split('\n').map(l => l.split('\t').map(x => x.trim())).filter(([a, b]) => a && b);
   return [...set, ...Object.entries(readKept().제출용).filter(([k, v]) => v && !set.some(([a]) => a === k))]; };
 // 같은 뜻 칸 — 양식의 '응모자 성명'도 설정의 '이름'으로 채운다
-const KIND = [['이름', /이름|성명|서명|응모자/], ['연락처', /연락처|전화|휴대|핸드폰|폰/i], ['이메일', /이메일|e-?mail|메일/i], ['주소', /주소/], ['생년월일', /생년|생일/], ['소속', /소속|직장|학교|기관/]];
+const KIND = [['이름', /이름|성명|서명|응모자/], ['연락처', /연락처|전화|휴대|핸드폰|폰/i], ['이메일', /이메일|e-?mail|메일/i], ['주소', /주소|거주지|자택/], ['생년월일', /생년|생일/], ['성별', /성별/],
+  ['학과', /학과|전공/], ['직업', /직업|직종/], ['소속', /소속|직장|회사|학교|기관/], ['계좌번호', /계좌/], ['은행', /은행/], ['예금주', /예금주/]];
 const kindOf = t => (KIND.find(([, re]) => re.test(t)) || [])[0];
 const mine = (me, label) => (me.find(([a]) => a === label || label.includes(a) || a.includes(label)) || me.find(([a]) => kindOf(a) && kindOf(a) === kindOf(label)) || [])[1];
 // 문서(.hwp·.hwpx) 모듈은 쓸 때만 불러온다 — Java가 없는 컴퓨터에서도 나머지는 돌게
@@ -348,8 +524,12 @@ const formAutoOk = (db, c, me) => { const f = c.fit; return !c.form_doubt && !c.
 const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 function browsable(c){
   const f = c.fit, s = f.submit, u = E.urlOf(s.to);
-  if (f.unreadable || (c.deadline && c.deadline < TODAY)) return null;
-  if (s.method === 'site' && u && S.isPublicUrl(u)) return { url: u, kind: 'site' };
+  if (c.deadline && c.deadline < TODAY) return null;
+  if (!f.unreadable && s.method === 'site' && u && S.isPublicUrl(u)) return { url: u, kind: 'site' };
+  // 접수 방법·접수처를 모르면 사람에게 원문을 보라고 하지 않고, AI가 공고를 열어 찾는다(찾은 것은 요강에 적고, 한 번만)
+  const page = E.urlOf(String(c.homepage || '').split('#')[0]) || c.url, lost = f.unreadable || ['', 'etc', 'site'].includes(s.method) || (s.method === 'email' && !E.firstEmail(s.to)) || (['form', 'nform', 'oform'].includes(s.method) && !u && !(c.form && !c.form.error));
+  if (lost && !c.explored && page && S.isPublicUrl(page)) return { url: page, kind: 'explore' };
+  if (f.unreadable) return null;
   if (c.form && !c.form.error && c.form.url && ((c.form.blockers || []).length || c.form.login) && !(c.form.kind === 'google' && c.form.login)) return { url: c.form.url, kind: 'form' };   // 구글 로그인이 필요한 폼은 이 브라우저에서 로그인이 막힌다 — 직접 낸다
   return null;
 }
@@ -379,20 +559,21 @@ function browseTask(c, bro, me){
   const f = c.fit, cand = pickIdx(c)[0], x = c.draft.items[cand], files = attachOf(c);
   const plan = bro.kind === 'form' && c.fplan && c.fplan.sig === c.form.sig ? c.form.questions.map((q, i) => { const a = c.fplan.answers.find(v => v.id === q.id);
     return `${i + 1}. ${E.str(q.title, 120)} → ${a && a.text.trim() ? forAgent(a.text, c, cand, c.fplan.extras).replace(/\n/g, ' / ') : '(비워 둠)'}`; }) : [];
-  return [`접수 주소: ${bro.url}`, `공모전: ${c.title}`, `주최: ${c.organizer || '-'}`, `마감: ${c.deadline || '요강 확인'} · 오늘: ${TODAY}`, `받는 작품: ${f.kinds.join(', ') || '-'}`, `낼 것: ${f.submit.what || '-'}`,
+  return [bro.kind === 'explore' ? `공고 주소: ${bro.url} — 접수 방법을 아직 몰라요. 공고를 읽고 찾아서, 여기서 낼 수 있으면 내고 아니면 found에 적어요` : `접수 주소: ${bro.url}`, `공모전: ${c.title}`, `주최: ${c.organizer || '-'}`, `마감: ${c.deadline || '요강 확인'} · 오늘: ${TODAY}`, `받는 작품: ${f.kinds.join(', ') || '-'}`, `낼 것: ${f.submit.what || '-'}`,
     `요강의 접수 방법: ${f.submit.how || '-'}`, `양식·주의: ${f.submit.note || '-'}`, `뜻풀이 글자 제한: ${f.submit.desc_limit ? `${f.submit.desc_limit}자` : '요강에 없음(칸의 제한을 따름)'}`, '',
     `응모작: ${x.text}`, `뜻풀이: ${x.why}`, '',
     ...(plan.length ? ['문항별 답 계획(폼을 미리 읽어 세운 것 — 화면의 문항과 맞춰 넣기)', ...plan, ''] : []),
-    `쓸 수 있는 자리표시: ${Object.keys({ ...meVars(me), ...answered(c).mine }).map(a => `{{${a}}}`).join(' ') || '(없음)'}`, ...Object.entries(answered(c).open).map(([k, v]) => `사용자가 정한 답 — ${k}: ${v}`), `올릴 수 있는 파일: ${files.map(a => a.filename).join(', ') || '(없음)'}`, '', `요강 원문 일부:\n${E.text(c.brief || '', 1500) || '(없음)'}`].join('\n');
+    `쓸 수 있는 자리표시: ${Object.keys({ ...meVars(me), ...answered(c).mine }).map(a => `{{${a}}}`).join(' ') || '(없음)'}`, ...[...factsOf(), ...Object.entries(answered(c).open)].map(([k, v]) => `사용자가 정한 답 — ${k}: ${v}`), `올릴 수 있는 파일: ${files.map(a => a.filename).join(', ') || '(없음)'}`, '', `요강 원문 일부:\n${briefOf(c, 1500) || '(없음)'}`].join('\n');
 }
 const browseOpts = (c, bro, me) => ({ vars: { ...meVars(me), ...answered(c).mine }, files: attachOf(c).map(a => ({ name: a.filename, path: a.path })),
-  allow: [...new Set([hostOf(bro.url), hostOf(E.urlOf(String(c.homepage || ''))), ...(bro.kind === 'form' ? ['docs.google.com', 'form.naver.com'] : [])].filter(Boolean))] });
+  allow: [...new Set([hostOf(bro.url), hostOf(E.urlOf(String(c.homepage || ''))), ...(bro.kind === 'explore' ? [hostOf(E.urlOf(c.fit.submit.to)), 'docs.google.com', 'form.naver.com', 'naver.me', 'forms.gle'] : []), ...(bro.kind === 'form' ? ['docs.google.com', 'form.naver.com'] : [])].filter(Boolean))] });
 // 확인 없이 브라우저로 내도 되는 경우(완전 자동화) — 조건·AI 제한·요강 의문이 없고, 지난 시도가 불확실하게 끝나지 않았을 때
 const browseAutoOk = c => { const f = c.fit; return !(c.sited && c.sited.sent === 'unknown') && !c.formed && !c.mail_sending &&(!f.ai || f.ai.rule === 'none') && f.eligibility.ok === 'yes' && !f.doubt && !f.unreadable; };
-async function sendForm(db, c, me){
+async function sendForm(db, c, me, want){
   if (c.formed) return c.formed;
   const sheet = formSheet(c, me, readJSON(ANSWERS(c), {})), why = formGate(db, c, sheet);
   if (why.length) fail(`폼을 제출하지 않았어요 — ${why[0]}`);
+  if (want !== undefined && want !== formSig(c, sheet)) throw changed(want ? '폼에 넣을 답이 바뀌었어요(내 정보·고른 안·동의 답)' : '폼에 넣을 답을 한 번 더 확인해 주세요(확인한 화면과 맞춰 보려고 다시 보여 드려요)');
   const r = await F.submitForm(c.form, sheet.answers).catch(e => ({ ok: false, sent: 'unknown', message: e.message }));
   if (r.ok){ c.formed = { at: AT, kind: c.form.kind, id: E.str(r.id || '', 60), sure: r.sure !== false }; delete c.form_doubt; save(db); return c.formed; }
   if (r.sent === 'unknown'){ c.form_doubt = AT; save(db); fail(`${r.message || '보내는 중에 연결이 끊겼어요'} — 제출됐는지 알 수 없어요. 다시 보내면 두 번 들어갈 수 있으니, 폼의 확인 화면이나 주최 쪽 안내를 먼저 확인해 주세요`); }
@@ -453,7 +634,7 @@ async function prep(){
   if (c.draft && args.answer !== 'regen') return { summary: `AI 안 ${c.draft.items.length}개 있음${found}`, need_ai: false, ...out };
   const ctx = [`공모전: ${c.title}`, `주최: ${c.organizer || '-'}`, `받는 작품: ${f.kinds.join(', ') || '-'}`, `낼 것: ${f.unreadable ? '요강을 읽지 못함 — 이름 + 뜻풀이 200자 꼴로' : f.submit.what || '-'}`,
     `1인 응모 건수: ${f.submit.allow}`, `의미 설명 글자 제한: ${f.submit.desc_limit ? `${f.submit.desc_limit}자` : '없음(200자 안팎)'}`, `양식·주의: ${f.submit.note || '-'}`, `시상: ${f.prize.text || '-'}`,
-    '신청서 칸(후보마다 채울 것): (없음)', `요강 원문 일부:\n${c.brief || '(없음)'}`].join('\n');
+    '신청서 칸(후보마다 채울 것): (없음)', `요강 원문 일부:\n${briefOf(c) || '(없음)'}`].join('\n');
   return { summary: `${args.answer === 'regen' ? 'AI 안 다시 만들기' : 'AI 안 만들기'}${found}`, need_ai: true, ...out, _ctx: ctx };
 }
 // 서류: 받아 둔 양식을 읽어 AI가 '어느 자리에 무엇을' 계획하게 한다 — 계획이 없거나 응모작 후보가 바뀌었을 때만
@@ -471,7 +652,8 @@ async function papers(){
     parts.push(`### 문서 ${i}: ${d.name}\n${body}`);
   }
   const ctx = [`공모전: ${c.title}`, `주최: ${c.organizer || '-'}`, `찾는 분야의 작품: ${f.kinds.join(', ') || '-'}`, `낼 것: ${f.submit.what || '-'}`, `양식·주의: ${f.submit.note || '-'}`, `오늘 날짜: ${TODAY}`, `찾은 곳: ${[c.source, ...(c.also || []).map(a => a.source)].filter(Boolean).join(', ') || '-'}(공모전 모음 사이트)`,
-    `접수 방식: ${E.METHODS[f.submit.method] || '모름'} — ${f.submit.how || '-'}`, `의미 설명 글자 제한: ${f.submit.desc_limit ? `${f.submit.desc_limit}자` : '없음'}`, `요강 원문 일부:\n${E.text(c.brief || '', 2000) || '(없음)'}`].join('\n');
+    `접수 방식: ${E.METHODS[f.submit.method] || '모름'} — ${f.submit.how || '-'}`, `의미 설명 글자 제한: ${f.submit.desc_limit ? `${f.submit.desc_limit}자` : '없음'}`,
+    `응모자가 이미 알려 준 정보(값은 프로그램이 넣어요. 뜻이 맞으면 이 이름 그대로 자리표시로 써요): ${meOf().map(([a]) => a).join(', ') || '(없음)'}`, `요강 원문 일부:\n${briefOf(c, 2000) || '(없음)'}`].join('\n');
   return { summary: `${have} 읽음`, need_plan, need_fplan, _ctx: ctx, _cands: c.draft.items.map((x, i) => `[${i}] ${x.text} — ${E.str(x.why, 400)}`).join('\n'), _docs: parts.join('\n\n').slice(0, 26000), _form: need_fplan ? formText(fm) : '' };
 }
 const used = c => c.plan ? c.plan.docs.filter(d => d.use !== 'skip' && (c.docs || [])[d.doc]) : [];
@@ -490,7 +672,7 @@ function resolve(text, { c, cand, me, ans, missing, extras }){
     if (x && /^(뜻풀이|의미|설명)$/.test(k)) return x.why;
     const e = ex.find(v => loose(v.name) === loose(k)); if (e) return e.value;
     if (ans[k]) return ans[k];
-    const v = mine(me, k); if (v) return v;
+    const v = knownOf(me, k); if (v) return v;
     missing.add(k); return '';
   });
 }
@@ -503,9 +685,11 @@ function missingOf(c, me, ans){
 // 정보: 양식을 채우는 데 모자란 것을 묻는다 — 동의 표시(내가 고른다) → 양식에 필요한데 없는 내용. 답은 프로필 데이터에 둔다
 async function info(){
   const db = load(), c = contest(db, args.cid);
-  if (!blank(args.plan) && c.draft){ c.plan = { ...E.normalizePlan(json(args.plan, '양식을 채울 계획'), (c.docs || []).length, c.draft.items.length), made: c.draft.made, at: AT }; delete c.filled; delete c.skipped; save(db); }
-  if (!blank(args.fplan) && c.draft && c.form && !c.form.error){ c.fplan = { ...E.normalizeFormPlan(json(args.fplan, '폼 답 계획'), c.form, c.draft.items.length), made: c.draft.made, sig: c.form.sig, at: AT }; save(db); }
-  if (!used(c).length && !planned(c)) return { summary: '채울 양식·폼 없음' };
+  // 같은 계획으로 다시 돌면(알려 줄 정보에서 답해 이어 갈 때) 계획을 다시 적지 않는다 — 건너뛴 칸·채운 서류가 그대로 남게
+  const psig = blank(args.plan) ? '' : sha(args.plan).slice(0, 12), fsig = blank(args.fplan) ? '' : sha(args.fplan).slice(0, 12);
+  if (psig && c.draft && !(c.plan && c.plan.psig === psig)){ c.plan = { ...E.normalizePlan(json(args.plan, '양식을 채울 계획'), (c.docs || []).length, c.draft.items.length), made: c.draft.made, at: AT, psig }; delete c.filled; delete c.skipped; save(db); }
+  if (fsig && c.draft && c.form && !c.form.error && !(c.fplan && c.fplan.psig === fsig)){ c.fplan = { ...E.normalizeFormPlan(json(args.fplan, '폼 답 계획'), c.form, c.draft.items.length), made: c.draft.made, sig: c.form.sig, at: AT, psig: fsig }; save(db); }
+  if (!used(c).length && !planned(c)){ if (c.need){ delete c.need; save(db); } return { summary: '채울 양식·폼 없음' }; }
   let answer = blank(args.answer) ? '' : String(args.answer).trim();
   if (/^consent:(yes|no)$/.test(answer)){ c.consent = answer.slice(8); delete c.filled; save(db); answer = ''; }
   if (/^fconsent:(yes|no)$/.test(answer)){ c.fconsent = answer.slice(9); save(db); answer = ''; }
@@ -535,21 +719,23 @@ async function info(){
       const i = line.search(/[:：]/); if (i < 0) continue;
       const k = asked.find(a => loose(a) === loose(line.slice(0, i))), v = line.slice(i + 1).trim();
       if (!k) continue;
-      if (!v) skipped.add(k); else { ans[k] = v; go.push(k); if (keepMine(k)){ kept.제출용[k] = v; gm.push(k); } }
+      if (!v) skipped.add(k); else (remember(kept, ans, k, v) === 'here' ? go : gm).push(k);
     }
-    for (const k of asked) if (!ans[k]) skipped.add(k);
+    for (const k of asked) if (!ans[k] && !gm.includes(k)) skipped.add(k);
     writeLocal(ANSWERS(c), ans); writeLocal(KEPT, kept); noteGot(gm, c, go);
-    c.skipped = [...skipped]; delete c.filled; save(db);
-    return { summary: `적은 내용 ${Object.keys(ans).length}개${c.skipped.length ? ` · 비워 둔 것 ${c.skipped.length}개` : ''}` };
+    c.skipped = [...skipped]; delete c.filled; delete c.need; save(db);
+    return { summary: `적은 내용 ${go.length}개${gm.length ? ` · 내 정보로 기억 ${gm.length}개` : ''}${c.skipped.length ? ` · 비워 둔 것 ${c.skipped.length}개` : ''}`, ...(gm.length ? refreshLists() : {}) };   // 값은 싣지 않는다(실행 기록은 동기화된다) — 목록만 다시 가져와 같은 정보를 기다리던 공모전이 이어 간다
   }
   const miss = missingOf(c, me, ans).filter(k => !(c.skipped || []).includes(k));
-  if (!miss.length) return { summary: '모자란 내용 없음' };
+  if (!miss.length){ if (c.need){ delete c.need; save(db); } return { summary: '모자란 내용 없음' }; }
   // 고르는 문항에 들어갈 내용이면 보기를 알려 준다
-  const opts = planned(c) ? miss.map(k => { const a = c.fplan.answers.find(a => a.text.includes(`{{${k}}}`)), q = a && c.form.questions.find(q => q.id === a.id); return q && q.options.length ? `${k} 보기: ${q.options.map(o => E.cut(o, 30)).join(' / ')}` : ''; }).filter(Boolean) : [];
-  const what = used(c).length && planned(c) ? '양식·폼' : planned(c) ? '폼' : '양식';
+  const optOf = k => { const a = planned(c) && c.fplan.answers.find(a => a.text.includes(`{{${k}}}`)), q = a && c.form.questions.find(q => q.id === a.id); return q ? q.options.map(o => E.cut(o, 40)).slice(0, 12) : []; };
+  const opts = miss.map(k => optOf(k).length ? `${k} 보기: ${optOf(k).join(' / ')}` : '').filter(Boolean);
+  setNeed(c, miss.map(k => ({ name: k, question: '', options: optOf(k) }))); save(db);   // 내 정보는 '알려 줄 정보'에 모인다 — 거기서 답해도 이 공모전이 이어 간다
+  const common = miss.filter(keepMine), what = used(c).length && planned(c) ? '양식·폼' : planned(c) ? '폼' : '양식';
   return { summary: '모자란 내용 묻기', verdict: { tone: 'ok', title: `${what}에 들어갈 내용 ${miss.length}개가 모자라요`, text: miss.join(' · ') },
     ask: { question: `${what}에 넣을 내용을 적어 주세요`, free: true, value: miss.map(k => `${k}: `).join('\n'),
-      hint: [...opts, ''].join('\n') + "줄마다 ':' 뒤에 적어요. 비워 두면 그 자리는 빈칸으로 남아요(다시 묻지 않아요)\n이름·연락처 같은 내 정보는 내 데이터에 기억해서 다음 공모전과 다른 기기에서도 써요. AI에게 보내지 않아요" } };
+      hint: [...opts, ''].join('\n') + "줄마다 ':' 뒤에 적어요. 비워 두면 그 자리는 빈칸으로 남아요(다시 묻지 않아요)\n" + (common.length ? `${common.join('·')}${eun(common.at(-1))} 내 정보로 기억해서 다른 공모전에서는 묻지 않아요. '알려 줄 정보'에서 답해도 이 공모전이 이어서 해요. AI에게 보내지 않아요` : '이 공모전에만 쓰는 답이에요') } };
 }
 // 채우기: 계획대로 문서를 채워 프로필 데이터의 files/에 둔다 — 응모작마다 내는 문서는 고른 안마다 한 부씩
 async function fill(){
@@ -585,18 +771,34 @@ function mailOf(c, me){
       ...(attachOf(c).length ? [`첨부: ${attachOf(c).map(a => a.filename).join(', ')}`, ''] : []), '감사합니다.'].join('\n'),
     attachments: attachOf(c) };
 }
+// 승인 값 대조 — 확인 화면에 보인 메일·폼 답의 지문을 버튼 값에 담고, 보내기 직전에 다시 만든 것과 다르면 보내지 않고 다시 보인다
+// (화면을 본 뒤 '보탤 파일'에 파일을 넣었거나 다른 기기에서 내 정보·고른 안을 바꿨으면, 본 것과 다른 것이 나가지 않게)
+const sha = v => crypto.createHash('sha1').update(v).digest('hex');
+const fileSig = f => { try { return sha(fs.readFileSync(f)); } catch { return 'gone'; } };
+const mailSig = m => sha(JSON.stringify([m.to, m.subject, m.text, m.attachments.map(a => [a.filename, fileSig(a.path)])])).slice(0, 12);
+const formSig = (c, sheet) => sha(JSON.stringify([c.form.url || c.form.id || '', sheet.answers])).slice(0, 12);
+const changed = why => Object.assign(new Error(why), { changed: why });
+function mailChanged(was, m){
+  const now = m.attachments.map(a => a.filename), add = now.filter(n => !was.files.includes(n)), gone = was.files.filter(n => !now.includes(n));
+  return was.to !== m.to ? `받는 사람이 바뀌었어요(${was.to} → ${m.to})` : add.length || gone.length ? `붙일 파일이 바뀌었어요${add.length ? ` · 더함 ${add.join(', ')}` : ''}${gone.length ? ` · 빠짐 ${gone.join(', ')}` : ''}`
+    : now.length && was.sig !== mailSig(m) && was.body === sha(m.subject + m.text).slice(0, 12) ? '붙일 파일의 내용이 바뀌었어요' : '메일 제목이나 본문이 바뀌었어요(내 정보·고른 안)';
+}
 // 확인 없이 보내도 되는 경우 — 하나라도 걸리면 켜 두어도 묻는다(보낸 메일은 되돌릴 수 없다). 확인창으로 한 번 보내 본 뒤에만(계정 설정이 맞는지 본 뒤)
 const autoOk = (db, c) => { const f = c.fit; return !c.mail_sending && all(db).some(x => x.mailed) &&(!f.ai || f.ai.rule === 'none') && f.eligibility.ok === 'yes' && !f.doubt && !f.unreadable && (c.filled || []).every(o => !o.error && !o.hand && !o.manual.length && !o.missing.length && !o.skipped) && !(c.deadline && c.deadline < TODAY)
   && top(c).every(x => !f.submit.desc_limit || x.why.length <= f.submit.desc_limit); };   // 뜻풀이가 글자 제한을 넘으면 실격될 수 있다
 // 자동 메일을 보내도 되는 시각 — 한국 시각 08:00~21:00(사람이 직접 누른 것은 시각과 상관없이 보낸다)
 const mailHour = () => { const h = new Date(NOW.getTime() + 9 * 3600000).getUTCHours(); return h >= 8 && h < 21; };
 // 보내기 전에 '보내는 중'을 먼저 적는다 — 보낸 뒤 꺼지거나 끊겨도 다음 실행이 다시 보내지 않게(A2)
-async function mail(db, c, me){
+// 시험에서만 — PKM_CONTEST_SMTP=127.0.0.1:포트 이면 그 가짜 서버(평문)로 보낸다
+const testSmtp = () => { const m = /^127\.0\.0\.1:(\d+)$/.exec(process.env.PKM_CONTEST_SMTP || ''); return m ? { host: '127.0.0.1', port: Number(m[1]), secure: false, timeout: 3000 } : {}; };
+// want: 사람이 누른 버튼에 담긴 지문(자동으로 보낼 때는 undefined — 규칙 게이트 autoOk가 대신한다)
+async function mail(db, c, me, want){
   if (c.mailed) return c.mailed;
   if (c.mail_sending) fail(`지난번 메일이 보내졌는지 확인하지 못했어요(${kst(c.mail_sending.at)}, ${c.mail_sending.to}). 네이버 메일 보낸메일함을 먼저 봐 주세요. 보내졌으면 [직접 냈어요], 안 보내졌으면 [제출 준비]에서 '안 보내졌어요 · 다시 보내기'를 눌러요`);
   const m = mailOf(c, me);
+  if (want !== undefined && want !== mailSig(m)) throw changed(want && c.shown ? mailChanged(c.shown, m) : '보낼 메일을 한 번 더 확인해 주세요(확인한 화면과 맞춰 보려고 다시 보여 드려요)');
   c.mail_sending = { at: AT, to: m.to }; save(db);
-  try { const r = await M.send({ user: process.env.NAVER_ID, pass: process.env.NAVER_APP_PASSWORD, to: m.to, subject: m.subject, text: m.text, attachments: m.attachments }); c.mailed = { at: AT, to: m.to, id: r.messageId }; delete c.mail_sending; save(db); }
+  try { const r = await M.send({ ...testSmtp(), user: process.env.NAVER_ID, pass: process.env.NAVER_APP_PASSWORD, to: m.to, subject: m.subject, text: m.text, attachments: m.attachments }); c.mailed = { at: AT, to: m.to, id: r.messageId }; delete c.mail_sending; save(db); }
   catch (e) { if (!e.unknown){ delete c.mail_sending; save(db); } fail(e.user ? e.message : `메일을 보내지 못했어요(${e.message})`); }
   return c.mailed;
 }
@@ -608,11 +810,14 @@ function remembered(c){
   const own = Object.keys(readJSON(ANSWERS(c), {})).filter(k => !Object.keys(readKept().제출용).includes(k)).map(k => `${k}(${day(((g.답 || {})[base(c)] || {})[k])})`);
   return [...mineK, ...own].slice(0, 12).join(' · ');
 }
-async function submit(){
+async function submit(again = ''){
   const db = load(), c = contest(db, args.cid), f = c.fit || fail('요강을 아직 읽지 못했어요. [지금 찾기]를 먼저 해 주세요');
   saveDraft(db, c);
   const items = c.draft ? c.draft.items : [], allow = f.submit.allow;
-  let answer = blank(args.answer) ? '' : String(args.answer).trim(), pickErr = '';
+  let answer = again ? '' : blank(args.answer) ? '' : String(args.answer).trim(), pickErr = '', want;
+  // 보내는 버튼은 'mail:지문'처럼 확인 화면에 보인 것의 지문을 담는다. 지문이 없으면(예전 화면) 맞춰 볼 수 없으니 다시 보인다
+  const sm = answer.match(/^(mail|mailretry|form)(?::([0-9a-f]{12}))?$/);
+  if (sm){ answer = sm[1]; want = sm[2] || ''; }
   // 보낼 안 고르기의 답 — 'pick:0,2'(선택지) 또는 '1, 3'(번호를 적음). 고르면 그 안으로 신청서·메일을 다시 만들어 보인다
   const pm = answer.match(/^pick:([\d,]+)$/), nums = !pm && /^[\d\s,.]+$/.test(answer) ? (answer.match(/\d+/g) || []).map(v => Number(v) - 1) : null;
   if (pm || nums){
@@ -634,12 +839,15 @@ async function submit(){
     save(db);
     return { summary: { mail: '메일 보냄', form: '폼 제출함', yes: '냈어요', later: '나중에', no: '안 내요' }[choice], choice, ask_names: choice === 'yes', names: top(c).map(x => x.text).join('\n'), ...extra };
   };
+  // 자동으로 내다가 멈추면(확인 못 함·실패) 휴대폰 알림으로 사람을 깨운다 — 지켜보는 사람이 없다
+  const wake = async (what, go) => { try { return await go(); } catch (e) {
+    throw Object.assign(e, { notify: { title: /알 수 없어요|확인하지 못했어요/.test(e.message) ? `${what} — 제출됐는지 확인이 필요해요` : `${what}이 멈췄어요`, text: `${titleOf(c.title)} · ${E.cut(e.message, 150)}` } }); } };
   if (!answer && (args.auto === 'true' || FULL) && ready && autoOk(db, c)){
     if (!mailHour()){ c.mail_wait = AT; save(db); return { ...done('later'), summary: '아침 8시 이후에 보내요', auto: true, verdict: { tone: 'ok', title: '아침 8시 이후에 보내요', text: '자동 메일은 한국 시각 오전 8시~오후 9시에만 보내요. 그 전에 보내려면 [제출 준비]에서 [메일 보내기]를 눌러요' } }; }
     delete c.mail_wait;
-    return done('mail', { auto: true, to: (await mail(db, c, me)).to });
+    return done('mail', { auto: true, to: (await wake('자동 메일', () => mail(db, c, me))).to });
   }
-  if (!answer && (args.fauto === 'true' || FULL) && fmode && formAutoOk(db, c, me)){ const sent = await sendForm(db, c, me); return done('form', { auto: true, to: fname, sure: sent.sure }); }
+  if (!answer && (args.fauto === 'true' || FULL) && fmode && formAutoOk(db, c, me)){ const sent = await wake('자동 폼 제출', () => sendForm(db, c, me)); return done('form', { auto: true, to: fname, sure: sent.sure }); }
   if (!answer && FULL && bro && browseAutoOk(c) && !(fmode && !formGate(db, c, formSheet(c, me, readJSON(ANSWERS(c), {}))).length)) return done('browse', { auto: true });
   const limits = [`1인 ${allow}건까지`, f.submit.desc_limit && `뜻풀이 ${f.submit.desc_limit}자 이내`].filter(Boolean);
   const cand = (x, i, where) => ({ where, title: x.read ? `${x.text} · ${x.read}` : x.text, note: f.submit.desc_limit ? `뜻 ${x.why.length}/${f.submit.desc_limit}자${x.why.length > f.submit.desc_limit ? ' · 줄여야 해요' : ''}` : `뜻 ${x.why.length}자` });
@@ -658,7 +866,7 @@ async function submit(){
   }
   if (answer === 'repick') answer = '';   // 고를 것이 없으면(안이 하나·계정 없음) 그대로 제출 화면으로
   if (!answer){
-    const s = f.submit, findings = [...aiRule], split = ['form', 'nform', 'oform', 'site'].includes(s.method), mine = new Set(top(c));
+    const s = f.submit, findings = [...(again ? [{ where: '다시 확인', tag: '바뀜', title: '보내지 않았어요', text: `${again}. 아래 내용을 확인하고 다시 눌러 주세요` }] : []), ...aiRule], split = ['form', 'nform', 'oform', 'site'].includes(s.method), mine = new Set(top(c));
     // 메일로 보낼 수 있으면 고른 안을 '보낼 안'으로, 아니면 AI 추천을 '추천'으로 표시한다
     const sheet = fmode ? formSheet(c, me, readJSON(ANSWERS(c), {})) : null, gate = fmode ? formGate(db, c, sheet) : ['폼 아님'], fcan = !gate.length && !c.formed;   // 이미 보낸 폼은 다시 보내는 선택지를 두지 않는다
     if (fmode || bro) mine.clear(), mine.add(top(c)[0]);
@@ -673,12 +881,13 @@ async function submit(){
         o.manual.length ? `직접 할 일: ${o.manual.join(' · ')}` : ''].filter(Boolean).join('\n') });
     if ((c.docs || []).length && !c.plan) for (const d of c.docs) findings.push({ where: '양식', title: d.name, text: '받아 뒀지만 채우지는 못했어요. 내려받아 직접 채워 주세요', file: d.file });
     for (const a of c.blocked || []) findings.push({ where: '직접 받을 양식', title: a.name, text: '주최 홈페이지가 자동 내려받기를 막아 두었어요. 직접 받아 주세요', ...(E.urlOf(a.url) ? { url: a.url } : {}) });
-    const web = E.urlOf(s.to), m = s.method === 'email' ? mailOf(c, me) : null;
+    const web = E.urlOf(s.to), m = s.method === 'email' ? mailOf(c, me) : null, msig = ready && m ? mailSig(m) : '', fsig = fcan ? formSig(c, sheet) : '';
+    if (msig){ c.shown = { at: AT, sig: msig, to: m.to, files: m.attachments.map(a => a.filename), body: sha(m.subject + m.text).slice(0, 12) }; save(db); }
     if (m && m.to){
       findings.push({ where: '받는 사람', title: m.to, copy: m.to }, { where: '메일 제목', copy: m.subject, private: true }, { where: '메일 본문', copy: m.text, private: true });
-    } else if (s.method === 'email') findings.push({ where: '이메일 주소는 원문에서', title: '이메일로 내요', text: s.how });
+    } else if (s.method === 'email' && !(bro && bro.kind === 'explore')) findings.push({ where: '이메일 주소를 못 찾음', title: '이메일로 내요', text: `${s.how || ''}\n요강·첨부·공고에서 접수 메일 주소를 찾지 못했어요`.trim() });
     else if (SEND[s.method]) findings.push({ where: s.method === 'form' ? '구글 폼 열기' : s.method === 'nform' ? '네이버 폼 열기' : s.method === 'oform' ? '접수 폼 열기' : '접수 페이지', title: SEND[s.method], text: s.how, ...(web ? { url: web } : {}) });
-    else findings.push({ where: '접수 방법', title: '원문에서 확인해 주세요', text: s.how || '요강에 접수 방법이 따로 적혀 있지 않았어요', url: c.url });
+    else if (!(bro && bro.kind === 'explore')) findings.push({ where: '접수 방법', title: '여기서 낼 수 없는 접수예요', text: s.how || '요강과 공고에서 접수 방법을 찾지 못했어요', url: c.url });
     if (ready){   // 메일에 붙일 파일과, 손으로 만든 파일을 더할 폴더(메일을 여기서 보낼 수 있을 때만)
       const at = attachOf(c); fs.mkdirSync(extraDir(c), { recursive: true, mode: 0o700 });
       findings.push({ where: '메일에 붙일 파일', title: at.length ? `${at.length}개` : '없음', text: [at.map(a => a.filename).join('\n'), '서명한 스캔·PDF처럼 직접 만든 파일은 아래 폴더에 넣으면 함께 붙여요'].filter(Boolean).join('\n'), copy: shown(extraDir(c)) });
@@ -697,7 +906,7 @@ async function submit(){
     } else if (c.form && c.form.error) findings.push({ where: '폼 읽기', title: '폼 문항을 읽지 못했어요', text: `${c.form.error}\n폼을 열어 직접 내 주세요` });
     if (canBrowse){
       const at = attachOf(c);
-      findings.push({ where: '브라우저로 내기', title: bro.kind === 'form' ? '로그인한 브라우저로 폼을 채워 제출해요' : 'AI가 접수 화면을 읽고 채워 제출해요',
+      findings.push({ where: '브라우저로 내기', title: bro.kind === 'explore' ? 'AI가 공고를 읽고 접수 방법을 찾아 내요' : bro.kind === 'form' ? '로그인한 브라우저로 폼을 채워 제출해요' : 'AI가 접수 화면을 읽고 채워 제출해요',
         text: ['pkm 전용 브라우저에서 접수 화면을 열어 칸을 읽고, 위 안과 내 정보로 채운 뒤 제출해요. 필수 동의 항목에는 동의로 표시해요(홍보·마케팅 수신 같은 선택 동의는 하지 않아요)',
           '로그인·회원가입·본인 인증·캡차가 나오면 멈추고 이 화면의 브라우저에서 직접 하게 넘겨요. 내 정보는 AI에게 보이지 않고 프로그램이 넣어요',
           at.length ? `올릴 수 있는 파일: ${at.map(a => a.filename).join(', ')}` : ''].filter(Boolean).join('\n'), url: bro.url });
@@ -712,10 +921,10 @@ async function submit(){
     }
     const rem = remembered(c);
     if (rem) findings.push({ where: '기억한 값', text: `기억한 값으로 채움: ${rem}` });
-    findings.push({ where: '공모전 원문', url: c.url });
+    findings.push({ where: '모음 사이트 공고', url: c.url });   // 참고 링크 — 읽는 일은 AI가 한다
     const how = SEND[s.method] && !f.unreadable;
     const verdict = n != null && n < 0 ? { tone: 'bad', title: `마감이 지났어요 · ${E.kday(c.deadline)}`, text: '그래도 냈다면 [직접 냈어요]를 눌러요' }
-      : { tone: 'ok', title: `${sendable ? `보낼 안 · ${E.cut(top(c).slice(0, fmode ? 1 : 99).map(x => x.text).join(' · '), 40)}` : `AI 안 ${items.length}개`}${c.filled && c.filled.length ? ` · 서류 ${c.filled.length}개` : ''} · ${how ? SEND[s.method] : '낼 방식은 원문에서 확인해 주세요'}`,
+      : { tone: 'ok', title: `${sendable ? `보낼 안 · ${E.cut(top(c).slice(0, fmode ? 1 : 99).map(x => x.text).join(' · '), 40)}` : `AI 안 ${items.length}개`}${c.filled && c.filled.length ? ` · 서류 ${c.filled.length}개` : ''} · ${how ? SEND[s.method] : bro ? 'AI가 공고를 읽고 내요' : '여기서 낼 수 없는 접수예요'}`,
         text: f.unreadable ? "요강을 다 읽지 못해서 '이름 + 뜻풀이 200자' 꼴로 만들었어요" : [c.deadline && `마감 ${E.kday(c.deadline)}`, ...limits].filter(Boolean).join(' · ') };
     const repick = sendable && items.length > 1;
     const hint = [ready ? (c.mail_sending ? `안 보내졌어요 · 다시 보내기 → 보낸메일함에 없을 때만 눌러요. ${m.to}에 다시 보내요` : `메일 보내기 → 내 네이버 메일로 ${m.to}에 보내고 '결과 기다리는 공모전'으로 옮겨요`) : '', unsureForm ? "제출된 걸 확인했어요 → 폼 응답에서 확인했으면 '결과 기다리는 공모전'으로 옮겨요" : '',fcan ? `폼 제출하기 → 위 '폼 1, 2…'의 답 그대로 ${fname}에 제출하고 '결과 기다리는 공모전'으로 옮겨요` : '',
@@ -723,32 +932,35 @@ async function submit(){
       repick ? `보낼 안 다시 고르기 → 다른 안으로 ${fmode ? '폼 답을' : c.filled && c.filled.length ? '메일과 서류를' : '메일을'} 다시 만들어요` : '', `${sendable ? '직접 냈어요' : '냈어요'} → '결과 기다리는 공모전'으로 옮겨요`, '나중에 낼게요 → 그대로 둬요. 만든 안도 남아요',
       "안 낼래요 → '뺀 공모전'으로 옮겨요. 다시 넣을 수 있어요", s.method === 'email' && !ready && m && m.to ? '네이버 아이디·애플리케이션 비밀번호를 플러그인 준비 화면의 비밀값에 넣으면 여기서 바로 보낼 수 있어요' : '',
       hasAccount() && s.method !== 'email' && !fmode ? `[메일 보내기]는 이메일로 받는 공모전에만 나와요 · 이 공모전은 ${SEND[s.method] ? `${E.METHODS[s.method]} 접수예요` : '접수 방법을 요강에서 확인해야 해요'}` : '',
-      hasAccount() && s.method === 'email' && !(m && m.to) ? '접수 메일 주소를 요강에서 찾지 못해 [메일 보내기]를 둘 수 없어요. 원문에서 주소를 확인해 직접 보내 주세요' : ''].filter(Boolean).join('\n');
+      hasAccount() && s.method === 'email' && !(m && m.to) && !(bro && bro.kind === 'explore') ? '접수 메일 주소를 찾지 못해 [메일 보내기]를 둘 수 없어요' : ''].filter(Boolean).join('\n');
     // 내가 할 일만 남기고, 이미 자동으로 채운 것은 접어 둔다(펼치면 그대로 보인다). 여기서 못 내는 접수(직접 복사해 내야 함)는 고른 안과 복사할 것을 그대로 보인다
-    const NEED = new Set(['응모 규칙', '폼 제출', '폼 읽기', '지난 시도', '접수 폼 후보', '직접 받을 양식', '양식', '접수 방법', '이메일 주소는 원문에서']);
+    const NEED = new Set(['다시 확인', '응모 규칙', '폼 제출', '폼 읽기', '지난 시도', '접수 폼 후보', '직접 받을 양식', '양식', '접수 방법', '이메일 주소를 못 찾음']);
     const mineNow = top(c).slice(0, fmode || bro ? 1 : 99);
     for (const [i, x] of findings.entries()){
-      const cand = i >= aiRule.length && i < aiRule.length + items.length ? items[i - aiRule.length] : null;
+      const lead = aiRule.length + (again ? 1 : 0), cand = i >= lead && i < lead + items.length ? items[i - lead] : null;
       const todo = NEED.has(x.where) || /답이 비었어요|채우지 못했어요|빈칸으로 둔|직접 할 일|자필 서명|직접 채워/.test(x.text || '');
       if (cand ? !mineNow.includes(cand) : sendable && !todo) x.fold = true;
     }
     return { summary: '냈는지 묻기', verdict, fold_label: '자동으로 채운 것', findings: findings.slice(0, 45), ask: { question: `냈나요? · ${n == null ? '마감일 요강 확인' : n < 0 ? `마감 지남 (${E.kday(c.deadline)})` : `마감 ${n === 0 ? '오늘' : `D-${n}`} (${E.kday(c.deadline)})`}`, hint,
-      choices: [...(ready ? [c.mail_sending ? { value: 'mailretry', label: '안 보내졌어요 · 다시 보내기' } : { value: 'mail', label: '메일 보내기', recommended: true }] : []),
-        ...(fcan ? [{ value: 'form', label: '폼 제출하기', recommended: true, ...(c.form_doubt ? { confirm: '지난번 제출이 됐는지 확인하지 못했어요. 이미 들어갔다면 두 번 내게 돼요' } : {}) }] : []),
+      choices: [...(ready ? [c.mail_sending ? { value: `mailretry:${msig}`, label: '안 보내졌어요 · 다시 보내기' } : { value: `mail:${msig}`, label: '메일 보내기', recommended: true }] : []),
+        ...(fcan ? [{ value: `form:${fsig}`, label: '폼 제출하기', recommended: true, ...(c.form_doubt ? { confirm: '지난번 제출이 됐는지 확인하지 못했어요. 이미 들어갔다면 두 번 내게 돼요' } : {}) }] : []),
         ...(canBrowse ? [{ value: 'browse', label: 'AI가 브라우저로 내기', recommended: true, ...(c.sited && c.sited.sent === 'unknown' ? { confirm: '지난번에 제출됐는지 확인하지 못했어요. 이미 들어갔다면 두 번 내게 돼요' } : {}) }] : []),
         ...(repick ? [{ value: 'repick', label: '보낼 안 다시 고르기' }] : []), unsureForm ? { value: 'yes', label: '제출된 걸 확인했어요', recommended: true } : { value: 'yes', label: sendable ? '직접 냈어요' : '냈어요', recommended: !ready && !fcan && !canBrowse },{ value: 'later', label: '나중에 낼게요' }, { value: 'no', label: '안 낼래요' }] } };
   }
   if (!['mail', 'mailretry', 'form', 'browse', 'yes', 'later', 'no'].includes(answer)) fail('모르는 답이에요');
-  if (answer === 'browse'){ if (!bro) fail('이 공모전은 브라우저로 낼 접수 주소가 없어요. 원문에서 접수 방법을 확인해 주세요'); return done('browse'); }
+  if (answer === 'browse'){ if (!bro) fail('이 공모전은 브라우저로 낼 접수 주소가 없어요'); return done('browse'); }
   if (answer === 'form'){
     if (!fmode) fail('이 공모전은 여기서 폼을 제출할 수 없어요. 폼을 열어 직접 내 주세요');
-    const sent = await sendForm(db, c, me);
-    return done('form', { to: fname, sure: sent.sure });
+    let why = '';
+    const sent = await sendForm(db, c, me, want).catch(e => { if (e.changed){ why = e.changed; return null; } throw e; });
+    return sent ? done('form', { to: fname, sure: sent.sure }) : submit(why);
   }
   if (answer === 'mail' || answer === 'mailretry'){
     if (!ready) fail('네이버 아이디와 애플리케이션 비밀번호를 비밀값에 넣어야 메일을 보낼 수 있어요');
     if (answer === 'mailretry') delete c.mail_sending;   // 보낸메일함에 없다고 확인했다
-    return done('mail', { to: (await mail(db, c, me)).to });
+    let why = '';
+    const sent = await mail(db, c, me, want).catch(e => { if (e.changed){ why = e.changed; return null; } throw e; });
+    return sent ? done('mail', { to: sent.to }) : submit(why);
   }
   return done(answer);
 }
@@ -759,9 +971,8 @@ function browsed(){
   // 브라우저에서 내다가 물어서 받은 값(이름 → 값) — 내 정보는 다음 공모전에도, 그 밖의 답(조합원 여부·계좌 같은)은 이 공모전에만
   if (!blank(args.given)){ const g = json(args.given, '받은 내용'), kept = readKept(), ans = readJSON(ANSWERS(c), {}), gm = [], go = [];
     for (const [k0, v] of Object.entries(g && typeof g === 'object' ? g : {})){ const k = String(k0).slice(0, 40);
-      if (k && typeof v === 'string' && v.trim()){ if (keepMine(k)){ kept.제출용[k] = v.trim().slice(0, 400); gm.push(k); } else { ans[k] = v.trim().slice(0, 400); go.push(k); } } }
-    if (gm.length) writeLocal(KEPT, kept);
-    if (go.length) writeLocal(ANSWERS(c), ans);
+      if (k && typeof v === 'string' && v.trim()) (remember(kept, ans, k, v.trim().slice(0, 400)) === 'here' ? go : gm).push(k); }
+    if (gm.length || go.length){ writeLocal(KEPT, kept); writeLocal(ANSWERS(c), ans); }
     noteGot(gm, c, go); }
   const again = { step: '제출', value: 'browse' };   // 제출 단계부터 다시 — 새로 적은 내 정보를 넣어 브라우저로 다시 낸다
   if (a === 'yes'){ mark(); save(db); return { summary: '냈어요', sent: true }; }
@@ -770,16 +981,34 @@ function browsed(){
   if (a === 'retry') return { summary: '브라우저로 다시 내기', sent: false, again };
   if (a){   // 적은 내용('항목: 값' 줄) — 내 데이터에 기억하고 다시 낸다
     const kept = readKept(), ans = readJSON(ANSWERS(c), {}), gm = [], go = []; let n = 0;
-    for (const line of a.split(/\r?\n/)){ const i = line.search(/[:：]/), k = i < 0 ? '' : line.slice(0, i).trim().slice(0, 40), v = i < 0 ? '' : line.slice(i + 1).trim().slice(0, 400); if (k && v){ if (keepMine(k)){ kept.제출용[k] = v; gm.push(k); } else { ans[k] = v; go.push(k); } n++; } }   // 내 정보는 다음 공모전에도, 그 밖의 답(계좌 포함)은 이 공모전에만
+    for (const line of a.split(/\r?\n/)){ const i = line.search(/[:：]/), k = i < 0 ? '' : line.slice(0, i).trim().slice(0, 40), v = i < 0 ? '' : line.slice(i + 1).trim().slice(0, 400); if (k && v){ (remember(kept, ans, k, v) === 'here' ? go : gm).push(k); n++; } }   // 내 정보는 다음 공모전에도, 그 밖의 답(계좌 포함)은 이 공모전에만
     if (!n) fail("줄마다 '항목: 값' 꼴로 적어 주세요. 직접 냈거나 나중에 하려면 아래에서 골라요");
-    writeLocal(KEPT, kept); writeLocal(ANSWERS(c), ans); noteGot(gm, c, go);
-    return { summary: `적은 내용 ${n}개 · 브라우저로 다시 내기`, sent: false, again };
+    writeLocal(KEPT, kept); writeLocal(ANSWERS(c), ans); noteGot(gm, c, go); delete c.need; save(db);
+    return { summary: `적은 내용 ${n}개 · 브라우저로 다시 내기`, sent: false, again, ...(gm.length ? refreshLists() : {}) };
   }
   const raw = json(args.result, '브라우저 제출 결과'), r = E.normalizeBrowse(raw);
   // 러너가 넘긴 마지막 화면 원문(_screen)이 있으면 모델이 고른 proof 대신 그것으로 판정하고, 증거 글도 거기서 완료 문구가 든 줄을 뽑는다
   const screen = [args.screen, raw && raw._screen, raw && raw._result && raw._result._screen].find(s => typeof s === 'string' && s.trim());
   if (screen){ const lines = E.proofLines(screen); if (lines) r.proof = lines; else if (r.sent === 'yes') r.proof = E.text(screen, 300); }
   if (r.sent === 'yes' && !E.proofDone(screen || r.proof)) Object.assign(r, { sent: 'unknown', reason: 'AI는 냈다고 했지만 완료 문구·접수 번호를 확인하지 못했어요' });   // A4 — 증거 없이 '냈어요'로 적지 않는다
+  // 공고를 읽어 찾은 접수 방법 — 요강에 적고, 메일·폼이면 그 길로 다시 준비한다(사람에게 원문을 보라고 하지 않는다)
+  if (r.found.method){
+    c.explored = AT;
+    const sub = c.fit.submit, to = r.found.to, url = E.urlOf(to), mailTo = E.firstEmail(to);
+    if (r.found.method === 'email' && mailTo) Object.assign(sub, { method: 'email', to: mailTo, how: r.found.how || sub.how });
+    else if (['site', 'form'].includes(r.found.method) && url) Object.assign(sub, { method: F.kindOf(url) === 'naver' ? 'nform' : F.kindOf(url) === 'google' ? 'form' : r.found.method === 'form' ? 'oform' : 'site', to: url, how: r.found.how || sub.how });
+    else if (['post', 'visit', 'etc'].includes(r.found.method)) Object.assign(sub, { method: r.found.method, to: to || sub.to, how: r.found.how || sub.how });
+    c.refit_at = AT; save(db);
+    if (r.sent !== 'yes' && sub.method === 'email') return { summary: `접수 방법을 찾았어요 · 이메일 ${mailTo}`, sent: false, again: { step: '제출', value: '' } };
+    if (r.sent !== 'yes' && ['form', 'nform'].includes(sub.method)){ delete c.form; delete c.fplan; save(db); return { summary: `접수 방법을 찾았어요 · ${E.METHODS[sub.method]}`, sent: false, again: { step: '요강', value: '' } }; }   // 폼 문항부터 다시 읽는다
+  }
+  // 모자란 정보 — 이미 아는 것(다른 공모전에서 답했거나 '알려 줄 정보'에서 방금 답한 것)뿐이면 묻지 않고 다시 낸다. 모르는 것은 '알려 줄 정보'에 올린다
+  if (r.sent === 'no' && r.need.length){
+    const ans = readJSON(ANSWERS(c), {}), me = meOf(), open = r.need.filter(n => !knownOf(me, n.name) && !ans[n.name] && !(c.skipped || []).includes(n.name));
+    setNeed(c, r.need); c.sited = { at: AT, sent: 'no', reason: r.reason, proof: E.str(r.proof, 300), tries: (c.sited && c.sited.tries) || 0 }; save(db);
+    if (!open.length){ delete c.need; save(db); return { summary: '알려 준 정보로 다시 내기', sent: false, again }; }
+    r.need = open;
+  }
   const did =r.did.length ? [{ where: 'AI가 한 일', text: r.did.map((x, i) => `${i + 1}. ${x}`).join('\n') }] : [];
   const tries = (c.sited && c.sited.sent === 'no' ? c.sited.tries ?? 1 : 0) + (r.sent === 'no' && !r.need.length ? 1 : 0);   // 모자란 정보 때문에 멈춘 것은 실패로 세지 않는다
   c.sited = { at: AT, sent: r.sent, reason: r.reason, proof: E.str(r.proof, 300), tries };
@@ -791,7 +1020,7 @@ function browsed(){
     findings: [...(r.proof ? [{ where: '마지막 화면', text: r.proof }] : []), ...did, { where: '접수 화면', url: (browsable(c) || {}).url || c.url }],
     ask: unsure ? { question: '접수 화면에서 제출된 것을 확인했나요?', hint: '다시 내면 두 번 들어갈 수 있어요. 접수 화면이나 주최의 확인 메일·문자를 먼저 봐 주세요',
         choices: [{ value: 'yes', label: '제출된 걸 확인했어요' }, { value: 'later', label: '나중에 다시 할게요' }] }
-      : r.need.length ? { question: `접수 양식에 넣을 내용 ${r.need.length}개를 한 번에 적어 주세요. 보내면 바로 다시 내요`, free: true, value: r.need.map(k => `${k.name}: `).join('\n'),
+      : r.need.length ? { question: `접수 양식에 넣을 내용 ${r.need.length}개를 한 번에 적어 주세요. 보내면 바로 다시 내요${r.need.some(n => keepMine(n.name)) ? " · '알려 줄 정보'에서 답해도 돼요" : ''}`, free: true, value: r.need.map(k => `${k.name}: `).join('\n'),
         hint: [...r.need.map(k => `${k.name} — ${k.question || '알려 주세요'}${k.options.length ? ` (보기: ${k.options.join(' / ')})` : ''}`), "줄마다 ':' 뒤에 적고 보내요. 이름·주소 같은 내 정보는 내 데이터에 기억해서 다음에는 묻지 않아요. AI에게는 값이 아니라 자리표시만 가요"].join('\n'),
         choices: [{ value: 'yes', label: '직접 냈어요' }, { value: 'later', label: '나중에 다시 할게요' }] }
       : { question: '두 번 해 봤지만 내지 못했어요. 위 이유를 보고 골라 주세요', hint: '직접 냈다면 → 결과 기다리는 쪽으로 옮겨요\n다시 내기 → 막힌 것을 풀었을 때(예: 사이트 회원가입을 해 뒀다)',
@@ -803,15 +1032,16 @@ function picked(){
   c.sent_names = E.lines(String(args.answer).replace(/,/g, '\n')).slice(0, 20); save(db);
   return { summary: `낸 안 ${c.sent_names.length}개` };
 }
+const followUp = c => c.fit && c.fit.announce && c.fit.announce >= TODAY ? ` · 발표일(${E.kday(c.fit.announce)})이 되면 알림으로 알려 드려요` : '';
 function finish(){
   const db = load(), c = contest(db, args.cid), ch = args.choice;
   const wait = ch === 'later' && c.mail_wait && !c.submitted; if (c.mail_wait){ delete c.mail_wait; save(db); }
   const v = wait ? { tone: 'ok', title: '아침 8시 이후에 보내요', text: '자동 메일은 한국 시각 오전 8시~오후 9시에만 보내요. 그 전에 보내려면 [제출 준비]에서 [메일 보내기]를 눌러요' }
-    : ch === 'mail' ? { tone: 'ok', title: `메일을 보냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${proofOf(c)[0].text}\n'결과 기다리는 공모전'에서 발표일 순으로 보여요` }
+    : ch === 'mail' ? { tone: 'ok', title: `메일을 보냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${proofOf(c)[0].text}\n'결과 기다리는 공모전'에서 발표일 순으로 보여요${followUp(c)}` }
     : ch === 'form' && c.formed && !c.formed.sure && !c.submitted ? { tone: 'bad', title: '제출됐는지 확인하지 못했어요', text: "폼 응답이나 주최 안내에서 확인한 뒤 [제출 준비]에서 '제출된 걸 확인했어요'를 눌러 주세요. 다시 보내지는 않아요" }
-    : ch === 'form' ? { tone: 'ok', title: `폼을 제출했어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${FORM[(c.formed || {}).kind] || '폼'}에 냈어요. '결과 기다리는 공모전'에서 발표일 순으로 보여요` }
-    : ch === 'browse' && c.submitted ? { tone: 'ok', title: `냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${proofOf(c)[0].text}\n'결과 기다리는 공모전'에서 발표일 순으로 보여요` }
-    : ch === 'yes' ? { tone: 'ok', title: `냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: "'결과 기다리는 공모전'에서 발표일 순으로 보여요" }
+    : ch === 'form' ? { tone: 'ok', title: `폼을 제출했어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${FORM[(c.formed || {}).kind] || '폼'}에 냈어요. '결과 기다리는 공모전'에서 발표일 순으로 보여요${followUp(c)}` }
+    : ch === 'browse' && c.submitted ? { tone: 'ok', title: `냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `${proofOf(c)[0].text}\n'결과 기다리는 공모전'에서 발표일 순으로 보여요${followUp(c)}` }
+    : ch === 'yes' ? { tone: 'ok', title: `냈어요 · ${E.announceLine(c.fit, TODAY)}`, text: `'결과 기다리는 공모전'에서 발표일 순으로 보여요${followUp(c)}` }
     : ch === 'no' ? { tone: 'ok', title: '뺐어요', text: "'뺀 공모전'에서 다시 넣을 수 있어요" }
     : { tone: 'ok', title: `그대로 둘게요 · ${E.deadlineLine(c.deadline, TODAY).replace(/ · .*$/, '')}`, text: '다시 [제출 준비]를 누르면 만든 안을 바로 보여요' };
   return { summary: v.title, verdict: v, outcome: { title: wait ? '아침에 보낼 것' : ch === 'browse' ? (c.submitted ? '제출함' : '나중에') : ch === 'form' && !c.submitted ? '확인 필요' : { mail: '보냄', form: '제출함', yes: '냄', no: '뺌' }[ch] || '나중에', text: '' } };
@@ -939,7 +1169,7 @@ function autoToggle(){
   return { summary: '그대로', outcome: { title: '그대로', text: '' }, verdict: { tone: 'ok', title: FULL ? '켜 둔 채로 둘게요' : '지금처럼 확인하며 할게요', text: '' } };
 }
 
-const CMD = { 'auto-list': autoList, 'auto-toggle': autoToggle, 'form-test-list': formTestList, 'form-test': formTest, 'form-test-ok': formTestOk, 'mail-list': mailList, 'mail-test': mailTest, 'find-list': findList, 'open-list': openList, 'sent-list': sentList, 'out-list': outList, find, 'sort-out': sortOut, prep, papers, info, fill, submit, browsed, picked, finish, drop, force, result, award };
+const CMD = { 'me-list': meList, 'me-edit': meEdit, 'me-done': meDone, 'need-list': needList, 'need-answer': needAnswer, 'need-done': needDone, 'auto-list': autoList, 'auto-toggle': autoToggle, 'form-test-list': formTestList, 'form-test': formTest, 'form-test-ok': formTestOk, 'mail-list': mailList, 'mail-test': mailTest, 'find-list': findList, 'open-list': openList, 'sent-list': sentList, 'out-list': outList, find, 'sort-out': sortOut, prep, papers, info, fill, submit, browsed, picked, finish, drop, force, result, award };
 async function main(){
   if (argLost) return { error: '앞 단계 결과 파일을 찾지 못했어요(하루가 지나 지워졌을 수 있어요). 앞 단계부터 다시 해 주세요' };
   if (!fs.existsSync(path.join(profile, '_설정.md'))) return { error: `프로필 폴더를 찾지 못했어요: ${profile}` };
@@ -950,6 +1180,6 @@ async function main(){
 }
 const real = p => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 if (process.argv[1] && real(process.argv[1]) === real(fileURLToPath(import.meta.url))){
-  let r; try { r = await main(); } catch (e) { r = { error: e.user ? e.message : `처리하다 문제가 생겼어요(${e.message}). 이 단계를 다시 해 주세요` }; }
+  let r; try { r = await main(); } catch (e) { r = { error: e.user ? e.message : `처리하다 문제가 생겼어요(${e.message}). 이 단계를 다시 해 주세요`, ...(e.notify ? { notify: e.notify } : {}) }; }
   process.stdout.write(JSON.stringify(r) + '\n');
 }

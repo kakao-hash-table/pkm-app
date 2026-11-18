@@ -56,6 +56,37 @@
        "options"
       ]
      }
+    },
+    "found": {
+     "type": "object",
+     "description": "접수 방법을 찾아야 했을 때 찾은 것. 아니면 method를 빈 글로",
+     "properties": {
+      "method": {
+       "type": "string",
+       "enum": [
+        "",
+        "site",
+        "form",
+        "email",
+        "post",
+        "visit",
+        "etc"
+       ]
+      },
+      "to": {
+       "type": "string",
+       "description": "접수 주소(URL)·이메일 주소·우편 주소 — 공고에 적힌 그대로"
+      },
+      "how": {
+       "type": "string",
+       "description": "접수 방법 한 줄"
+      }
+     },
+     "required": [
+      "method",
+      "to",
+      "how"
+     ]
     }
    },
    "required": [
@@ -63,7 +94,8 @@
     "reason",
     "proof",
     "did",
-    "need"
+    "need",
+    "found"
    ]
   }
  },

@@ -67,7 +67,8 @@ test('모자란 내용 묻기 — 동의 표시는 내가 고르고, 양식에 �
   assert.equal(b.ask.free, true);
   const c = run('info', { cid: 'thinkcontest:1', plan: '', me: ME, answer: '생년월일: 1997. 05. 01.' });
   assert.equal(c.ask, undefined);
-  assert.equal(c.settings_patch, undefined, '내 정보를 단계 결과에 싣지 않는다(실행 기록은 동기화된다)');
+  assert.equal((c.settings_patch || {}).me, undefined, '내 정보를 단계 결과에 싣지 않는다(실행 기록은 동기화된다)');
+  assert.doesNotMatch(JSON.stringify(c), /1997/, '값은 어디에도 싣지 않고 목록만 다시 가져오게 한다');
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(STORE, '내정보.json'), 'utf8')), { 조건: {}, 제출용: { 생년월일: '1997. 05. 01.' } });   // 내 프로필 데이터에(다른 기기와 동기화)
   assert.equal(run('info', { cid: 'thinkcontest:1', plan: '', me: ME }).summary, '모자란 내용 없음');
   assert.doesNotMatch(fs.readFileSync(DB, 'utf8'), /1997\. 05|010-1234|김테스트/, '노트 폴더의 기록에는 내 정보가 없다');

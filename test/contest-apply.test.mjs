@@ -27,7 +27,7 @@ const FIT = (i, more = {}) => ({ i, unreadable: false, is_target: true, kinds: [
 test('규격 검사를 통과하고, 목록·워크플로우·정렬 칩이 설계대로다', async () => {
   const r = await plugins.inspect({ local: PLUGIN });
   assert.equal(r.ok, true, (r.errors || []).join('\n'));
-  assert.deepEqual(r.feeds.map(f => f.name), ['공모전 찾기', '완전 자동화', '낼 공모전', '결과 기다리는 공모전', '뺀 공모전', '메일 계정', '폼 제출 시험']);
+  assert.deepEqual(r.feeds.map(f => f.name), ['공모전 찾기', '완전 자동화', '낼 공모전', '알려 줄 정보', '결과 기다리는 공모전', '뺀 공모전', '내 정보', '메일 계정', '폼 제출 시험']);
 });
 
 test('엔진 — 표시 글: 상금·마감·발표, 제출 방식, 정렬 값', () => {
@@ -105,7 +105,7 @@ test('찾은 공모전을 AI 정리로 낼 것·뺀 것으로 나누고, 판정�
   const odd = open[3];
   assert.equal(odd.meta[1], '마감 D-18 · 11월 28일', '마감일은 사이트 값을 믿는다');
   assert.ok(odd.tags.includes('요강 확인'));
-  assert.match(odd.detail[0].text, /\n확인 · 본문이 2024년 공모 글 같아요 — 원문을 봐 주세요$/);
+  assert.match(odd.detail[0].text, /\n확인 · 본문이 2024년 공모 글 같아요 — 다음 찾기 때 첨부·홈페이지까지 다시 읽어요$/);
   assert.equal(a.title, '2026 수원 새 브랜드 네이밍 공모전');
   assert.deepEqual(a.tags, ['네이밍', '이메일', 'AI 안 없음']);
   assert.deepEqual(a.meta, ['1등 100만원 · 총 200만원', '마감 D-10 · 11월 20일', '발표 12월 5일', '주최 수원시']);
@@ -114,7 +114,7 @@ test('찾은 공모전을 AI 정리로 낼 것·뺀 것으로 나누고, 판정�
   assert.deepEqual(a.sort, { deadline: '2026-11-20', prize: 1000000, announce: '2026-12-05' });
   assert.deepEqual(a.vars, { cid: 'wevity:1' });
   assert.deepEqual(open[0].tags, ['네이밍', '방식 확인', 'AI 안 없음', '조건 확인']);
-  assert.match(open[0].detail[0].text, /^요강이 그림이라 읽지 못했어요/);
+  assert.match(open[0].detail[0].text, /^요강을 다 읽지 못했어요\. \[제출 준비\]를 누르면 AI가 공고 화면을 직접 읽고 내요$/);
 
   const out2 = run('out-list').items;
   assert.deepEqual(out2.map(i => [i.id, i.tags[0], i.detail[0].text]), [['wevity:2', '조건 안 맞음', '서울시 거주자 → 서울 거주만'], ['wevity:3', '분야 다름', '영상 공모전이에요']]);
@@ -140,7 +140,7 @@ test('제출 준비 — AI 안이 없으면 만들고, 복사할 것·제출처�
   assert.match(ask.ask.hint, /^냈어요 → .*\n나중에 낼게요 → .*\n안 낼래요 → /);
   assert.equal(ask.ask.question, '냈나요? · 마감 D-10 (11월 20일)');
   const w = ask.findings.map(f => f.where);
-  assert.deepEqual(w, ['추천 1', '추천 2', '안 3', '받는 사람', '메일 제목', '메일 본문', '공모전 원문']);   // 메일 접수는 내 정보를 본문에 담아 미리 보인다
+  assert.deepEqual(w, ['추천 1', '추천 2', '안 3', '받는 사람', '메일 제목', '메일 본문', '모음 사이트 공고']);   // 메일 접수는 내 정보를 본문에 담아 미리 보인다
   assert.equal(ask.findings[0].copy, '수원새빛\n새로운 빛으로 여는 수원');   // 이메일은 이름 + 뜻풀이
   assert.equal(ask.findings[1].note, '뜻 210/200자 · 줄여야 해요');
   assert.equal(ask.findings[4].copy, '[네이밍 공모] 홍길동_010-1234-5678');
@@ -259,7 +259,7 @@ test('전에 가져온 기록도 하나로 — 손으로 뺀 중복만 알던 �
     assert.match(run('mail-list').items[0].meta[1], /^메일로 바로 보낼 수 있는 낼 공모전 1개/);
     const ask = run('submit', { cid: 'wevity:12', draft: '', me: '', auto: 'false' }).ask;
     assert.match(ask.hint, /\[메일 보내기\]는 이메일로 받는 공모전에만 나와요 · 이 공모전은 구글 폼 접수예요$/);
-    assert.ok(!ask.choices.some(c => c.value === 'mail'));
+    assert.ok(!ask.choices.some(c => c.value.split(':')[0] === 'mail'));
   } finally { delete process.env.NAVER_ID; delete process.env.NAVER_APP_PASSWORD; }
 });
 
@@ -275,6 +275,27 @@ test('접수 방법을 모르던 공모전을 다시 읽히면 접수 방법·�
   assert.equal(out.verdict.title, '새 공모전이 없어요');
   const c = JSON.parse(fs.readFileSync(DB, 'utf8')).contests['wevity:20'];
   assert.deepEqual([c.fit.submit.method, c.fit.submit.to, c.fit.announce, c.fit.eligibility.ok, c.refit, !!c.refit_at, c.draft.items[0].text], ['email', 'sea@museum.kr', '2026-12-01', 'yes', undefined, true, '바다를 읽다']);
+});
+
+test('그림이라 못 읽었던 공모전을 그림과 함께 다시 읽으면 정리를 새것으로 바꾸고, 모르고 만든 AI 안은 지우고, 그림에서 읽은 글은 안 만들기 자료가 된다', () => {
+  const blind = E.normalizeFit({ contests: [FIT(0, { unreadable: true, submit_what: '', method: 'etc', submit_to: '', eligible: 'unsure' })] }).contests[0];
+  const draft = { items: [{ kind: '네이밍', text: '눈감은안', read: '', why: '', form: [] }], note: '', at: NOW, made: 'x' };
+  seed([{ key: 'wevity:30', title: '정보보안 표어 공모전', deadline: '2026-11-27', brief: '정보보안 표어 공모전', reread: true, fit: blind, draft },
+    { key: 'wevity:31', title: '흐린 포스터 공모', deadline: '2026-11-27', reread: true, fit: blind, draft }]);
+  const out = run('sort-out', { keys: ['wevity:30', 'wevity:31'], seen: 2, sites: 4, failed: '', fit: { contests: [
+    FIT(0, { submit_what: '표어 20자 이내', allow: 3, desc_limit: 0, method: 'form', submit_to: 'https://m.site.naver.com/2kPBc', submit_how: '네이버폼 온라인 접수', deadline: '2026-11-27',
+      eligibility_text: '국민 누구나', eligible: 'yes', image_text: '참가방법: 네이버폼 온라인 접수 https://m.site.naver.com/2kPBc\n1인 최대 3편, 표어 20자 이내(띄어쓰기 포함)' }),
+    FIT(1, { unreadable: true, image_text: '' })], note: '' } });
+  assert.match(out.verdict.text, /그림이라 못 읽었던 요강을 그림으로 다시 읽은 것 1개/);
+  assert.match(out.summary, /다시 읽음 1/);
+  const db = JSON.parse(fs.readFileSync(DB, 'utf8')).contests, c = db['wevity:30'], d = db['wevity:31'];
+  assert.deepEqual([c.fit.unreadable, c.fit.submit.what, c.fit.submit.allow, c.fit.eligibility.ok, c.reread, !!c.reread_at, c.draft, 'seen' in c.fit], [false, '표어 20자 이내', 3, 'yes', undefined, true, undefined, false]);
+  assert.match(c.poster, /1인 최대 3편, 표어 20자 이내/);
+  assert.deepEqual([d.fit.unreadable, d.draft.items[0].text, !!d.reread_at, d.poster], [true, '눈감은안', true, undefined], '또 못 읽으면 그대로 두고 다시 묻지 않는다');
+  const p = run('prep', { cid: 'wevity:30', birth: '', gender: '', home: '', work: '', status: '', me: '' });
+  assert.equal(p.need_ai, true);
+  assert.match(p._ctx, /낼 것: 표어 20자 이내/);
+  assert.match(p._ctx, /요강 원문 일부:\n정보보안 표어 공모전\n\[포스터 그림에서 읽은 글\]\n참가방법: 네이버폼/);
 });
 
 test('내 정보 연동 — 설정에 적은 값은 프로필 데이터(내정보.json)에 옮기고, 설정이 빈 기기에서는 데이터의 값으로 설정을 채운다', () => {

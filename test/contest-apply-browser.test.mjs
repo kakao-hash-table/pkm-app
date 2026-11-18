@@ -121,7 +121,7 @@ test('폼 — 확인 화면 없이 끝난 제출(sure:false)은 냈어요로 적
   r = run('submit', { cid: 'wevity:4', me: ME, full: 'true', fauto: 'true' });
   assert.equal(r.summary, '냈는지 묻기', '완전 자동화여도 다시 내지 않는다');
   assert.equal(where(r, '지난 시도')[0].title, '제출 요청은 받아들여졌지만 확인 화면은 못 봤어요');
-  assert.equal(r.ask.choices.some(c => ['form', 'browse'].includes(c.value)), false);
+  assert.equal(r.ask.choices.some(c => ['form', 'browse'].includes(c.value.split(':')[0])), false);
   assert.deepEqual(r.ask.choices.find(c => c.value === 'yes'), { value: 'yes', label: '제출된 걸 확인했어요', recommended: true });
   assert.ok(run('open-list').items.find(i => i.id === 'wevity:4').tags.includes('제출 확인 필요'));
   run('submit', { cid: 'wevity:4', me: ME, answer: 'yes' });
@@ -136,8 +136,8 @@ test('메일 — 보내는 중 기록(mail_sending)이 남아 있으면 다시 �
   let r = runM('submit', { cid: 'wevity:5', me: ME, auto: 'true', full: 'true' });
   assert.equal(r.summary, '냈는지 묻기', '켜 두어도 자동으로 보내지 않는다');
   assert.equal(where(r, '지난 시도')[0].title, '메일이 보내졌는지 확인하지 못했어요');
-  assert.deepEqual(r.ask.choices.map(c => c.value).slice(0, 1), ['mailretry']);
-  assert.equal(r.ask.choices.some(c => c.value === 'mail'), false);
+  assert.deepEqual(r.ask.choices.map(c => c.value.split(':')[0]).slice(0, 1), ['mailretry']);
+  assert.equal(r.ask.choices.some(c => c.value.split(':')[0] === 'mail'), false);
   assert.ok(runM('open-list').items.find(i => i.id === 'wevity:5').tags.includes('제출 확인 필요'));
   r = runM('submit', { cid: 'wevity:5', me: ME, answer: 'mail' });
   assert.match(r.error, /지난번 메일이 보내졌는지 확인하지 못했어요/);

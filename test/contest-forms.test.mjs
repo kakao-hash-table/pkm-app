@@ -86,7 +86,7 @@ const miniForm = (items, o) => readForm(`https://docs.google.com/forms/d/e/${MIN
 /* ---------- 주소 ---------- */
 test('kindOf: 구글·네이버 폼 주소만 가린다', () => {
   for (const u of ['https://forms.gle/kZd1UsysL9jrrsbG7', KSPO, `${KSPO}?usp=send_form`, 'https://docs.google.com/forms/d/abc/edit']) assert.equal(kindOf(u), 'google', u);
-  for (const u of [KIND, 'https://naver.me/FWTtLoq0']) assert.equal(kindOf(u), 'naver', u);
+  for (const u of [KIND, 'https://naver.me/FWTtLoq0', 'https://m.site.naver.com/2kPBc']) assert.equal(kindOf(u), 'naver', u);   // m.site.naver.com — 포스터 QR 짧은 주소
   for (const u of ['', 'forms.gle/x', 'https://docs.google.com/document/d/abc', 'https://example.com/forms.gle', 'https://form.naver.com.evil.test/response/x', 'javascript:alert(1)', null]) assert.equal(kindOf(u), '', String(u));
 });
 
@@ -99,6 +99,9 @@ test('짧은 주소는 Location만 읽어 폼 주소를 얻고, 폼이 아닌 �
   const f = await readForm('https://naver.me/FWTtLoq0', { fetch: n });
   assert.equal(f.url, KIND);
   assert.equal(n.calls.length, 2);   // 폼 화면(HTML)은 받지 않는다
+
+  const qr = stub(url => url === 'https://m.site.naver.com/2kPBc' ? new Response(null, { status: 308, headers: { location: 'https://naver.me/FWTtLoq0' } }) : url === 'https://naver.me/FWTtLoq0' ? new Response(null, { status: 307, headers: { location: KIND } }) : /9aiNWQM4Vo9\/access/.test(url) ? new Response(read('form-naver-kind.json')) : null);
+  assert.equal((await readForm('https://m.site.naver.com/2kPBc', { fetch: qr })).url, KIND, '포스터 QR 주소 → naver.me → 네이버 폼');
 
   const away = stub(url => url === 'https://naver.me/zzz' ? to('https://example.com/landing') : null);
   assert.match((await readForm('https://naver.me/zzz', { fetch: away })).error, /네이버 폼/);

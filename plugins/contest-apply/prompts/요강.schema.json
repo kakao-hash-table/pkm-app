@@ -16,6 +16,10 @@
         "type": "boolean",
         "description": "요강이 그림뿐이라 낼 것·조건을 읽지 못했으면 true"
        },
+       "image_text": {
+        "type": "string",
+        "description": "그림(포스터)에서 읽은 요강 글 중 본문에 없는 것, 1000자 안. 그림이 없으면 빈 글"
+       },
        "is_target": {
         "type": "boolean"
        },
@@ -142,6 +146,7 @@
       "required": [
        "i",
        "unreadable",
+       "image_text",
        "is_target",
        "kinds",
        "target_why",

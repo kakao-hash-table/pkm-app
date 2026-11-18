@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 
 const UA = 'pkm-contest/0.4 (personal use)';
 const G = 'https://docs.google.com/forms/d', NAPI = 'https://survey-api.naver.com/api/form', NPAGE = 'https://form.naver.com/response';
-const SHORT = new Set(['forms.gle', 'naver.me']);
+const SHORT = new Set(['forms.gle', 'naver.me', 'm.site.naver.com']);   // m.site.naver.com — 포스터 QR의 네이버 짧은 주소(naver.me로 간다)
 const PICK = new Set(['choice', 'multi', 'dropdown', 'scale', 'agree', 'category']), TEXT = new Set(['short', 'long']), LINES = new Set(['multi', 'grid', 'category']);
 const EMAIL = /^[\w.+-]+@([\w-]+\.)+[\w-]{2,}$/;
 const host = u => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } };
@@ -22,14 +22,14 @@ export const kindOf = url => {
   const h = u.hostname.toLowerCase();
   if (!/^https?:$/.test(u.protocol)) return '';
   if (h === 'forms.gle' || (h === 'docs.google.com' && u.pathname.startsWith('/forms/'))) return 'google';
-  return h === 'form.naver.com' || h === 'naver.me' ? 'naver' : '';
+  return h === 'form.naver.com' || h === 'naver.me' || h === 'm.site.naver.com' ? 'naver' : '';
 };
 
 /* ---------- 요청 ---------- */
 const call = (fetch, url, opt = {}) => fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20000), ...opt, headers: { 'user-agent': UA, ...opt.headers } });
 const cookieOf = r => (r.headers.getSetCookie?.() || []).map(c => c.split(';')[0].trim()).filter(Boolean).join('; ');
 const withCookie = cookie => cookie ? { cookie } : {};
-// 짧은 주소(forms.gle·naver.me)는 Location만 읽는다 — naver.me는 아무 데로나 갈 수 있어 끝까지 따라가지 않는다
+// 짧은 주소(forms.gle·naver.me·m.site.naver.com)는 Location만 읽는다 — naver.me는 아무 데로나 갈 수 있어 끝까지 따라가지 않는다
 async function expand(fetch, url){
   for (let i = 0; i < 4 && SHORT.has(host(url)); i++){
     const r = await call(fetch, url), loc = r.headers.get('location');

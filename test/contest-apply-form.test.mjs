@@ -65,17 +65,22 @@ test('네이버 폼 — 고르기를 먼저 묻지 않고 문항별 답을 보�
   assert.equal(rows[3].copy, '함께 짓는 내일'); assert.equal(rows[4].copy, '함께 만든다는 뜻');
   assert.equal(rows[5].text, '→ 예'); assert.equal(rows[5].private, undefined);
   assert.match(text(r, '폼 제출')[0].text, /폼 제출 시험/);
-  assert.equal(r.ask.choices.some(c => c.value === 'form'), false);
+  assert.equal(r.ask.choices.some(c => c.value.split(':')[0] === 'form'), false);
   assert.match(run('submit', { cid: 'wevity:1', me: ME, answer: 'form' }).error, /아직 네이버 폼 제출을 시험하지 않았어요/);
 
   const d = db(); d.form_test = { naver: { at: NOW, ok: true, sent: true } }; put(d);
   r = run('submit', { cid: 'wevity:1', me: ME });
-  const b = r.ask.choices.find(c => c.value === 'form');
+  const b = r.ask.choices.find(c => c.value.split(':')[0] === 'form');
   assert.equal(b.label, '폼 제출하기'); assert.equal(b.confirm, undefined, '확인창은 지난 제출이 불확실할 때만 둔다');
+  assert.match(b.value, /^form:[0-9a-f]{12}$/, '보여 준 답의 지문을 버튼에 담는다');
+  const stale = run('submit', { cid: 'wevity:1', me: ME.replace('김테스트', '박바뀜'), answer: b.value });   // 화면을 본 뒤 다른 기기에서 이름을 바꿨다
+  assert.equal(stale.summary, '냈는지 묻기');
+  assert.match(stale.findings.find(f => f.where === '다시 확인').text, /폼에 넣을 답이 바뀌었어요/);
+  assert.equal(db().contests['wevity:1'].formed, undefined, '제출하지 않았다');
   assert.equal(text(r, '폼 6')[0].text, '→ 예'); assert.equal(text(r, '폼 4')[0].copy, '함께 짓는 내일', '고른 안 그대로');
   assert.equal(text(r, '폼 제출').length, 0);
   const u = db(); u.contests['wevity:1'].form_doubt = NOW; put(u);
-  assert.match(run('submit', { cid: 'wevity:1', me: ME }).ask.choices.find(c => c.value === 'form').confirm, /두 번 내게 돼요/);
+  assert.match(run('submit', { cid: 'wevity:1', me: ME }).ask.choices.find(c => c.value.split(':')[0] === 'form').confirm, /두 번 내게 돼요/);
   delete u.contests['wevity:1'].form_doubt; put(u);
   assert.equal(run('open-list').items.find(i => i.id === 'wevity:1').tags[1], '네이버 폼');
 });
@@ -83,7 +88,7 @@ test('네이버 폼 — 고르기를 먼저 묻지 않고 문항별 답을 보�
 test('동의 문항에 답하지 않기로 하면 폼 답만 보이고 제출은 직접 한다', () => {
   const d = db(); d.contests['wevity:1'].fconsent = 'no'; put(d);
   const r = run('submit', { cid: 'wevity:1', me: ME });
-  assert.equal(r.ask.choices.some(c => c.value === 'form'), false);
+  assert.equal(r.ask.choices.some(c => c.value.split(':')[0] === 'form'), false);
   assert.match(text(r, '폼 제출')[0].text, /동의 문항에 답하지 않기로/);
   assert.equal(text(r, '폼 6')[0].text, '답하지 않아요(동의 문항)');
 });
@@ -102,7 +107,7 @@ test('구글 폼 — 글자 제한을 넘으면 막고, 작품 칸만 채운 주
   assert.equal([...pre.searchParams.values()].includes('세계를 잇는 길'), true);
   assert.doesNotMatch(decodeURIComponent(pre.href), /김테스트|01012345678|kim@example\.com|동의/);
   r = run('submit', { cid: 'wevity:2', me: ME, answer: 'pick:1' });
-  assert.equal(r.ask.choices.find(c => c.value === 'form').recommended, true);
+  assert.equal(r.ask.choices.find(c => c.value.split(':')[0] === 'form').recommended, true);
 });
 
 test('완전 자동 — 동의는 기본이 묻지 않고 동의(끈 때만 묻는다), 확인 없이 제출은 시험을 통과한 종류의 폼에만 한다', () => {
@@ -116,7 +121,7 @@ test('완전 자동 — 동의는 기본이 묻지 않고 동의(끈 때만 묻�
   assert.equal(db().contests['wevity:1'].fconsent, 'yes'); assert.ok(db().contests['wevity:1'].consent_auto);
   const r = run('submit', { cid: 'wevity:1', me: ME, fauto: 'true' });   // 네이버 폼은 아직 시험 전 — 보내지 않고 묻는다
   assert.equal(r.summary, '냈는지 묻기');
-  assert.equal(r.ask.choices.some(c => c.value === 'form'), false);
+  assert.equal(r.ask.choices.some(c => c.value.split(':')[0] === 'form'), false);
   assert.equal(db().contests['wevity:1'].submitted, undefined);
 });
 

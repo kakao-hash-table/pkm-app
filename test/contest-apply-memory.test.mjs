@@ -1,4 +1,4 @@
-// 공모전 신청 — 기억 범위와 보내는 시각: 계좌는 이 공모전의 답으로만, 받은 값은 내 정보/이 공모전 답으로 나누고 받은 날을 남긴다.
+// 공모전 신청 — 기억 범위와 보내는 시각: 한 번 받은 값은 다른 공모전에도 쓴다 — 내 정보(값은 AI에게 숨김)·고른 답(AI가 봄)·이 공모전 답(작품·응모에 관한 것)으로 나누고 받은 날을 남긴다.
 // 메일에는 요강이 요구할 때만 계좌를 넣고, 자동 메일은 한국 시각 08~21시에만. 브라우저 결과는 러너가 넘긴 화면 원문(_screen)으로 판정한다.
 // 메일 서버에는 닿지 않는다 — 자동 메일은 밤 시각으로만 돌리고, 계정은 가짜다.
 import { test } from 'node:test';
@@ -24,22 +24,23 @@ const base = (key, f) => ({ key, site: 'wevity', source: '위비티', title: `${
 put({ contests: { 'wevity:1': base('wevity:1', fit('site', 'www.example.org/apply')), 'wevity:2': base('wevity:2', fit('email', 'contest@example.com')) } });
 const where = (r, w) => r.findings.filter(f => f.where === w);
 
-test('브라우저에서 적은 값 — 계좌·은행은 내 정보가 아니라 이 공모전의 답으로, 받은 날을 남긴다', () => {
-  const r = run('browsed', { cid: 'wevity:1', answer: '이름: 김테스트\n상금 계좌: 국민 123-45\n조합원 여부: 비조합원' });
+test('브라우저에서 적은 값 — 다른 공모전에도 쓰게 기억한다: 계좌는 내 정보, 조합원 여부는 고른 답, 작품 의도는 이 공모전에만', () => {
+  const r = run('browsed', { cid: 'wevity:1', answer: '이름: 김테스트\n상금 계좌: 국민 123-45\n조합원 여부: 비조합원\n작품 의도: 안전을 먼저' });
   assert.equal(r.sent, false);
-  assert.deepEqual(read('내정보.json').제출용, { 이름: '김테스트' });
-  assert.deepEqual(read('답/wevity-1.json'), { '상금 계좌': '국민 123-45', '조합원 여부': '비조합원' });
+  assert.deepEqual(read('내정보.json').제출용, { 이름: '김테스트', '상금 계좌': '국민 123-45' });
+  assert.deepEqual(read('내정보.json').답, { '조합원 여부': '비조합원' });
+  assert.deepEqual(read('답/wevity-1.json'), { '작품 의도': '안전을 먼저' });
   const g = read('받은날.json');
-  assert.deepEqual([g.제출용.이름, g.답['wevity-1']['상금 계좌'], g.답['wevity-1']['조합원 여부']], ['2026-11-10', '2026-11-10', '2026-11-10']);
+  assert.deepEqual([g.제출용.이름, g.제출용['상금 계좌'], g.제출용['조합원 여부'], g.답['wevity-1']['작품 의도']], ['2026-11-10', '2026-11-10', '2026-11-10', '2026-11-10']);
 });
 
 test('브라우저가 물어서 받은 값(given)도 내 정보와 이 공모전의 답으로 나눈다', () => {
   run('browsed', { cid: 'wevity:1', given: { 주소: '서울특별시 중구', '거래 은행': '국민', '단체 회원 여부': '아니오' }, result: { sent: 'unknown', reason: '확인 못 함', proof: '', did: [] } });
   const k = read('내정보.json').제출용, a = read('답/wevity-1.json');
   assert.equal(k.주소, '서울특별시 중구');
-  assert.equal(k['거래 은행'], undefined, '은행은 다른 공모전에 번지지 않는다');
-  assert.equal(k['단체 회원 여부'], undefined);
-  assert.deepEqual([a['거래 은행'], a['단체 회원 여부']], ['국민', '아니오']);
+  assert.equal(k['거래 은행'], '국민', '한 번 받은 은행도 다음 공모전에 쓴다(메일에는 요구할 때만)');
+  assert.equal(read('내정보.json').답['단체 회원 여부'], '아니오');
+  assert.deepEqual([a['거래 은행'], a['단체 회원 여부']], [undefined, undefined]);
   assert.equal(read('받은날.json').제출용.주소, '2026-11-10');
 });
 
@@ -49,7 +50,8 @@ test('메일 본문 — 계좌는 요강이 요구할 때만 넣고, 이름·연
   let body = where(r, '메일 본문')[0].copy;
   assert.match(body, /이름: 김테스트/); assert.match(body, /연락처: 010-1234-5678/);
   assert.doesNotMatch(body, /계좌|123-45/);
-  assert.match(where(r, '기억한 값')[0].text, /^기억한 값으로 채움: 주소\(11\/10\)/);
+  assert.match(where(r, '기억한 값')[0].text, /^기억한 값으로 채움: .*주소\(11\/10\)/);
+  assert.doesNotMatch(body, /거래 은행|상금 계좌|조합원/, '고른 답과 계좌는 요구하지 않으면 메일에 넣지 않는다');
   const d = db(); d.contests['wevity:2'].fit.submit.note = '수상자는 상금 받을 계좌 사본을 함께 보내요'; put(d);
   body = where(run('submit', { cid: 'wevity:2', me: ME }), '메일 본문')[0].copy;
   assert.match(body, /계좌: 국민 123-45/);
