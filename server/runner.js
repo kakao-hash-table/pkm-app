@@ -128,24 +128,43 @@ export async function connectLocalAI(){
   const conn = localConn();
   if (!conn) throw fail(404, '이 컴퓨터에서 켠 pkm-ai-server를 찾지 못했어요. pkm-ai-server를 최신으로 받아 켠 뒤 다시 눌러 주세요');
   await ai(conn, '/v1/plugins');   // 닿는지, 토큰이 맞는지
-  const c = readConf(); c.ai = { ...conn, at: now() }; writeConf(c);
+  const c = readConf(); c.ai = { ...pickAI(c.ai), ...conn, at: now() }; writeConf(c);
   return { url: conn.url };
+}
+
+/* pkm 화면에서 고른 AI·모델·생각하는 정도 — 플러그인 AI 단계도 이것을 따른다. 연결을 새로 넣어도 남긴다 */
+const pickAI = a => Object.fromEntries(['provider', 'model', 'effort'].filter(k => a && a[k]).map(k => [k, a[k]]));
+export const aiChoice = () => pickAI(readConf().ai);
+export function setAIChoice(b){
+  const ok = (v, re) => v == null || v === '' || (typeof v === 'string' && re.test(v));
+  if (!ok(b.provider, /^[\w-]{1,40}$/) || !ok(b.model, /^[\w.\-:@/]{1,80}$/) || !ok(b.effort, /^[\w-]{1,20}$/)) throw fail(400, 'AI 선택 값의 형식이 맞지 않아요');
+  const c = readConf(), a = { ...(c.ai || {}) };
+  for (const k of ['provider', 'model', 'effort']) if (b[k] && !(k === 'model' && b[k] === 'default')) a[k] = b[k]; else delete a[k];
+  c.ai = a; writeConf(c);
+  return pickAI(a);
 }
 
 /* ---------- 상태 파일 ---------- */
 // 넘겨받기 알림 제목 — 무엇(실행 대상 항목 이름)에 대한 일인지 보이게. 항목 이름이 없으면 플러그인 이름
 export const askTitle = m => `${m.kind === 'value' ? '알려 주세요' : '브라우저에서 해 주세요'} · ${String(m.title || m.name || '').trim().slice(0, 80) || m.name}`;
-export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = () => {} }){
+export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = () => {}, onNotify = () => {} }){
+  // 스크립트가 결과에 notify: { title, text }를 내면 휴대폰 알림으로 보낸다(예: 주문이 체결됐다) — 승인한 스크립트(목록·스크립트 단계)의 결과만, 결과 하나에 한 번
+  const tell = (p, x, out, run) => { const n = out && typeof out === 'object' ? out.notify : null; if (!n || typeof n !== 'object' || !String(n.title || '').trim()) return;
+    Promise.resolve().then(() => onNotify(p, { plugin: x.id, name: x.manifest.name, title: clip(n.title, 80), text: clip(n.text || '', 200), run: run ? run.id : null })).catch(() => {}); };
   const stateDir = p => path.join(DATA, p, P.DIR, '.state');
   const statePath = (p, id) => path.join(stateDir(p), `${id}.json`);
   const readJSON = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
   const readState = (p, id) => readJSON(statePath(p, id), null) || { v: 1, feeds: {}, runs: [], applied: [] };
   function writeState(p, id, st){
-    st.host = HOST; st.updated = now();
+    st.host = HOST;
     fs.mkdirSync(stateDir(p), { recursive: true });
-    const f = statePath(p, id), tmp = `${f}.${process.pid}.tmp`, text = JSON.stringify(st, null, 1) + '\n';
-    if (readJSON(f, null) && fs.readFileSync(f, 'utf8') === text) return;
-    fs.writeFileSync(tmp, text); fs.renameSync(tmp, f);
+    const f = statePath(p, id), tmp = `${f}.${process.pid}.tmp`;
+    // 내용이 그대로면 쓰지 않는다. updated만 달라진 것은 바뀐 것이 아니다 — 차례마다(10초) 시각을 새로 찍어 쓰면 상태 파일이 쉬지 않고 바뀌어
+    // 동기화 커밋이 줄줄이 생기고, 화면도 볼 때마다 '바뀌었다'고 보고 다시 그린다
+    let old = null; try { old = fs.readFileSync(f, 'utf8'); } catch {}
+    if (old != null && st.updated && JSON.stringify(st, null, 1) + '\n' === old) return;
+    st.updated = now();
+    fs.writeFileSync(tmp, JSON.stringify(st, null, 1) + '\n'); fs.renameSync(tmp, f);
     onWrite(p);
   }
   const busy = new Set();   // 프로필|플러그인 — 한 번에 한 차례만
@@ -172,10 +191,11 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     const v = P.validate([{ path: 'plugin.md', size: 0, text: fs.readFileSync(path.join(x.path, 'plugin.md'), 'utf8') },
       ...(await docs('searches')).map((t, i) => ({ path: `searches/${i}.md`, size: t.length, text: t })), ...(await docs('editors')).map((t, i) => ({ path: `editors/${i}.md`, size: t.length, text: t })),
       ...(await docs('links')).map((t, i) => ({ path: `links/${i}.md`, size: t.length, text: t })),
+      ...(await docs('ranges')).map((t, i) => ({ path: `ranges/${i}.md`, size: t.length, text: t })),
       ...(await docs('checkins')).map((t, i) => ({ path: `checkins/${i}.md`, size: t.length, text: t })),
       ...(await named('prompts')),
       ...x.manifest.permissions.bundled.map(b => ({ path: b, size: 0, text: '' }))]);
-    return { ...x, feeds, workflows, searches: v.searches || [], editors: v.editors || [], checkins: v.checkins || [], links: v.links || [] };
+    return { ...x, feeds, workflows, searches: v.searches || [], editors: v.editors || [], checkins: v.checkins || [], links: v.links || [], ranges: v.ranges || [] };
   }
   function settingsFor(x, conf){
     const v = conf.settings || {};
@@ -215,6 +235,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       id: clip(it.id, 200), title: clip(it.title || it.id, 300), url: /^https?:\/\//.test(String(it.url || '')) ? String(it.url) : '',
       meta: strs(it.meta, 6), tags: strs(it.tags, 4, 30), at: it.at ? String(it.at) : null, version: it.version != null ? clip(it.version, 100) : null,
       detail: (Array.isArray(it.detail) ? it.detail : []).slice(0, 8).map(d => ({ who: clip(d.who, 120), at: d.at ? String(d.at) : null, text: clip(d.text, 2000), url: /^https?:\/\//.test(String(d.url || '')) ? String(d.url) : '', kind: d.kind ? clip(d.kind, 30) : '' })),
+      ...(P.normChart(it.chart) ? { chart: P.normChart(it.chart) } : {}),   // 버튼 없는 목록이 그리는 선 그래프(예: 누적 손익)
       vars: Object.fromEntries(Object.entries(it.vars && typeof it.vars === 'object' ? it.vars : {}).slice(0, 20).map(([k, v]) => [clip(k, 40), clip(v, k === 'project' ? 30000 : 6000)])),
       // 정렬 칩이 읽는 값 — 숫자나 ISO 날짜 글자. 모르는 값(null·빈 글)은 화면이 늘 맨 뒤로 둔다
       sort: Object.fromEntries(Object.entries(it.sort && typeof it.sort === 'object' ? it.sort : {}).slice(0, 6).filter(([k]) => /^[a-z_][a-z0-9_]{0,40}$/.test(k))
@@ -258,8 +279,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       if (job.status !== 'done') throw fail(502, job.status === 'error' ? jobError(job) : '가져오기가 2분 안에 끝나지 않았어요');
       const out = parseOut(job.result.stdout);
       if (!out || !Array.isArray(out.items)) throw fail(502, '스크립트 결과에 items 목록이 없어요');
+      tell(p, x, out);
       const items = out.items.map(normItem).filter(Boolean).slice(0, 200);
-      if (f.seeded && feed.notify === 'yes') fresh = items.filter(it => !f.first[it.id]);   // 처음 가져온 목록은 알리지 않는다
+      if (f.seeded && ['yes', 'push'].includes(feed.notify)) fresh = items.filter(it => !f.first[it.id]);   // 처음 가져온 목록은 알리지 않는다
       // 처음 가져온 목록은 "원래 있던 것" — 자동 시작을 먼저 켰어도 이미 할당돼 있던 티켓까지 한꺼번에 돌지 않게
       for (const it of items) f.first[it.id] ||= f.seeded ? now() : '1970-01-01T00:00:00.000Z';
       f.seeded = true;
@@ -270,7 +292,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     } catch (e) {
       Object.assign(f, { at: now(), ok: false, error: clip(e.message, 500) });
     } finally { f.running = false; }
-    for (const it of fresh) addNote(st, { kind: 'new', feed: feed.name, item: it.id, title: it.title, text: `${feed.name}에 새로 올라왔어요`, url: it.url });
+    // 자동 시작 목록인데 꺼져 있으면 그렇다고 적는다 — "올라왔어요"만 보고 알아서 시작한 줄 알지 않게
+    const idle = feed.start_mode === 'auto' && !conf.auto ? ' · 자동 시작이 꺼져 있어 시작하지 않았어요' : '';
+    for (const it of fresh){ addNote(st, { kind: 'new', feed: feed.name, item: it.id, title: it.title, text: `${feed.name}에 새로 올라왔어요${idle}`, url: it.url });
+      if (feed.notify === 'push') tell(p, x, { notify: { title: it.title, text: `${feed.name}에 새로 올라왔어요${idle}` } }); }   // notify: push — 종 알림을 휴대폰으로도
     // 새로 들어온 항목 — 자동 시작을 켠 뒤에 처음 본 것만 자동으로
     const pc = conf;
     if (f.ok && feed.start){
@@ -386,6 +411,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         // 브라우저 단계의 결과는 웹 페이지를 읽은 AI의 글이다 — 실행기를 움직이는 필드(묻기·설정 바꾸기·지우기·갈래)는 스크립트 단계만 낸다
         if (web && out && typeof out === 'object'){ out = scrub(out, my); for (const k of ['ask', 'settings_patch', 'forget', 'lane', 'change', 'fork']) delete out[k]; }
         if (web && !(out && out.error)){ out = { ...(out && typeof out === 'object' ? out : {}), _given: step.given || {} }; step.given = undefined; }   // 사람이 알려 준 값(없으면 빈 객체) — 뒤 단계에만 넘기고 실행이 끝나면 지운다
+        if (d.kind === 'script') tell(p, x, out, run);   // 멈춘 결과(error)에 붙은 알림도 보낸다
         const text = scrub(clip(d.kind === 'script' ? (out ? out.summary || '' : j.result.stdout) : j.result.text, 6000), my);
         // JSON을 내려다 중간에 잘린 출력 — 결과 없이 넘기면 다음 단계가 "채우지 못한 값"으로 멈춘다. 여기서 멈춰 다시 하게 한다
         if (d.kind === 'script' && !out && /^\s*\{/.test(j.result.stdout || '')){ Object.assign(step, { status: 'failed', error: '스크립트 결과를 읽지 못했어요. 출력이 중간에 잘렸을 수 있어요', text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
@@ -445,8 +471,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     (st.notes ||= []).unshift({ id: 'n' + crypto.randomBytes(5).toString('hex'), at: now(), read: false, ...n, title: clip(n.title, 200), text: clip(n.text, 300) });
     st.notes = st.notes.slice(0, NOTE_KEEP);
   }
-  function noteRuns(x, st){
-    const on = new Set(x.feeds.filter(f => f.notify === 'yes').map(f => f.name));
+  function noteRuns(x, st, p){
+    const on = new Set(x.feeds.filter(f => ['yes', 'push'].includes(f.notify)).map(f => f.name)), loud = new Set(x.feeds.filter(f => f.notify === 'push').map(f => f.name));
     if (!on.size) return;
     st.notes_since ||= now();   // 알림을 켜기 전에 이미 멈춰 있던 작업은 알리지 않는다
     for (const r of st.runs){
@@ -461,6 +487,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         : r.status === 'stopped' ? `멈췄어요: ${s ? s.name : ''}${s && s.error ? ` · ${s.error}` : ''}`
         : `끝났어요${verdict ? `: ${verdict.title}` : ''}`;
       addNote(st, { kind: r.status, feed: r.feed, item: r.item.id, run: r.id, title: r.item.title, text, url: r.item.url || '' });
+      // notify: push — 휴대폰으로도. 스크립트가 이미 알린 실행(결과에 notify)은 두 번 보내지 않는다
+      if (p && loud.has(r.feed) && !r.steps.some(z => z.output && z.output.notify)) tell(p, x, { notify: { title: r.item.title, text: `${text}${verdict && verdict.text && r.status === 'done' ? ` — ${verdict.text}` : ''}` } }, r);
     }
   }
   // 끝나거나 그만둔 실행은 다음 단계에 넘기려고 받은 큰 값(이름이 _로 시작하는 필드, 예: diff)과 private 짚은 곳(예: 제출용 내 정보)을 버린다 — 상태 파일은 동기화된다
@@ -513,6 +541,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     if (step.answer != null && !resume) prompt += `\n\n사용자 추가 요청: ${step.answer}`;
     const provider = web ? 'claude' : settings.provider || 'claude';   // 브라우저 도구는 Claude만
     const body = { plugin: { id: x.id, root: x.path }, provider, prompt, tag: `plugin:${x.id}` };
+    if ((conn.provider || 'claude') === provider){   // pkm 화면에서 고른 모델·생각하는 정도(runner.json ai) — 고른 AI와 같을 때만. 없으면 AI 서버의 계정 기본값
+      if (conn.model) body.model = conn.model;
+      if (conn.effort) body.effort = conn.effort;
+    }
     if (schema){   // ai·agent·browser 모두 — 결과(구조화 출력)가 단계 결과가 된다
       if (provider === 'claude') body.json_schema = schema;   // 지원하는 AI만. 나머지는 글 끝의 JSON을 읽는다
       else body.prompt += `\n\n답은 아래 JSON 스키마에 맞는 JSON 하나로만 써 주세요.\n${JSON.stringify(schema)}`;
@@ -694,7 +726,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           await advance(p, x, pc, st, conf.ai);
           const changed = st.runs.filter(r => ['done', 'stopped'].includes(r.status) && prior.get(r.id) !== r.status);
           if (changed.length) for (const feed of x.feeds.filter(f => f.controls === 'project')) await refreshFeed(p, x, pc, feed, st, conf.ai);
-          noteRuns(x, st);
+          noteRuns(x, st, p);
           st.auto = !!pc.auto;   // 다른 기기도 돌리는 컴퓨터의 자동 시작 상태를 보게
           writeState(p, x.id, st);
         } catch (e) { console.error(`플러그인 실행기 ${p}/${x0.id}: ${e.message}`); }
@@ -716,7 +748,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     const out = {};
     for (const x of list){
       const st = readState(p, x.id), pc = plugConf(c, p, x.id), full = await pluginOf(p, x.id);
-      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, input_values: !!f.inputs, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, checkins: full.checkins, links: full.links, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
+      out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, input_values: !!f.inputs, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, checkins: full.checkins, links: full.links, ranges: full.ranges, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
         local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null, every: pc.every || {}, gates: pc.gates || {} } };
     }
     return { here: here(p), plugins: out };
@@ -726,7 +758,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     if (conn){
       if (!/^https?:\/\/[\w.:\-[\]]+$/.test(String(conn.url || '')) || !/^[\w.~-]{16,200}$/.test(String(conn.token || ''))) throw fail(400, 'AI 연결 주소나 접속 토큰 형식이 맞지 않아요');
       await ai({ url: conn.url, token: conn.token }, '/v1/plugins');   // 닿는지, 토큰이 맞는지
-      c.ai = { url: conn.url, token: conn.token, at: now() };
+      c.ai = { ...pickAI(c.ai), url: conn.url, token: conn.token, at: now() };
     }
     if (on != null){
       if (on && !c.ai) throw fail(409, '이 컴퓨터의 AI 연결이 먼저 필요해요');
@@ -791,7 +823,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
             if (!r || (s && s.kind !== 'script')) break;
             await new Promise(res => setTimeout(res, 500));
           }
-          noteRuns(x, st);
+          noteRuns(x, st, p);
           if (st.runs.some(r => ['done', 'stopped'].includes(r.status) && prior.get(r.id) !== r.status)) for (const feed of x.feeds.filter(f => f.controls === 'project')) await refreshFeed(p, x, plugConf(c, p, id), feed, st, c.ai);
         }
         writeState(p, id, st);

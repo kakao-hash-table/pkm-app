@@ -41,7 +41,7 @@ export function splitSummary(text){
   return { text: (s.slice(0, m.index) + s.slice(m.index + m[0].length)).trimEnd(), summary: q || a ? { q, a } : null };
 }
 
-export function createChats({ DATA, readConf, findCard, findProject = async () => null, onPush = null }){
+export function createChats({ DATA, readConf, findCard, findProject = async () => null, findPlugin = async () => null, onPush = null }){
   const media = createChatMedia(path.join(DIR, 'media'));
   async function upload(p, id, req, name){ await need(p); roomOf(p, id); return media.upload(p, id, req, name); }
   function attachment(p, id, aid, req, res){ roomOf(p, id); return media.serve(p, id, aid, req, res); }
@@ -116,8 +116,9 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
   // 방마다 탭 하나 — pkm-ai-server의 탭 키(영문·숫자 몇 가지만)로
   const tabKey = (p, r) => `chat:${crypto.createHash('sha1').update(p).digest('hex').slice(0, 10)}:${r.id.replace(/[^\w-]/g, '_').slice(0, 100)}`;
   // 프로젝트 방은 플러그인에 project 채팅이 없으면 카드 채팅 설정을 빌려 쓴다(옛 ai-chat도 돈다)
-  const scopeOf = (pl, kind) => kind === 'project' ? pl.chats.find(c => c.scope === 'project') || pl.chats.find(c => c.scope === 'card') : pl.chats.find(c => c.scope === (kind === 'data' ? 'profile' : 'card'));
-  const isWork = r => r.kind === 'card' || r.kind === 'project';   // 작업 폴더를 고르는 방
+  // 프로젝트·플러그인 방은 그 채팅이 없으면(옛 ai-chat) 카드 채팅 설정을 빌려 쓴다
+  const scopeOf = (pl, kind) => ['project', 'plugin'].includes(kind) ? pl.chats.find(c => c.scope === kind) || pl.chats.find(c => c.scope === 'card') : pl.chats.find(c => c.scope === (kind === 'data' ? 'profile' : 'card'));
+  const isWork = r => ['card', 'project', 'plugin'].includes(r.kind);   // 작업 폴더를 고르는 방
 
   /* ---------- 상태 파일 ---------- */
   const ST = {};   // 프로필 → { rev, rooms: [] }
@@ -200,8 +201,23 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     return dir;
   }
   function remember(p, dir){ const s = state(p); s.recent = [dir, ...s.recent.filter(x => x !== dir)].slice(0, 8); }
-  async function open(p, { card, project, cwd } = {}){
+  async function open(p, { card, project, plugin, cwd } = {}){
     const pl = await need(p), s = state(p);
+    if (plugin){   // 플러그인마다 방 하나 — 그 플러그인을 고치는 곳. 작업 폴더는 원본(앱 내장이면 이 앱 폴더 — 테스트·규격 문서가 함께 있다)
+      const sc = scopeOf(pl, 'plugin'); if (!sc) throw fail(400, '이 플러그인에는 카드·플러그인 채팅이 없어요');
+      const id = `plugin-${String(plugin)}`;
+      let r = s.rooms.find(r => r.id === id);
+      if (r) return r;
+      const x = await findPlugin(p, String(plugin));
+      if (!x) throw fail(404, '설치된 플러그인이 아니에요');
+      const dir = cwd ? checkDir(cwd) : [x.app, x.src].find(d => d && isDir(d)) || null;
+      if (dir) remember(p, dir);
+      r = { id, kind: 'plugin', card: { id: x.id, title: x.name }, cwd: dir, session: null, created: now(), updated: now(), read: now(), turns: [] };
+      s.rooms.push(r);
+      if (s.rooms.length > KEEP_ROOMS) s.rooms.splice(1, s.rooms.length - KEEP_ROOMS);
+      touch(p, true);
+      return r;
+    }
     if (project){   // 프로젝트마다 방 하나 — 처음 열 때 작업 폴더는 그 프로젝트의 AI 작업 폴더
       const sc = scopeOf(pl, 'project'); if (!sc) throw fail(400, '이 플러그인에는 카드·프로젝트 채팅이 없어요');
       const id = `project-${String(project)}`;
@@ -513,6 +529,16 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
         project_file: pj ? pj.file : '', project_hub: pj && pj.hub ? pj.hub : '없음', project_cards: cards || '없음',
         // 프로젝트 채팅이 없는 옛 플러그인은 카드 프롬프트를 쓴다 — 카드 자리를 프로젝트로 채운다
         card_id: r.card.id, card_title: `프로젝트 ${r.card.title}`, card_status: pj ? pj.status : '', card_file: pj && pj.hub ? pj.hub : '', card_body: `목표: ${pj ? pj.goal : ''}\n\n이 프로젝트의 단기 카드:\n${cards}` });
+    }
+    if (r.kind === 'plugin'){
+      const x = await findPlugin(p, r.card.id);
+      if (x) r.card.title = x.name;
+      const where = !x ? '찾지 못함(지워졌을 수 있음)' : { bundled: '앱 내장 — 이 앱 저장소의 원본', local: '로컬 폴더에서 설치', git: `git(${x.git})에서 받은 사본 — 원본 저장소가 이 컴퓨터에 없다`, unknown: '설치 기록에 출처가 없다' }[x.kind];
+      const spec = x && x.app ? path.join(x.app, 'docs', 'PLUGIN.md') : '';
+      Object.assign(vars, { plugin_id: r.card.id, plugin_name: r.card.title, plugin_version: x ? x.version : '', plugin_description: x ? x.description : '', plugin_src: x ? x.src : '', plugin_installed: x ? x.installed : '',
+        plugin_kind: where, plugin_app: x && x.app ? x.app : '없음(앱 내장이 아님)', plugin_spec: spec || '플러그인 규격 문서(docs/PLUGIN.md)는 pkm-app 저장소에 있다', plugin_status: x ? x.status : '',
+        // 플러그인 채팅이 없는 옛 플러그인은 카드 프롬프트를 쓴다 — 카드 자리를 플러그인으로 채운다
+        card_id: r.card.id, card_title: `플러그인 ${r.card.title}`, card_status: x ? `v${x.version}` : '', card_file: x ? x.src : '', card_body: x ? `플러그인 원본: ${x.src}\n설치본: ${x.installed}\n${x.description}\n\n지금 상태:\n${x.status}` : '' });
     }
     const tpl = sc && sc.prompt ? fs.readFileSync(path.join(pl.path, sc.prompt), 'utf8') : '';
     return { system: tpl.replace(/\{([a-z_]+)\}/g, (m, k) => vars[k] ?? m) + SUM_ASK, mode: (sc && sc.mode) || 'auto' };

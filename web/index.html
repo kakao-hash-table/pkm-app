@@ -315,6 +315,30 @@ progress.meter.thin{height:4px;margin:4px 0 12px}
 .ped-comb{margin:-4px 0 0;font-size:.875rem;color:var(--text-2)}
 .ped-comb .over{color:var(--danger);font-weight:700}
 .ped-hub{margin:8px 0 0}
+.rg-pick{border:0;padding:0;margin:0 0 12px;min-width:0}
+.rg-tables{margin:0 0 16px}
+.rg-tables a{text-decoration:none;min-height:40px}
+.rg-tables a[aria-current="page"]{border:2px solid var(--primary);padding:0 13px;background:var(--primary-weak);color:var(--on-primary-weak)}
+.rg-pick legend{padding:0;margin-bottom:6px;color:var(--text-2);font-size:.875rem;font-weight:600}
+.rg-spots{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:4px;max-width:560px}
+.rg-spots.many{grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
+.rg-spots label{position:relative;display:block}
+.rg-spots span{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 2px;border:1px solid var(--line-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--text-2);font-weight:700;font-size:clamp(.6875rem,3.1vw,.8125rem);letter-spacing:-.03em;white-space:nowrap;cursor:pointer}
+.rg-spots input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.rg-spots input:checked+span{border-color:var(--primary-fill);background:var(--primary-fill);color:var(--on-primary)}
+.rg-spots input:focus-visible+span{outline:2px solid var(--primary);outline-offset:2px}
+.rg-sum{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 10px;margin:16px 0 10px}
+.rg-sum b{font-size:1.25rem}
+.rg-sum span{color:var(--text-2);font-size:.875rem}
+.rg-grid{display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:1px;max-width:560px;padding:1px;background:var(--line);border-radius:var(--r-sm);overflow:hidden}
+.rg-grid i{display:flex;align-items:center;justify-content:center;aspect-ratio:1;background:var(--surface);color:var(--text-3);font-style:normal;font-size:clamp(.5625rem,2.5vw,.8125rem);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.rg-grid i.on{background:var(--primary-fill);color:var(--on-primary);font-weight:700}
+.rg-key{display:flex;flex-wrap:wrap;gap:4px 16px;margin:10px 0 0;color:var(--text-2);font-size:.8125rem}
+.rg-key i{display:inline-block;width:12px;height:12px;margin-right:6px;border:1px solid var(--line-strong);border-radius:3px;background:var(--surface);vertical-align:-1px}
+.rg-key i.on{border-color:var(--primary-fill);background:var(--primary-fill)}
+.rg-text{margin:16px 0 0;max-width:560px;font-weight:600;overflow-wrap:anywhere}
+.rg-note{margin:12px 0 0;max-width:560px}
+@media (max-width:359px){.rg-spots{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .ped-lint:empty{display:none}
 .ped-lint{display:flex;flex-wrap:wrap;gap:6px;margin-top:-4px}
 .lint-chip{display:inline-flex;gap:4px;align-items:baseline;font-size:.8125rem;padding:3px 8px;border-radius:999px;background:var(--s-review-bg);color:var(--s-review)}
@@ -1031,6 +1055,11 @@ dialog .cw-addr,dialog .cw-type{padding:0;flex-direction:row;gap:6px}
 .ch-ico .i{position:relative;display:inline-flex}
 .ch-ico .dot{position:absolute;top:-3px;right:-5px}
 .ch-ico .lbl{font-size:.75rem;font-weight:700;white-space:nowrap}
+.pl-head-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pl-ai{display:inline-flex;align-items:center;gap:6px}
+.pl-ai .i{position:relative;display:inline-flex}
+.pl-ai .dot{position:absolute;top:-3px;right:-5px;width:10px;height:10px;border-radius:50%;background:var(--s-review);box-shadow:0 0 0 2px var(--surface)}
+.pl-ai .lbl{font-weight:700}
 .ch-ico:not([data-state="none"]) svg path{fill:currentColor;fill-opacity:.16}
 .t-acts .ch-ico{margin:0 auto 0 -8px}
 .ch-ico[data-state="idle"],.ch-ico[data-state="reply"]{color:var(--text-2)}
@@ -1080,6 +1109,25 @@ body.has-chat-fab main{padding-bottom:120px}
 .badge.pl-review{background:var(--s-review-bg);color:var(--s-review)}
 .badge.pl-done{background:var(--s-done-bg);color:var(--s-done)}
 .badge.pl-bad{background:var(--danger-bg);color:var(--danger)}
+.pl-chart{padding:0 20px 16px}
+.pl-chart:focus-visible{outline:2px solid var(--primary);outline-offset:-2px;border-radius:var(--r-sm)}
+.pl-chart-plot{position:relative;height:96px;touch-action:pan-y}
+.pl-chart-plot svg{display:block;width:100%;height:100%;overflow:visible}
+.pl-chart-plot path{fill:none;stroke:var(--primary);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.pl-chart-plot line{stroke:var(--line-strong);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.pl-chart-x{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:var(--line-strong);pointer-events:none}
+.pl-chart-dot{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 2px var(--surface);pointer-events:none}
+.pl-chart-zero{position:absolute;right:0;padding:0 0 2px 4px;transform:translateY(-100%);font-size:.6875rem;line-height:1;color:var(--text-3);pointer-events:none}
+.pl-chart-read{margin:8px 0 0;font-size:.875rem;color:var(--text-2);font-variant-numeric:tabular-nums}
+.pl-chart-read b{margin-right:6px;color:var(--text);font-size:1rem}
+.pl-chart .ref{fill:none;stroke:var(--text-3);stroke-width:1.5;stroke-linecap:butt;vector-effect:non-scaling-stroke}
+.pl-chart .ref.r0{stroke-dasharray:6 4}.pl-chart .ref.r1{stroke-dasharray:2 3}.pl-chart .ref.r2{stroke-dasharray:8 3 2 3}
+.pl-chart-legend{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:.8125rem;color:var(--text-2);font-variant-numeric:tabular-nums}
+.pl-chart-legend li{display:flex;align-items:center;gap:8px;min-width:0}
+.pl-chart-legend svg{flex:0 0 22px;width:22px;height:8px}
+.pl-chart-legend span{flex:1;min-width:0;overflow-wrap:anywhere}
+.pl-chart-legend b{flex:0 0 auto;color:var(--text);font-weight:600}
+.pl-chart-range{margin:2px 0 0;font-size:.8125rem;color:var(--text-3);font-variant-numeric:tabular-nums}
 .pl-excerpt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--text-2);font-size:.875rem;margin-top:6px;overflow-wrap:anywhere}
 .row .title{overflow-wrap:anywhere}
 .pl-find{display:flex;align-items:center;gap:8px;margin:0 0 12px}.pl-find input{flex:1;min-height:44px}.pl-find .faint{white-space:nowrap}
@@ -2676,6 +2724,7 @@ async function loadAI(refresh){
   if (AI.list && $('#dlg-ai').open) renderAI();
   try { AI.list = await PKMAI.providers(refresh); AI.error = null; }
   catch (e) { AI.error = e; }
+  await PKMAI.pullChoice();
   clearTimeout(slow); AI.loading = false; AI.slow = false;
   aiAutoPick();
   if ($('#dlg-ai').open) renderAI();
@@ -4403,17 +4452,25 @@ function plPairCollect(fs){
   if (bad){ bad.x.focus(); return null; }
   return out.join('\n');
 }
+// 플러그인 상태는 크다(실행 기록까지 수백 KB) — 15초마다 묻되, 지난번에 받은 것과 같으면 서버가 304만 준다
+async function plStateGet(){
+  const r = await fetch(`/api/profile/${encodeURIComponent(S.profile)}/plugins/state`, PL.etag && PL.st ? { headers:{ 'if-none-match':PL.etag } } : undefined);
+  if (r.status === 304) return null;
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(b.error || `서버 오류(${r.status})`), { status:r.status });
+  return { st:b, etag:r.headers.get('etag') };
+}
 async function plLoad(force){
   if (!plOK() || PL.loading) return;
-  if (PL.p !== S.profile) Object.assign(PL, { p:S.profile, st:null, list:null, machine:{}, scripts:{}, at:0, inspect:null, sent:{}, keep:{}, picked:{}, track:{}, reveal:{}, web:{} });
+  if (PL.p !== S.profile) Object.assign(PL, { p:S.profile, st:null, etag:null, list:null, machine:{}, scripts:{}, at:0, inspect:null, sent:{}, keep:{}, picked:{}, track:{}, reveal:{}, web:{} });
   if (!force && PL.at && Date.now() - PL.at < 10000) return;
   PL.loading = true;
   try {
-    const [st, list] = await Promise.all([papi('/plugins/state'), papi('/plugins')]);
-    const before = PL.st ? JSON.stringify([PL.st, PL.updates]) : '';
-    Object.assign(PL, { st, list:list.plugins, updates:list.updates || {}, at:Date.now(), error:null });
+    const [got, list] = await Promise.all([plStateGet(), papi('/plugins')]);   // got: 바뀌지 않았으면 null(서버가 304)
+    const before = JSON.stringify(PL.updates || {});
+    Object.assign(PL, { st:got ? got.st : PL.st, etag:got ? got.etag : PL.etag, list:list.plugins, updates:list.updates || {}, at:Date.now(), error:null });
     for (const [rid, a] of Object.entries(PL.sent)) if (Date.now() - a > 15 * 60000) delete PL.sent[rid];
-    if (plTrackUpdate() || before !== JSON.stringify([st, PL.updates])) plRepaint();   // 누른 항목이 있으면 'n분째'도 새로
+    if (plTrackUpdate() || got || before !== JSON.stringify(PL.updates)) plRepaint();   // 누른 항목이 있으면 'n분째'도 새로
   } catch (e) { PL.error = e.message; PL.at = Date.now(); plRepaint(); }
   finally { PL.loading = false; plTrackSchedule(); }
 }
@@ -4590,6 +4647,50 @@ function plRunRow(id, x, r){
   return `<li><a class="row" href="#/plugins/${id}/run/${r.id}"><span class="body"><span class="title">${key && !r.item.title.includes(key) ? `${esc(key)} ` : ''}${esc(r.item.title)}${(x.feeds.find(f => f.name === r.feed) || {}).starts?.length > 1 ? ` · ${esc(r.workflow)}` : ''}${r.lane ? ` · ${esc(r.lane)}` : ''}</span>
     <span class="meta">${plBadge(w, tone)}<span>${PL.sent[r.id] ? `${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요` : esc(plRunLine(x, r))}</span></span></span><span class="chev" aria-hidden="true">›</span></a></li>`;
 }
+/* 목록 항목의 선 그래프(item.chart — 규격: docs/PLUGIN.md › 피드). 선 하나라 범례는 없고, 값은 아래 글로도 읽힌다(지금·최고·최저).
+   가리키거나(좌우 화살표로도) 옮기면 그 시점의 값을 아래 줄에 보인다. 글자는 본문 색, 선만 강조색 */
+function plChart(c){
+  if (!c) return '';
+  const g = PKMPlugin.chartGeom(c), W = 320, H = 96, PAD = 6, X = x => PAD + x * (W - 2 * PAD), Y = y => PAD + y * (H - 2 * PAD);
+  const num = v => `${c.signed && v > 0 ? '+' : ''}${(Math.abs(v) >= 1000 ? Math.round(v) : Math.round(v * 100) / 100).toLocaleString('ko-KR')}${c.unit}`;   // 큰 값은 소수점 없이
+  const when = (p, i) => p.t ? plTime(p.t) : `${i + 1}번째`;
+  const lines = c.lines || [], lv = (l, i) => l.values[i] == null ? '-' : num(l.values[i]);
+  // 점마다: 자리(x%, y%) · 값 글 · 시각 글 · 기준선 값 글들 — 가리킨 시점의 값을 아래 줄과 범례에 보인다
+  const data = c.points.map((p, i) => [+(X(g.pts[i].x) / W * 100).toFixed(2), +(Y(g.pts[i].y) / H * 100).toFixed(2), num(p.v), when(p, i), lines.map(l => lv(l, i))]);
+  const last = data[data.length - 1], label = c.label || '값';
+  const path = pts => { let d = '', pen = false; for (const q of pts){ if (!q){ pen = false; continue; } d += `${pen ? 'L' : 'M'}${X(q.x).toFixed(1)} ${Y(q.y).toFixed(1)}`; pen = true; } return d; };
+  const zero = g.zero == null ? '' : `<line x1="0" x2="${W}" y1="${Y(g.zero).toFixed(1)}" y2="${Y(g.zero).toFixed(1)}"/>`;
+  // 기준선은 색이 아니라 선 모양(긴 점선·짧은 점선·쇄선)과 범례의 이름으로 가린다. 글자는 본문 색
+  const legend = lines.length ? `<ul class="pl-chart-legend">${lines.map((l, k) => `<li><svg class="ref r${k}" viewBox="0 0 22 8" aria-hidden="true"><path d="M1 4H21"/></svg><span>${esc(l.label)}</span><b>${esc(last[4][k])}</b></li>`).join('')}</ul>` : '';
+  return `<div class="pl-chart" tabindex="0" role="group" aria-label="${esc(label)} 그래프. 좌우 화살표로 시점마다 값을 봐요" data-chart="${esc(JSON.stringify(data))}">
+    <div class="pl-chart-plot"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${zero}${g.lines.map((pts, k) => `<path class="ref r${k}" d="${path(pts)}"/>`).join('')}<path d="${path(g.pts)}"/></svg>
+      ${g.zero == null ? '' : `<span class="pl-chart-zero" style="top:${(Y(g.zero) / H * 100).toFixed(2)}%" aria-hidden="true">0</span>`}<i class="pl-chart-x" hidden></i><i class="pl-chart-dot" style="left:${last[0]}%;top:${last[1]}%"></i></div>
+    <p class="pl-chart-read" aria-live="polite"><b>${esc(last[2])}</b><span>지금 · ${esc(last[3])}</span></p>
+    ${legend}
+    <p class="pl-chart-range">${esc(data[0][3])}부터 · 최고 ${esc(num(g.max))} · 최저 ${esc(num(g.min))}</p>
+  </div>`;
+}
+// i번째 점을 가리킨다. i가 없으면 처음 모습(마지막 점, 세로줄 없음)으로
+function plChartAt(el, i){
+  const d = el._d ||= JSON.parse(el.dataset.chart), n = d.length, on = i != null, k = on ? Math.max(0, Math.min(n - 1, i)) : n - 1, [x, y, v, t, refs] = d[k];
+  el._i = on ? k : null;
+  const hair = el.querySelector('.pl-chart-x'), dot = el.querySelector('.pl-chart-dot'), read = el.querySelector('.pl-chart-read');
+  hair.hidden = !on; hair.style.left = `${x}%`; dot.style.left = `${x}%`; dot.style.top = `${y}%`;
+  read.firstChild.textContent = v; read.lastChild.textContent = k === n - 1 ? `지금 · ${t}` : t;
+  el.querySelectorAll('.pl-chart-legend b').forEach((b, j) => { b.textContent = (refs || [])[j] ?? ''; });
+}
+document.addEventListener('pointermove', e => {
+  const plot = e.target.closest && e.target.closest('.pl-chart-plot'); if (!plot) return;
+  const el = plot.parentElement, d = el._d ||= JSON.parse(el.dataset.chart), r = plot.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width * 100;
+  plChartAt(el, d.reduce((best, p, i) => Math.abs(p[0] - fx) < Math.abs(d[best][0] - fx) ? i : best, 0));
+});
+document.addEventListener('pointerleave', e => { if (e.target.classList && e.target.classList.contains('pl-chart-plot')) plChartAt(e.target.parentElement); }, true);
+document.addEventListener('focusout', e => { if (e.target.classList && e.target.classList.contains('pl-chart')) plChartAt(e.target); });
+document.addEventListener('keydown', e => {
+  const el = e.target.classList && e.target.classList.contains('pl-chart') ? e.target : null; if (!el) return;
+  const n = (el._d ||= JSON.parse(el.dataset.chart)).length, cur = el._i == null ? n - 1 : el._i, to = { ArrowLeft:cur - 1, ArrowRight:cur + 1, Home:0, End:n - 1 }[e.key];
+  if (to != null){ e.preventDefault(); plChartAt(el, to); }
+});
 function plItemRow(it, hide){
   const ex = it.detail && it.detail.length ? it.detail[it.detail.length - 1] : null;
   const excerpt = ex ? `${ex.who ? `${ex.who}${ex.kind ? ` · ${ex.kind}` : ''}: ` : ''}${ex.text || (ex.kind ? '' : '')}` : '';
@@ -4597,7 +4698,8 @@ function plItemRow(it, hide){
     <span class="meta">${(it.tags || []).map(t => plBadge(t, /변경|멈|오류/.test(t) ? 'bad' : 'wait')).join('')}${(it.meta || []).slice(0, 4).map(m => `<span>${esc(m)}</span>`).join('')}</span>
     ${excerpt.trim() && ex.text ? `<span class="pl-excerpt">${esc(excerpt)}</span>` : ''}</span>`;
   const x = hide ? `<button class="pl-x" type="button" data-pl="hide" data-id="${hide.id}" data-feed="${esc(hide.feed)}" data-item="${esc(it.id)}" data-version="${esc(it.version == null ? '' : it.version)}" aria-label="${esc(it.title || '이 항목')} 확인하고 닫기" title="확인하고 닫기">×</button>` : '';
-  return plUrl(it.url) ? `<li${x ? ' class="pl-hide-row"' : ''}><a class="row" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${inner}<span class="chev" aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>${x}</li>` : `<li${x ? ' class="pl-hide-row"' : ''}><div class="row">${inner}</div>${x}</li>`;
+  const chart = plChart(it.chart);   // 줄 아래에 — 링크 안에 조작되는 것을 넣지 않는다
+  return plUrl(it.url) ? `<li${x ? ' class="pl-hide-row"' : ''}><a class="row" href="${esc(plUrl(it.url))}" target="_blank" rel="noopener">${inner}<span class="chev" aria-hidden="true">↗</span><span class="sr-only">새 창</span></a>${x}${chart}</li>` : `<li${x ? ' class="pl-hide-row"' : ''}><div class="row">${inner}</div>${x}${chart}</li>`;
 }
 const plList = (rows, more = 20) => rows.length <= more ? `<ul class="list">${rows.join('')}</ul>` : `<ul class="list">${rows.slice(0, more).join('')}</ul><details class="more"><summary>${rows.length - more}개 더 보기</summary><ul class="list">${rows.slice(more).join('')}</ul></details>`;
 function plFeedError(id, f){
@@ -4873,6 +4975,9 @@ function vPlugins(id){
   if (!PL.st) return `<div class="page"><h1 tabindex="-1">플러그인</h1>${PL.error ? `<div class="ai-state bad" style="margin-top:16px"><b>플러그인 상태를 읽지 못했어요</b><span>${esc(PL.error)}</span></div>` : '<p class="muted" style="margin-top:8px" role="status">불러오는 중이에요</p>'}</div>`;
   const ids = plIds(), cks = pckList().filter(c => !ids.includes(c.id));
   // 목록이 없는 체크인 플러그인(성과 평가 글)은 탭으로 바로 그 화면에 간다
+  const rgs = prgIds().filter(k => !ids.includes(k) && !cks.some(c => c.id === k));
+  // 목록이 없는 레인지 표 플러그인도 탭으로 바로 그 화면에 간다
+  if (rgs.includes(id) || (rgs.length && !ids.length && !cks.length)) return vRange(rgs.includes(id) ? id : rgs[0]);
   if (cks.length && (!ids.length || cks.some(c => c.id === id))){ const c = cks.find(x => x.id === id) || cks[0]; return vCheckin(c.id, c.name, 'main'); }
   if (!ids.length) return vPluginManage();
   if (!ids.includes(id)){ const last = LS.get(`pkm:v1:pl-tab:${S.profile}`, ''); id = ids.includes(last) ? last : ids[0]; }
@@ -4889,7 +4994,7 @@ function vPlugins(id){
   if (!feeds.length) gate = '';
   else if (!plRunner()) gate = `<div class="ai-state wait"><b>아직 목록을 가져오는 컴퓨터가 없어요</b><span>회사처럼 GitHub·Jira에 닿는 컴퓨터에서 켜 두면, 브라우저를 닫아도 그 컴퓨터가 가져와요.</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">이 컴퓨터에서 돌리기</a></div></div>`;
   else if (plIsRunner() && m && m.at){ const left = plMissing(id); if (left.length) gate = `<div class="ai-state wait"><b>준비가 ${left.length}개 남았어요</b><span>${esc(left.join(' · '))}</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">준비 마치기</a></div></div>`; }
-  const tabs = ids.length + cks.length > 1 ? seg([...ids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), ...cks.map(c => [`ck:${c.id}`, `#/plugins/${c.id}`, esc(c.name)])], id, 'seg-compact', ids.length + cks.length > 3 ? '플러그인 보기' : '') : '';
+  const tabs = plTabs(id);
   const autoFeed = feeds.find(f => f.start && f.start_mode === 'auto');
   const autoLine = autoFeed ? `<p class="pl-auto">새로 들어오면 자동 시작 · <b>${plAuto(x) ? '켜짐' : '꺼짐'}</b> ${plIsRunner() ? `<button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${plAuto(x) ? '' : '1'}" aria-label="새로 들어오면 자동 시작 ${plAuto(x) ? '끄기' : '켜기'}">${plAuto(x) ? '끄기' : '켜기'}</button>` : ''}</p>` : '';
   const extra = [
@@ -4913,7 +5018,8 @@ function vPlugins(id){
       const err = fs_.ok === false ? plFeedError(id, fs_) : '', vis = plVisible(x, f), hid = items.length - vis.length;
       const hide = f.dismiss === 'yes' ? { id, feed:f.name } : null;
       const list = vis.length ? plList(vis.map(it => plItemRow(it, hide))) : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}${hid ? ` · 닫은 ${hid}개는 새 소식이 오면 다시 보여요` : ''}</p>` : '';
-      return section(`${esc(f.name)}${vis.length ? ` <span class="count">${vis.length}</span>` : ''}`, `${err}${err && vis.length ? `<p class="faint" style="margin:8px 0">${plTime((fs_.items_at || fs_.at))}에 가져온 목록이에요</p>` : ''}${list}`);
+      const note = fs_.note && vis.length ? `<p class="faint" style="margin:-4px 0 12px">${esc(fs_.note)}</p>` : '';   // 스크립트가 낸 한 줄(예: 언제 기준인지)
+      return section(`${esc(f.name)}${vis.length ? ` <span class="count">${vis.length}</span>` : ''}`, `${note}${err}${err && vis.length ? `<p class="faint" style="margin:8px 0">${plTime((fs_.items_at || fs_.at))}에 가져온 목록이에요</p>` : ''}${list}`);
     }
     if ((f.starts || []).length > 1 || f.start_mode !== 'auto') return plMultiFeed(id, x, f);   // 늘 남는 목록(프로젝트·에이전트) — 들어온 티켓을 하나씩 처리하는 자동 시작 목록만 '시작 전' 꼴
     const runs = (x.state.runs || []).filter(r => r.feed === f.name), active = new Set(runs.filter(r => !['done', 'canceled'].includes(r.status)).map(r => r.item.id));
@@ -4931,13 +5037,65 @@ function vPlugins(id){
       ${ended.length ? `<details class="more" data-key="pl-ended-${id}"><summary>끝난 작업 ${ended.length}</summary>${plList(ended.map(r => plRunRow(id, x, r)))}</details>` : ''}`;
   }).join('');
   return `<div class="page">
-    <header class="page-head"><h1 tabindex="-1">${ids.length > 1 ? '플러그인' : esc(plName(id))}</h1><a class="btn btn-ghost btn-sm" href="#/plugins/_manage">관리</a></header>
+    <header class="page-head"><h1 tabindex="-1">${ids.length > 1 ? '플러그인' : esc(plName(id))}</h1><div class="pl-head-acts">${chPluginBtn(id)}<a class="btn btn-ghost btn-sm" href="#/plugins/_manage">관리</a></div></header>
     ${tabs}
     <div class="pl-fresh" ${feeds.length ? '' : 'hidden'}>${fresh ? `<span class="num">${fresh}</span>` : ''}${plIsRunner() ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="refresh" data-id="${id}" ${busy ? 'aria-disabled="true"' : ''}>${busy ? '가져오는 중' : '지금 가져오기'}</button>` : ''}<a class="btn btn-text btn-sm" href="#/plugins/${id}/setup">설정</a></div>
     ${stale ? `<p class="faint">${esc(plRunner())}에서 한동안 소식이 없어요. 컴퓨터가 잠들었거나 pkm 서버가 꺼졌을 수 있어요.</p>` : ''}
     ${plUpdBanner(id)}${gate}${autoLine}${tabBar}${tabbed ? `<div role="tabpanel" id="pl-ftab-panel" aria-labelledby="pl-ftab-${tabNames.indexOf(tabNow)}">${body}</div>` : body}${tabNow ? '' : plLoginBox(id)}
   </div>`;
 }
+/* 플러그인 메뉴의 탭 — 목록 플러그인 + 목록 없이 자기 화면이 있는 것(체크인 · 레인지 표) */
+function plTabs(cur){
+  const ids = plIds(), cks = pckList().filter(c => !ids.includes(c.id)), rgs = prgIds().filter(k => !ids.includes(k) && !cks.some(c => c.id === k));
+  const n = ids.length + cks.length + rgs.length;
+  return n > 1 ? seg([...ids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), ...cks.map(c => [`ck:${c.id}`, `#/plugins/${c.id}`, esc(c.name)]), ...rgs.map(k => [`rg:${k}`, `#/plugins/${k}`, esc(plName(k))])], cur, 'seg-compact', n > 3 ? '플러그인 보기' : '') : '';
+}
+/* ---------------- 레인지 표: 고를 것(포지션) 하나를 고르면 그 핸드 레인지를 13×13 표로 ----------------
+   규격: docs/PLUGIN.md › 레인지 표. 실행되는 것은 없고, 고른 것은 이 브라우저에 기억한다 */
+const prgIds = () => PL.st && PL.p === S.profile ? Object.keys(PL.st.plugins || {}).filter(id => (PL.st.plugins[id].ranges || []).length) : [];
+const prgKey = (id, name) => `pkm:v1:rg:${S.profile}:${id}/${name}`;
+const prgHref = (id, name) => `#/plugins/${encodeURIComponent(id)}/range/${encodeURIComponent(name)}`;
+const prgTitle = (g, spot) => !g.then ? spot.name : g.title ? g.title.replace('{a}', spot.a).replace('{b}', spot.b) : `${spot.a} · ${spot.b}`;
+// 고르는 줄 + 표. then이 있으면 두 줄 — 둘째 줄은 첫째에서 고른 것 아래의 것만
+function prgMain(id, g, spot){
+  const R = PKMPlugin.RANKS, r = PKMPlugin.parseHands(spot.text), on = new Set(r.hands), pct = (r.combos / PKMPlugin.HAND_COMBOS * 100).toFixed(1), title = prgTitle(g, spot);
+  const cells = [...R].map((a, i) => [...R].map((b, j) => { const h = i === j ? a + b : i < j ? a + b + 's' : b + a + 'o'; return `<i${on.has(h) ? ' class="on"' : ''}>${h}</i>`; }).join('')).join('');
+  const row = (name, legend, items, cur, n) => `<fieldset class="rg-pick"><legend>${esc(legend)}</legend><div class="rg-spots${n > 7 ? ' many' : ''}" style="--n:${n}">${items.map(v =>
+    `<label><input type="radio" name="${name}" data-rg="${esc(id)}" data-name="${esc(g.name)}" value="${esc(v)}" ${v === cur ? 'checked' : ''}><span>${esc(v)}</span></label>`).join('')}</div></fieldset>`;
+  const as = [...new Set(g.spots.map(sp => sp.a))], bs = a => g.spots.filter(sp => sp.a === a).map(sp => sp.b);
+  const picks = g.then ? row('rg-a', g.pick, as, spot.a, as.length) + row('rg-b', g.then, bs(spot.a), spot.b, Math.max(...as.map(a => bs(a).length)))
+    : row('rg-a', g.pick, g.spots.map(sp => sp.name), spot.name, g.spots.length);
+  return `${picks}<div aria-live="polite"><p class="rg-sum"><b>${esc(title)} ${g.then && g.title ? '' : `${esc(g.mark)} `}<span class="num">${pct}%</span></b><span>1,326가지 중 <span class="num">${r.combos.toLocaleString()}</span>가지</span></p></div>
+    <div class="rg-grid" role="img" aria-label="${esc(`${title} 레인지 표. 든 핸드는 아래 글과 같아요`)}">${cells}</div>
+    <p class="rg-key"><span><i class="on" aria-hidden="true"></i>${esc(g.mark)}</span><span><i aria-hidden="true"></i>${esc(g.rest || '그 밖')}</span><span>오른쪽 위 s 수딧 · 왼쪽 아래 o 오프수트 · 대각선 페어</span></p>
+    <p class="rg-text">${esc(spot.text)}</p>`;
+}
+function vRange(id, name){
+  if (plOK()) plLoad();
+  const x = PL.st && PL.p === S.profile ? PL.st.plugins[id] : null, list = (x && x.ranges) || [];
+  if (!list.length) return PL.st ? vNotFound() : `<div class="page"><p class="faint" role="status">불러오는 중…</p></div>`;
+  // 주소에 표 이름이 없으면 마지막에 본 표
+  const g = list.find(r => r.name === name) || list.find(r => r.name === LS.get(prgKey(id, ''), '')) || list[0], saved = LS.get(prgKey(id, g.name), ''), spot = g.spots.find(sp => sp.name === saved) || g.spots[0];
+  if (name === g.name) LS.set(prgKey(id, ''), g.name);
+  const more = list.length > 1 ? chipNav(list.map(r => [r.name, prgHref(id, r.name)]), g.name, '레인지 표') : '';
+  return `<div class="page">
+    <header class="page-head"><h1 tabindex="-1">${esc(plName(id))}</h1><div class="pl-head-acts">${chPluginBtn(id)}<a class="btn btn-ghost btn-sm" href="#/plugins/_manage">관리</a></div></header>
+    ${plTabs(`rg:${id}`)}${more}
+    <div id="rg-main">${prgMain(id, g, spot)}</div>
+    ${g.description ? `<p class="muted rg-note">${list.length > 1 ? '' : `<b>${esc(g.name)}</b> · `}${esc(g.description)}</p>` : ''}
+    ${g.note ? `<p class="faint rg-note">${esc(g.note)}</p>` : ''}
+  </div>`;
+}
+const chipNav = (items, cur, label) => `<nav class="chip-bar rg-tables" aria-label="${label}">${items.map(([n, href]) => `<a class="chip-btn" href="${href}" ${n === cur ? 'aria-current="page"' : ''}>${esc(n)}</a>`).join('')}</nav>`;
+document.addEventListener('change', e => { const t = e.target; if (!t.matches || !t.matches('input[data-rg]')) return;
+  const id = t.dataset.rg, g = ((PL.st && PL.st.plugins[id] || {}).ranges || []).find(r => r.name === t.dataset.name); if (!g) return;
+  let spot;
+  if (!g.then) spot = g.spots.find(sp => sp.name === t.value);
+  else { const val = n => (document.querySelector(`input[name="${n}"]:checked`) || {}).value, a = val('rg-a'), b = val('rg-b');
+    spot = g.spots.find(sp => sp.a === a && sp.b === b) || g.spots.find(sp => sp.a === a); }   // 첫째를 바꿨는데 고른 둘째가 그 아래에 없으면 첫 번째 것
+  if (!spot) return;
+  LS.set(prgKey(id, g.name), spot.name); $('#rg-main').innerHTML = prgMain(id, g, spot);
+  const again = document.querySelector(`input[name="${t.name}"]:checked`); if (again) again.focus({ preventScroll:true }); });
 /* 검색·편집기만 있는 플러그인 — 돌리는 컴퓨터 없이 지금 이 컴퓨터에서 쓴다 */
 const plLocalOnly = id => { const x = PL.st && PL.st.plugins[id]; return !!x && !x.feeds.length && !(x.workflows || []).length; };
 const plNoScripts = id => { const li = (PL.list || []).find(z => z.id === id); return !!li && !((li.manifest.permissions || {}).bundled || []).length; };
@@ -5222,7 +5380,7 @@ function vPluginSetup(id){
     : ready ? `<div class="ai-state ok"><b>준비됐어요</b><span>${esc(plWho())}에서 가져와요</span><div><a class="btn btn-primary btn-sm" href="#/plugins/${id}">목록 보기</a></div></div>`
     : m.at || !here.ai ? `<div class="ai-state wait"><b>준비가 ${left.length}개 남았어요</b><span>${esc(left.join(' · '))}</span></div>` : '';
   return `<div class="page">
-    <a class="back" href="#/plugins/${x && x.feeds.length ? id : '_manage'}"><span aria-hidden="true">‹</span> ${x && x.feeds.length ? esc(mf.name) : '플러그인 관리'}</a>
+    <a class="back" href="#/plugins/${x && (x.feeds.length || (x.ranges || []).length) ? id : '_manage'}"><span aria-hidden="true">‹</span> ${x && (x.feeds.length || (x.ranges || []).length) ? esc(mf.name) : '플러그인 관리'}</a>
     <h1 tabindex="-1">${esc(mf.name)} 준비와 설정</h1>
     ${pckList().filter(c => c.id === id).map(c => `<p style="margin:8px 0 0"><a class="btn btn-tonal btn-sm" href="${pckHref(c)}">${esc(c.name)} 열기</a></p>`).join('')}
     ${card}
@@ -5258,7 +5416,7 @@ function vPluginManage(){
 function plTraits(z){
   const x = PL.st && PL.st.plugins[z.id], mf = z.manifest; if (!x || !mf) return '';
   const chats = x.chats || [], perm = mf.permissions || {}, ai = perm.ai || [], scripts = (perm.bundled || []).length;
-  const room = x.feeds.length ? '플러그인 메뉴의 자기 칸' : (x.checkins || []).length || (x.editors || []).length ? '노트에서 여는 편집 화면' : '없음';
+  const room = x.feeds.length || (x.ranges || []).length ? '플러그인 메뉴의 자기 칸' : (x.checkins || []).length || (x.editors || []).length ? '노트에서 여는 편집 화면' : '없음';
   const card = (x.links || []).length || (x.checkins || []).some(c => c.card) || chats.some(c => c.scope === 'card' || c.scope === 'project');
   const into = [x.feeds.length && '지금', card && '단기 카드', ((x.checkins || []).length || (x.editors || []).length) && '노트', (x.searches || []).length && '찾기', chats.some(c => c.scope === 'profile') && '챗봇 버튼'].filter(Boolean);
   const does = [ai.includes('agent') && `<span class="pl-danger">AI가 파일 고침·명령 실행</span>`, !ai.includes('agent') && ai.includes('chat') && 'AI 대화', (x.editors || []).length && '노트 내용 고침', scripts && `스크립트 ${scripts}개`].filter(Boolean);
@@ -5283,7 +5441,7 @@ function vPluginAdd(){
   const review = !ins ? '' : !ins.ok ? `<div class="ai-state bad" role="alert"><b>설치할 수 없어요 — 규격에 맞지 않는 곳이 ${ins.errors.length}개 있어요</b><ul>${ins.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul><div><button class="btn btn-ghost btn-sm" type="button" data-pl="inspect-reset">다른 주소로 다시 하기</button></div></div>` : `
     <section class="section pl-review" aria-labelledby="pl-rv-h"><h2 id="pl-rv-h" tabindex="-1">${esc(mf.name)} <span class="faint num">${esc(mf.version)}</span></h2>${mf.description ? `<p class="pl-text">${esc(mf.description)}</p>` : ''}
       ${changes}
-      <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${(ins.checkins || []).map(c => `<li>체크인 「${esc(c.name)}」 — 주요 업무·과제를 한 화면에서 고치고, 제출 미리보기·점검${c.prompts && c.prompts.score ? '·점수' : ''}${c.card ? `, 단기 카드에 [${esc(c.card)}]` : ''}</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}${(ins.chats || []).map(c => `<li>${c.scope === 'card' ? `단기 카드마다 「${esc(c.label || c.name)}」 세션 — 이 컴퓨터의 작업 폴더에서, 카드끼리 동시에` : `오른쪽 아래 AI 챗봇 버튼 — 「${esc(c.name)}」, 이 프로필 데이터를 말로 고쳐요`}</li>`).join('')}</ul>
+      <h3>하는 일</h3><ul>${(ins.feeds || []).map(f => `<li>「${esc(f.name)}」 목록을 ${f.days === 'weekdays' ? '평일 ' : ''}${f.hours ? `${esc(f.hours.replace('-', '–'))} ` : ''}${f.every}분마다 가져와요</li>`).join('')}${(ins.checkins || []).map(c => `<li>체크인 「${esc(c.name)}」 — 주요 업무·과제를 한 화면에서 고치고, 제출 미리보기·점검${c.prompts && c.prompts.score ? '·점수' : ''}${c.card ? `, 단기 카드에 [${esc(c.card)}]` : ''}</li>`).join('')}${(ins.ranges || []).map(r => `<li>레인지 표 「${esc(r.name)}」 — ${esc(r.pick)}${r.then ? `·${esc(r.then)}` : ''}만 고르면 13×13 표로 봐요(${r.spots.length}가지)</li>`).join('')}${ins.workflows.map(w => `<li>작업 「${esc(w.name)}」 ${w.steps.length}단계${(ins.feeds || []).some(f => f.start === w.name && f.start_mode === 'auto') ? ' — 시작하기 버튼, 켜면 새 항목을 자동으로 시작' : ''}</li>`).join('')}${(ins.chats || []).map(c => `<li>${c.scope === 'card' ? `단기 카드마다 「${esc(c.label || c.name)}」 세션 — 이 컴퓨터의 작업 폴더에서, 카드끼리 동시에` : `오른쪽 아래 AI 챗봇 버튼 — 「${esc(c.name)}」, 이 프로필 데이터를 말로 고쳐요`}</li>`).join('')}</ul>
       <h3>쓰는 권한</h3><ul>
         ${mf.permissions.ai.includes('agent') ? `<li class="pl-danger"><b>AI가 파일을 고치고 명령을 실행해요</b> (에이전트 · 상한 ${esc(mf.permissions.agent_mode)})</li>` : mf.permissions.ai.includes('chat') ? '<li>AI와 대화만 해요</li>' : ''}
         ${mf.permissions.browser ? '<li class="pl-danger"><b>AI가 이 컴퓨터의 브라우저를 다뤄요</b> — pkm 전용 Chrome 프로필이라 거기서 한 로그인이 남아요. 로그인·결제 정보는 사람이 직접 넣어요</li>' : ''}
@@ -5733,7 +5891,7 @@ function route(p){
       return vAction(b);
     }
     case 'plugins': if (p[1] === '_manage') return vPluginManage(); if (p[1] === '_add') return vPluginAdd();
-      if (p[2] === 'setup') return vPluginSetup(p[1]); if (p[2] === 'run') return vPluginRun(p[1], p[3]); if (p[2] === 'edit') return vPluginEditor(p[1], p[3]); if (p[2] === 'checkin') return vCheckin(p[1], p[3], p[4], p[5]); return vPlugins(p[1]);
+      if (p[2] === 'setup') return vPluginSetup(p[1]); if (p[2] === 'run') return vPluginRun(p[1], p[3]); if (p[2] === 'edit') return vPluginEditor(p[1], p[3]); if (p[2] === 'checkin') return vCheckin(p[1], p[3], p[4], p[5]); if (p[2] === 'range') return vRange(p[1], p[3]); return vPlugins(p[1]);
     default: return vNotFound();
   }
 }
@@ -5768,9 +5926,12 @@ const chCards = () => chOn() && chScope('card');
 const chSum = id => ((CH.st && CH.st.rooms) || []).find(r => r.id === id) || null;
 const chCardRoom = tid => chSum(`card-${tid}`);
 const chProjects = () => chOn() && (chScope('project') || chScope('card'));   // 프로젝트 채팅이 없는 옛 플러그인은 카드 채팅 설정을 빌린다
-const chRoomWord = r => r && r.kind === 'project' ? '프로젝트' : '카드';
+const chRoomWord = r => r && r.kind === 'project' ? '프로젝트' : r && r.kind === 'plugin' ? '플러그인' : '카드';
+const chPlugins = () => chOn() && (chScope('plugin') || chScope('card'));   // 플러그인 채팅이 없는 옛 ai-chat은 카드 채팅 설정을 빌린다
+// 플러그인 방은 일이 걸려 있을 때(하는 중·확인 요청·새 답·멈춤)만 채팅 목록에 — 평소에는 그 플러그인 화면 맨 위에서 연다
+const CH_BUSY = ['run', 'ask', 'new', 'bad'];
 // 채팅방 목록에는 완료 카드의 방을 빼고 보인다 — 카드의 AI Chat 아이콘으로 들어온 지금 방은 남긴다
-const chListed = rooms => rooms.filter(r => (r.kind === 'project' || (r.kind === 'card' && (r.id === CH.room || !r.card || (find('tasks', r.card.id) || {}).status !== '완료'))));
+const chListed = rooms => rooms.filter(r => (r.kind === 'project' || (r.kind === 'plugin' && (r.id === CH.room || CH_BUSY.includes(chState(r)))) || (r.kind === 'card' && (r.id === CH.room || !r.card || (find('tasks', r.card.id) || {}).status !== '완료'))));
 const chDraftKey = r => `pkm:v1:chat-draft:${S.profile}:${r}`;
 const CH_MEDIA = new Map();
 const chMediaKey = (p = S.profile, room = CH.room) => `pkm:v1:chat-media:${p}:${room}`;
@@ -5870,6 +6031,7 @@ async function chLoad(){
   if (CH.st && CH.st.plugin) CH.timer = setTimeout(chLoad, CH.open && active ? 1200 : active ? 4000 : CH.open ? 5000 : 30000);
   else CH.timer = setTimeout(chLoad, 60000);   // 설치하면 1분 안에 버튼이 생긴다(설치 화면은 바로 부른다)
   chFab(); aiNowPaint(); if (CH.open) chPaint();
+  document.querySelectorAll('#main .pl-ai').forEach(el => { const html = chPluginBtn(el.dataset.id); if (html && el.outerHTML !== html){ const f = document.activeElement === el; el.outerHTML = html; if (f) $(`#main .pl-ai[data-id="${CSS.escape(el.dataset.id)}"]`)?.focus(); } });
   // 카드 아이콘(세션 상태)은 보드·카드 화면에만 — 입력 중이면 그리지 않는다
   if (before !== JSON.stringify(CH.st && [CH.st.ok, CH.st.rooms]) && /^#\/(action\/short|plugins\/[^/]+\/setup)/.test(location.hash) && !document.querySelector('dialog[open]')
     && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#main input, #main textarea, #main select'))) render();
@@ -5955,6 +6117,20 @@ function chProjectBtn(pid, name){
   if (!chProjects()) return '';
   const st = chState(chSum(`project-${pid}`)), word = CH_LABEL[st], dot = ['run', 'ask', 'new', 'bad'].includes(st), lbl = !['none', 'idle'].includes(st);
   return `<button class="ch-ico" type="button" data-ch="project" data-id="${esc(pid)}" data-state="${st}" aria-label="${esc(name)} 프로젝트 AI Chat · ${word}" title="AI Chat · ${word}"><span class="i">${CH_ICON}${dot ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>${lbl ? `<span class="lbl" aria-hidden="true">${word}</span>` : ''}</button>`;
+}
+/* 플러그인 화면 맨 위의 [AI로 고치기] — 플러그인마다 방 하나. 없으면 바로 만든다(작업 폴더는 서버가 그 플러그인의 원본으로 잡는다).
+   일이 걸려 있으면(하는 중·확인 요청·새 답·멈춤) 점과 짧은 말을 붙인다 — 색만으로 가르지 않게 */
+async function chPlugin(id){
+  CH.pick = null;
+  if (chSum(`plugin-${id}`)) return chOpen(`plugin-${id}`);
+  if (!chPlugins()) return toast('플러그인 세션은 이 컴퓨터의 pkm-ai-server에 연결돼 있을 때만 만들 수 있어요');
+  try { const r = await capi('', { plugin:id }); CH.rooms[r.id] = r; await chLoad(); return chOpen(r.id); }
+  catch (e) { toast(`플러그인 세션을 만들지 못했어요 — ${e.message}`); }
+}
+function chPluginBtn(id){
+  if (!chPlugins()) return '';
+  const st = chState(chSum(`plugin-${id}`)), busy = CH_BUSY.includes(st), word = CH_LABEL[st];
+  return `<button class="btn btn-ghost btn-sm pl-ai" type="button" data-ch="plugin" data-id="${esc(id)}" data-state="${st}" aria-label="${esc(plName(id))} AI로 고치기${busy ? ` · ${word}` : ''}"><span class="i">${CH_ICON}${busy ? '<span class="dot" aria-hidden="true"></span>' : ''}</span>AI로 고치기${busy ? `<span class="lbl"> · ${word}</span>` : ''}</button>`;
 }
 async function chCard(tid){
   const t = find('tasks', tid); if (!t) return;
@@ -6138,12 +6314,12 @@ function chPaint(force){
     : `<span class="faint" title="${esc(r && r.cwd ? r.cwd : '')}">${CH.room === 'data' ? `${esc(S.profile)} 프로필 데이터` : r && r.cwd ? `작업 폴더 ${esc(chTail(r.cwd))}` : '작업 폴더 없음'}</span>
       ${cwAvail() ? `<button class="btn btn-text btn-sm" type="button" data-ch="web" aria-controls="chat-web" aria-expanded="${cwWant()}">${cwWant() ? '브라우저 숨기기' : '브라우저 보기'}</button>` : ''}
       ${card ? `<button class="btn btn-text btn-sm" type="button" data-ch="pick" ${busy ? 'disabled title="하는 중에는 바꿀 수 없어요"' : ''}>${r && r.cwd ? '폴더 바꾸기' : '작업 폴더 고르기'}</button>` : ''}
-      ${card ? (sum.kind === 'project' ? '<a class="btn btn-text btn-sm" href="#/action/short">단기 보드 보기</a>' : `<a class="btn btn-text btn-sm" href="#/action/short/${esc(card.id)}">카드 보기</a>`) : ''}
+      ${card ? (sum.kind === 'project' ? '<a class="btn btn-text btn-sm" href="#/action/short">단기 보드 보기</a>' : sum.kind === 'plugin' ? `<a class="btn btn-text btn-sm" href="#/plugins/${esc(card.id)}">플러그인 보기</a>` : `<a class="btn btn-text btn-sm" href="#/action/short/${esc(card.id)}">카드 보기</a>`) : ''}
       ${r && r.turns.length && !chPend(r) ? `<button class="btn btn-text btn-sm" type="button" data-ch="view">${CH.view === 'sum' ? '대화 보기' : '요약 보기'}</button>` : ''}
       ${r && r.turns.length && !busy ? `<button class="btn btn-text btn-sm" type="button" data-ch="reset">새 대화</button>` : ''}
       ${card ? `<button class="btn btn-text btn-sm pl-danger" type="button" data-ch="remove">세션 지우기</button>` : ''}`);
   tools.hidden = !toolHtml.trim();
-  $('#chat-in').placeholder = CH.room === 'data' ? "예: 내일까지 '견적서 보내기' 단기를 만들어 줘" : '예: 할 일 첫 줄부터 해 줘';
+  $('#chat-in').placeholder = CH.room === 'data' ? "예: 내일까지 '견적서 보내기' 단기를 만들어 줘" : sum && sum.kind === 'plugin' ? '예: 신호 탭에 지금 값도 보여 줘' : '예: 할 일 첫 줄부터 해 줘';
   $('#chat-hint').hidden = chCoarse();
   if (tools.dataset.sig !== toolHtml){ tools.innerHTML = toolHtml; tools.dataset.sig = toolHtml; }
   chMemoPaint(sum);
@@ -6155,7 +6331,7 @@ function chPaint(force){
   let html;
   if (!chOn()) html = `<p class="ch-empty">${esc((CH.st && CH.st.message) || 'AI 챗봇을 쓸 수 없어요')}</p>`;
   else if (CH.pick) html = chPickHtml(r);
-  else if (!r || !r.turns.length) html = `<p class="ch-empty">${CH.room === 'data' ? '노트·단기·기록을 말로 더하고 고치고 지워요. 고친 것은 화면에 바로 보여요.' : '이 카드에서 할 일을 말해 주세요. 이 대화는 카드 세션에 이어져요.'}${CH.st.full ? '' : '<br><span class="faint">pkm-ai-server가 full 모드를 허용하지 않아 자동 권한 모드로 돌아요.</span>'}</p>`;
+  else if (!r || !r.turns.length) html = `<p class="ch-empty">${CH.room === 'data' ? '노트·단기·기록을 말로 더하고 고치고 지워요. 고친 것은 화면에 바로 보여요.' : sum && sum.kind === 'plugin' ? `${esc(card.title)}에서 바꾸고 싶은 것을 말해 주세요. AI가 원본을 고치면 플러그인 화면에 업데이트가 떠요 — 승인하면 반영돼요.` : '이 카드에서 할 일을 말해 주세요. 이 대화는 카드 세션에 이어져요.'}${CH.st.full ? '' : '<br><span class="faint">pkm-ai-server가 full 모드를 허용하지 않아 자동 권한 모드로 돌아요.</span>'}</p>`;
   else if (CH.view === 'sum' && !chPend(r)) html = chSumsHtml(r);
   else html = r.turns.map(t => chTurn(CH.room, t)).join('');
   if (CH.err && !CH.pick) html += `<p class="ch-st bad" role="alert">${esc(CH.err)}</p>`;
@@ -6473,6 +6649,7 @@ document.addEventListener('click', async e => {
   if (act === 'push') return puOpen();
   if (act === 'goto-live') return chOpen(b.dataset.room);
   if (act === 'card') return chCard(b.dataset.id);
+  if (act === 'plugin') return chPlugin(b.dataset.id);
   if (act === 'project'){ if (b.closest('summary')) e.preventDefault(); return chProject(b.dataset.id); }   // 묶음 머리 안의 아이콘 — 펼치고 접기는 하지 않는다
   if (act === 'pick'){ const r = CH.rooms[CH.room]; return chPickGo((r && r.cwd) || (CH.st && CH.st.card_cwd) || ''); }
   if (act === 'pick-go') return chPickGo(b.dataset.path);
@@ -7803,7 +7980,7 @@ function vCheckin(id, name, tab, arg){
   const X = pckCtx(c), TABS = ['main', 'tasks', 'preview', 'score', 'intake'];
   if (!TABS.includes(tab)) tab = 'main';
   // 플러그인 메뉴에서 왔을 때 다른 플러그인으로 옮겨 갈 탭(목록 플러그인 + 체크인)
-  const fids = plIds(), cks = pckList().filter(x => !fids.includes(x.id)), ptabs = fids.length + cks.length > 1 ? seg([...fids.map(k => [k, `#/plugins/${k}`, `${esc(plName(k))}${plCount(k) ? ` <span class="num">${plCount(k)}</span>` : ''}`]), ...cks.map(x => [`ck:${x.id}`, `#/plugins/${x.id}`, esc(x.name)])], `ck:${id}`, 'seg-compact', fids.length + cks.length > 3 ? '플러그인 보기' : '') : '';
+  const fids = plIds(), cks = pckList().filter(x => !fids.includes(x.id)), ptabs = plTabs(`ck:${id}`);
   const head = `${ptabs || `<a class="back" href="#/plugins/_manage"><span aria-hidden="true">‹</span> 플러그인 관리</a>`}<p class="eyebrow">${esc(plName(id))} · 체크인 노트</p><h1 tabindex="-1">${esc(c.name)}</h1>`;
   const gate = (!X.em ? empty('주요 업무 편집기를 찾지 못했어요', '플러그인을 다시 설치해 주세요.') : pedGate(X.em, X.nm, id)) || (!X.et ? '' : pedGate(X.et, X.nt, id));
   if (gate) return `<div class="page">${head}${gate}</div>`;

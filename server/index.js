@@ -26,6 +26,7 @@
 // POST /api/profile/:p/plugins/:id/search {name, q}   플러그인 검색 한 번(이 컴퓨터의 pkm-ai-server, 60초까지) → { items, note }
 // GET  /api/profile/:p/plugins/:id/browser?tab=  플러그인의 브라우저 탭(tab을 비우면 쓸 수 있는지와 로그인 탭 키만) · GET …/browser/frame?tab=  지금 화면(JPEG)
 // POST …/plugins/:id/browser/open?tab= {url?} · POST …/browser/input?tab= {type, …}  누르기·적기(server/runner.js browser — tab은 그 플러그인의 탭만)
+// GET  /api/ai/choice                    pkm 화면에서 고른 AI·모델·생각하는 정도 { provider, model, effort } · POST 저장(플러그인 AI 단계가 따른다)
 // GET  /api/ai/local                     같은 컴퓨터에 켠 pkm-ai-server를 찾았는지 { found, ok, url, connected } · POST  연결 코드 없이 그곳에 연결(server/runner.js)
 // GET  /api/profile/:p/gcal              구글 캘린더 연결 상태
 // GET  /api/profile/:p/gcal/connect      구글 로그인으로 보낸다(302) — 돌아오는 곳은 /api/gcal/callback
@@ -33,7 +34,7 @@
 // POST /api/gcal/client {client_id, client_secret}   내 구글 OAuth 클라이언트 등록(토큰과 함께 ~/.pkm-app/gcal.json, 데이터 폴더 밖)
 // GET  /api/profile/:p/jobs               AI 예약 작업의 마지막 실행(이 컴퓨터) · POST …/jobs/:id/run  지금 돌리기(server/jobs.js)
 // GET  /api/profile/:p/chats              AI 챗봇 상태(로컬 AI 연결인지)와 방 목록 · GET …/chats/:room  방 하나(말·진행·확인 요청)
-// POST /api/profile/:p/chats {card? | project?, cwd?} 데이터 방, 카드 방, 프로젝트 방 열기(없으면 만든다) · DELETE …/chats/:room  카드 세션 지우기
+// POST /api/profile/:p/chats {card? | project? | plugin?, cwd?} 데이터 방, 카드 방, 프로젝트 방 열기(없으면 만든다) · DELETE …/chats/:room  카드 세션 지우기
 // POST …/chats/:room/send {id, text, provider, model?, effort?}  말 보내기 · …/cancel  그만두기 · …/reset  새 대화 · …/answer {request_id, allow}  확인 요청에 답하기(server/chats.js)
 // POST …/chats/:room/memo {text}  방 메모 적기(빈 글이면 지운다) · …/read  끝난 답을 읽었다고 적기(카드의 '새 답'을 지운다)
 // POST …/chats/:room/cwd {cwd|null}  카드 세션의 작업 폴더 고르기·비우기 · GET …/chats/_dirs?path=  폴더 고르기 화면의 하위 폴더 목록
@@ -42,6 +43,8 @@
 // POST …/push/off {endpoint}  끄기 · …/push/test {endpoint}  테스트 알림 · …/push/seen {dev, visible}  이 기기로 앱을 보는 중(그동안은 안 보낸다)(server/push.js)
 // PKM_AI_CONNECT='https://ai.example.com'   AI 연결 서버 주소를 CSP connect-src에 더한다(기본: 127.0.0.1·localhost·*.ts.net)
 import http from 'node:http';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
@@ -52,7 +55,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
-import { createRunner, askTitle, readConf, localAI, connectLocalAI } from './runner.js';
+import { createRunner, askTitle, readConf, localAI, connectLocalAI, aiChoice, setAIChoice } from './runner.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
 import { createPush } from './push.js';
@@ -229,7 +232,9 @@ setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다
 /* ---------- 플러그인 실행기: 이 컴퓨터에서 돌리기를 켠 프로필만 ---------- */
 const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p, 30000); },
   // 브라우저 단계에서 AI가 사람에게 넘긴 일 — 채팅의 넘겨받기와 같은 알림(내 답이 필요할 때)으로
-  onAsk:(p, m) => push.notify(p, { kind:'ask', title:askTitle(m), body:String(m.question).slice(0, 160), tag:`plugin:${m.plugin}:${m.run}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}/run/${m.run}` }) });
+  onAsk:(p, m) => push.notify(p, { kind:'ask', title:askTitle(m), body:String(m.question).slice(0, 160), tag:`plugin:${m.plugin}:${m.run}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}/run/${m.run}` }),
+  // 스크립트가 알리라고 한 일(예: 주문 체결) — 끝남 알림을 켠 기기로. 알림마다 따로 보이게 tag는 매번 다르게
+  onNotify:(p, m) => push.notify(p, { kind:'done', title:`${m.name} · ${m.title}`, body:m.text, tag:`plugin:${m.plugin}:notify:${Date.now()}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}${m.run ? `/run/${m.run}` : ''}` }) });
 /* ---------- AI 예약 작업: 돌리는 컴퓨터가 정한 때에 AI에 맡기고 결과를 인박스로 ---------- */
 const jobs = createJobs({ DATA, listProfiles, settingsOf, here:p => runner.here(p), onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p); } });
 
@@ -251,8 +256,19 @@ async function findProject(p, id){
     file:rec ? path.join(DATA, p, '_플러그인', '.data', 'project-pilot', `${id}.json`) : '', hub:rec && rec.hub && rec.hub.path ? path.join(DATA, p, rec.hub.path) : '',
     work:rec && rec.work ? rec.work : '', cards };
 }
+// 플러그인(플러그인 채팅) — 원본 폴더와, 이 컴퓨터가 마지막으로 본 상태(목록마다 가져온 때·오류, 최근 실행)를 짧게
+async function findPlugin(p, id){
+  if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(String(id))) return null;
+  const pl = await plugins.locate(path.join(DATA, p), String(id));
+  if (!pl) return null;
+  let st = null; try { st = JSON.parse(await fs.readFile(path.join(DATA, p, '_플러그인', '.state', `${id}.json`), 'utf8')); } catch {}
+  const feeds = Object.entries((st && st.feeds) || {}).map(([n, f]) => `- 목록 ${n}: ${f.ok === false ? `오류 — ${String(f.error || '').slice(0, 200)}` : `항목 ${(f.items || []).length}개`}${f.at ? ` (${f.at} 가져옴)` : ''}`);
+  const runs = ((st && st.runs) || []).slice(0, 6).map(r => { const s = (r.steps || []).find(z => z.status === 'failed');
+    return `- 실행 ${r.workflow} · ${r.item && r.item.title ? String(r.item.title).slice(0, 60) : ''} · ${r.status}${s && s.error ? ` — ${s.key}: ${String(s.error).slice(0, 200)}` : ''} (${r.updated || r.created})`; });
+  return { ...pl, status: [...feeds, ...runs].join('\n') || '아직 돌린 기록이 없어요' };
+}
 const push = createPush();
-const chats = createChats({ DATA, readConf, findCard, findProject, onPush:(p, msg) => push.notify(p, msg) });
+const chats = createChats({ DATA, readConf, findCard, findProject, findPlugin, onPush:(p, msg) => push.notify(p, msg) });
 
 /* ---------- 교과서: 원본(Obsidian)이 정본, 바뀌면 다시 복제 ---------- */
 // 책 폴더의 .source.json 이 가리키는 원본을 지켜본다. 놓친 변경은 5분마다 한 번 더 맞춘다.
@@ -312,7 +328,19 @@ const TYPES = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; char
 const AI_CONNECT = ['http://127.0.0.1:*', 'http://localhost:*', 'https://*.ts.net', ...(process.env.PKM_AI_CONNECT || '').split(/\s+/).filter(Boolean)].join(' ');
 const sameHost = req => { const h = String(req.headers.host || '').replace(/:\d+$/, ''); return /^[a-z0-9.-]+$/i.test(h) ? ` http://${h}:* https://${h}:*` : ''; };
 const SEC = req => ({ 'x-content-type-options':'nosniff', 'referrer-policy':'no-referrer', 'content-security-policy':`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com ${AI_CONNECT}${sameHost(req)}; frame-ancestors 'none'` });
-const send = (res, code, body, type = 'application/json; charset=utf-8') => { res.writeHead(code, { 'content-type':type, 'cache-control':'no-store', ...SEC(res.req) }); res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body)); };
+// 큰 글 응답(프로필 전체·플러그인 상태)은 받는 쪽이 되면 gzip으로 — 휴대폰이 15초마다 받는 상태가 압축 없이 수백 KB였다
+const send = (res, code, body, type = 'application/json; charset=utf-8', extra = {}) => {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
+  const head = { 'content-type':type, 'cache-control':'no-store', ...SEC(res.req), ...extra };
+  if (buf.length < 4096 || !/\bgzip\b/.test(String(res.req.headers['accept-encoding'] || '')) || !/json|text|javascript/.test(type)){ res.writeHead(code, head); return res.end(buf); }
+  zlib.gzip(buf, { level:4 }, (e, z) => { if (e){ res.writeHead(code, head); return res.end(buf); } res.writeHead(code, { ...head, 'content-encoding':'gzip', vary:'accept-encoding' }); res.end(z); });
+};
+// 자주 묻는 큰 응답 — 내용이 그대로면 304만 돌려준다(화면은 받은 etag를 if-none-match로 다시 보낸다)
+const sendTagged = (res, body) => {
+  const text = JSON.stringify(body), etag = `"${crypto.createHash('sha1').update(text).digest('base64url').slice(0, 20)}"`;
+  if (res.req.headers['if-none-match'] === etag){ res.writeHead(304, { etag, 'cache-control':'no-store', ...SEC(res.req) }); return res.end(); }
+  send(res, 200, text, 'application/json; charset=utf-8', { etag });
+};
 /* 화면의 AI 요청을 이 컴퓨터의 AI 연결(플러그인·채팅이 쓰는 ~/.pkm-app/runner.json의 ai)로 넘긴다.
    https로 연 화면(휴대폰 홈 화면 앱)은 http인 pkm-ai-server에 직접 닿지 못한다. 화면이 쓰는 요청만, 작업은 도구 없는 AI만 */
 const AI_ROUTES = [['GET', /^providers$/], ['GET', /^usage$/], ['POST', /^jobs$/], ['GET', /^jobs\/[\w-]+$/], ['GET', /^jobs\/[\w-]+\/events$/], ['DELETE', /^jobs\/[\w-]+$/]];
@@ -359,6 +387,10 @@ async function api(req, res, url){
     if (cross) return send(res, 403, { error:'다른 사이트에서 온 요청이에요' });
   }
   if (parts[0] === 'ai' && parts[1] === 'v1') return aiProxy(req, res, parts.slice(2).join('/'), url);
+  if (parts[0] === 'ai' && parts[1] === 'choice' && !parts[2]){
+    if (req.method === 'GET') return send(res, 200, aiChoice());
+    if (req.method === 'POST') return send(res, 200, setAIChoice(await body(req)));
+  }
   if (parts[0] === 'ai' && parts[1] === 'local' && !parts[2]){
     if (req.method === 'GET') return send(res, 200, await localAI());
     if (req.method === 'POST') return send(res, 200, await connectLocalAI());
@@ -388,7 +420,7 @@ async function api(req, res, url){
     if (sub === 'runner' && req.method === 'POST') return send(res, 200, await runner.setRunner(p, await body(req)));
     if (sub === 'jobs' && !parts[3] && req.method === 'GET') return send(res, 200, await jobs.status(p));
     if (sub === 'jobs' && parts[3] && parts[4] === 'run' && req.method === 'POST') return send(res, 200, await jobs.runNow(p, parts[3]));
-    if (sub === 'plugins' && parts[3] === 'state' && req.method === 'GET') return send(res, 200, await runner.status(p));
+    if (sub === 'plugins' && parts[3] === 'state' && req.method === 'GET') return sendTagged(res, await runner.status(p));
     if (sub === 'notifications' && !parts[3] && req.method === 'GET') return send(res, 200, await runner.notes(p));
     if (sub === 'notifications' && parts[3] === 'read' && req.method === 'POST'){ const b = await body(req); return send(res, 200, await runner.readNotes(p, Array.isArray(b.ids) ? b.ids.map(String).slice(0, 200) : null)); }
     if (sub === 'chats'){
@@ -397,7 +429,7 @@ async function api(req, res, url){
       if (rid === '_dirs' && req.method === 'GET') return send(res, 200, await chats.dirs(p, url.searchParams.get('path')));
       if (rid && act === 'attachments' && parts[5] && req.method === 'GET') return chats.attachment(p, rid, parts[5], req, res);
       if (rid && act === 'attachments' && !parts[5] && req.method === 'POST') return send(res, 201, await chats.upload(p, rid, req, url.searchParams.get('name')));
-      if (!rid && req.method === 'POST'){ const b = await body(req); return send(res, 200, await chats.open(p, { card:b.card ? String(b.card) : null, project:b.project ? String(b.project) : null, cwd:b.cwd ? String(b.cwd) : null })); }
+      if (!rid && req.method === 'POST'){ const b = await body(req); return send(res, 200, await chats.open(p, { card:b.card ? String(b.card) : null, project:b.project ? String(b.project) : null, plugin:b.plugin ? String(b.plugin) : null, cwd:b.cwd ? String(b.cwd) : null })); }
       if (rid && !act && req.method === 'GET') return send(res, 200, chats.room(p, rid));
       if (rid && !act && req.method === 'DELETE') return send(res, 200, await chats.remove(p, rid));
       if (rid && req.method === 'POST' && act === 'send') return send(res, 202, await chats.send(p, rid, await body(req)));

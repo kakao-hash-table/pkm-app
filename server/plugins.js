@@ -91,7 +91,7 @@ export async function inspect({ git, ref, local }, appDir = APP_PLUGINS){
     return {
       stage, ok: result.ok, errors: result.errors, warnings: result.warnings, manifest: result.manifest, source, commit,
       workflows: result.workflows.map(w => ({ name: w.name, file: w.file, note: w.note || '', ok: w.ok || '', steps: w.steps })),
-      feeds: result.feeds, chats: result.chats || [],
+      feeds: result.feeds, chats: result.chats || [], ranges: result.ranges || [],
       files: files.map(f => ({ path: f.path, size: f.size, sha256: f.sha256 || null })),
       scripts: result.scripts.map(p => ({ path: p, sha256: hashOf(p), text: (files.find(f => f.path === p) || {}).text || '' }))
     };
@@ -142,6 +142,17 @@ export async function list(profileDir){
       installed_at: rec.installed_at || null, changed, scripts: r.scripts.map(p => ({ path: p, sha256: (files.find(f => f.path === p) || {}).sha256 || null })) });
   }
   return out;
+}
+
+/* 플러그인 하나의 원본 — 고칠 곳. 앱 내장이면 이 앱의 plugins/<id>, 로컬 폴더면 그 폴더. git은 받은 사본뿐이라 설치본(고쳐도 업데이트하면 덮인다)
+   { id, name, version, description, installed, src, kind: bundled|local|git|unknown, app: 이 앱 폴더(앱 내장일 때) } */
+export async function locate(profileDir, id, appDir = APP_PLUGINS){
+  const x = (await list(profileDir)).find(x => x.id === id);
+  if (!x) return null;
+  let rec = {}; try { rec = JSON.parse(await fs.readFile(path.join(x.path, INSTALL), 'utf8')); } catch {}
+  const s = await sourceOf(rec, id, appDir), m = x.manifest || {};
+  const kind = s ? s.kind : 'unknown', src = s && s.local ? s.local : x.path;
+  return { id, name: m.name || id, version: m.version || '', description: m.description || '', installed: x.path, src, kind, git: s && s.git ? s.git : null, app: kind === 'bundled' ? path.dirname(path.resolve(appDir)) : null };
 }
 
 /* ---------- 업데이트 ---------- */

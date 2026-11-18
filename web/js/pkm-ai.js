@@ -33,7 +33,20 @@
   const conn = () => { const c = stored(); if (c) return viaServer ? { ...c, via:'server' } : c; return serverOk && !(LS.get(null) || {}).no_server ? SERVER : null; };
   const via = () => { const c = conn(); return c ? c.via || 'direct' : null; };
   const prefs = () => Object.assign(DEF_PREFS(), (LS.get(null) || {}).prefs || {});
-  function setPrefs(p){ if (!conn()) return; const c = LS.get(null) || {}; c.prefs = Object.assign(prefs(), p); LS.set(c); }
+  function setPrefs(p){
+    if (!conn()) return; const c = LS.get(null) || {}; c.prefs = Object.assign(prefs(), p); LS.set(c);
+    if (['provider', 'model', 'effort'].some(k => k in p)){   // 이 컴퓨터의 플러그인도 같은 모델로 돌게 pkm 서버에 남긴다
+      const { provider, model, effort } = c.prefs;
+      fetch('/api/ai/choice', { method:'POST', headers:{ 'content-type':'application/json' }, body:JSON.stringify({ provider, model, effort }) }).catch(() => {});
+    }
+  }
+  /* pkm 서버에 남긴 선택을 이 브라우저로 — 기기마다 따로 고르지 않게 서버 값이 먼저 */
+  async function pullChoice(){
+    if (!conn()) return;
+    let s; try { const r = await fetch('/api/ai/choice'); if (!r.ok) return; s = await r.json(); } catch (e) { return; }
+    if (!s || !s.provider) return;
+    const c = LS.get(null) || {}; c.prefs = Object.assign(prefs(), { provider:s.provider, model:s.model || 'default', effort:s.effort || null }); LS.set(c);
+  }
   async function probe(){
     try { const r = await fetch(SERVER.url + '/v1/providers'); serverOk = r.ok; } catch (e) { serverOk = false; }
     return serverOk;
@@ -148,5 +161,5 @@
     return job;
   }
 
-  root.PKMAI = { parseCode, conn, via, probe, prefs, setPrefs, connect, localInfo, connectLocal, disconnect, providers, usage, windows, guard, run, ratio };
+  root.PKMAI = { parseCode, conn, via, probe, prefs, setPrefs, pullChoice, connect, localInfo, connectLocal, disconnect, providers, usage, windows, guard, run, ratio };
 })(typeof self !== 'undefined' ? self : this);

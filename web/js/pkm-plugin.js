@@ -51,7 +51,73 @@
 
   /* 검색·편집기 문서도 피드와 같은 꼴: "## 이름" 아래 "- 키: 값" 줄, 다른 줄은 설명 */
   const parseSearches = parseFeeds, parseEditors = parseFeeds, parseChats = parseFeeds, parseLinks = parseFeeds;
-  const CHAT_SCOPES = ['profile', 'card', 'project'];
+  const CHAT_SCOPES = ['profile', 'card', 'project', 'plugin'];
+  /* 레인지 표 문서: "## 이름" 아래 설명·"- 키: 값"(pick · then · title · mark · rest · note), "### 고를 것" 아래 줄들이 그 칸의 핸드 글(쉼표로 나눈 홀덤 표기).
+     then이 있으면 두 번 고른다 — 고를 것 이름은 "첫째 / 둘째"(예: "### UTG / BTN") */
+  function parseRanges(text){
+    const out = []; let cur = null, spot = null;
+    for (const line of String(text || '').split('\n')){
+      const h = line.match(/^##\s+(.+?)\s*$/);
+      if (h){ cur = { name: h[1], description: '', spots: [] }; out.push(cur); spot = null; continue; }
+      if (!cur) continue;
+      const sh = line.match(/^###\s+(.+?)\s*$/);
+      if (sh){ spot = { name: sh[1], text: '' }; cur.spots.push(spot); continue; }
+      if (spot){ if (line.trim()) spot.text += (spot.text ? ' ' : '') + line.trim(); continue; }
+      const m = line.match(/^-\s+([a-z_]+):\s*(.*?)\s*$/);
+      if (m) cur[m[1]] = m[2];
+      else if (line.trim()) cur.description += (cur.description ? ' ' : '') + line.trim();
+    }
+    return out;
+  }
+  /* 홀덤 핸드 표기 → 169칸 중 든 칸. "66+" "AKs" "A2s+"(높은 패 고정, 낮은 패를 그 아래까지) "KTo+" "A5s-A2s" "99-66" "AK"(s·o 둘 다).
+     hands: ['AA', 'AKs', …], combos: 조합 수(페어 6 · 수딧 4 · 오프 12, 전체 1326), bad: 읽지 못한 조각 */
+  const RANKS = 'AKQJT98765432', HAND_COMBOS = 1326;
+  function parseHands(text){
+    const set = new Set(), bad = [], ix = c => RANKS.indexOf(c);
+    const add = (a, b, t) => { if (a === b) set.add(RANKS[a] + RANKS[a]); else for (const k of t ? [t] : ['s', 'o']) set.add(RANKS[Math.min(a, b)] + RANKS[Math.max(a, b)] + k); };
+    for (const raw of String(text || '').split(/[,\n]/).map(x => x.trim()).filter(Boolean)){
+      const tok = raw.replace(/^([akqjt2-9]{2})/i, m => m.toUpperCase()).replace(/-([akqjt2-9]{2})/i, m => m.toUpperCase()).replace(/[SO]/g, m => m.toLowerCase());
+      const m = tok.match(/^([AKQJT2-9])([AKQJT2-9])([so])?(?:(\+)|-([AKQJT2-9])([AKQJT2-9])([so])?)?$/);
+      if (!m){ bad.push(raw); continue; }
+      const a = ix(m[1]), b = ix(m[2]), t = m[3] || '';
+      if (a > b || (a === b && t)){ bad.push(raw); continue; }   // 높은 패를 앞에, 페어에는 s·o를 붙이지 않는다
+      if (m[5]){
+        const c = ix(m[5]), d = ix(m[6]);
+        if ((m[7] || '') !== t || (a === b ? c !== d : c !== a || d <= c)){ bad.push(raw); continue; }
+        if (a === b) for (let i = Math.min(a, c); i <= Math.max(a, c); i++) add(i, i);
+        else for (let i = Math.min(b, d); i <= Math.max(b, d); i++) add(a, i, t);
+      } else if (m[4]){
+        if (a === b) for (let i = 0; i <= a; i++) add(i, i);
+        else for (let i = a + 1; i <= b; i++) add(a, i, t);
+      } else add(a, b, t);
+    }
+    const hands = [...set], combos = hands.reduce((n, h) => n + (h.length === 2 ? 6 : h[2] === 's' ? 4 : 12), 0);
+    return { hands, combos, bad };
+  }
+  /* 목록 항목의 그래프(chart) — 시간에 따라 변한 값 한 줄(선 하나). points는 숫자나 { t(ISO 시각), v(값) } 2~200개. 꼴이 틀리면 null(그리지 않는다).
+     lines: 그 값과 견줄 기준선 3개까지 — { label, values: 점마다 하나(없으면 null) }. 값이 그 선을 넘었는지 보려는 것(예: 매수 조건 값).
+     zero: false면 세로축에 0을 넣지 않는다(값의 범위만 — 가격처럼 0에서 먼 값) */
+  function normChart(c){
+    if (!c || typeof c !== 'object' || !Array.isArray(c.points)) return null;
+    const raw = c.points.slice(0, 200);
+    const points = raw.map(p => typeof p === 'number' ? { t: null, v: p } : p && typeof p === 'object' && p.v != null && p.v !== '' ? { t: p.t && !Number.isNaN(Date.parse(p.t)) ? new Date(p.t).toISOString() : null, v: Number(p.v) } : null).filter(p => p && Number.isFinite(p.v));
+    if (points.length < 2) return null;
+    // 기준선은 점과 자리가 맞아야 한다 — 버린 점이 있으면 어긋나므로 선도 버린다
+    const lines = points.length !== raw.length ? [] : (Array.isArray(c.lines) ? c.lines : []).slice(0, 3)
+      .map(l => l && Array.isArray(l.values) && l.values.length === c.points.length ? { label: String(l.label || '').slice(0, 30), values: l.values.slice(0, 200).map(v => v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v)) } : null)
+      .filter(l => l && l.values.some(v => v != null));
+    return { label: String(c.label || '').slice(0, 40), unit: String(c.unit || '').slice(0, 8), signed: c.signed === true, ...(c.zero === false ? { zero: false } : {}), points, ...(lines.length ? { lines } : {}) };
+  }
+  /* 그래프 자리 — 0~1 좌표(y는 위가 0). 가로는 시각(모든 점에 t가 있고 뒤로 가지 않을 때), 아니면 순서.
+     세로는 0을 포함한다(손익처럼 0이 기준인 값). zero: false면 값과 기준선의 범위만(위아래 8% 여유) — 이때 zero는 null */
+  function chartGeom(chart){
+    const p = chart.points, ts = p.map(q => q.t ? Date.parse(q.t) : NaN), timed = ts.every((t, i) => Number.isFinite(t) && (!i || t >= ts[i - 1])) && ts[ts.length - 1] > ts[0];
+    const vs = p.map(q => q.v), min = Math.min(...vs), max = Math.max(...vs), all = [...vs, ...(chart.lines || []).flatMap(l => l.values.filter(v => v != null))];
+    const free = chart.zero === false, lo0 = Math.min(...all), hi0 = Math.max(...all), pad = free ? (hi0 - lo0 || Math.abs(hi0) || 1) * 0.08 : 0;
+    const lo = free ? lo0 - pad : Math.min(0, lo0), hi = free ? hi0 + pad : Math.max(0, hi0), span = hi - lo || 1;
+    const pts = p.map((q, i) => ({ x: timed ? (ts[i] - ts[0]) / (ts[ts.length - 1] - ts[0]) : i / (p.length - 1), y: (hi - q.v) / span }));
+    return { timed, min, max, zero: free ? null : hi / span, pts, lines: (chart.lines || []).map(l => l.values.map((v, i) => v == null ? null : { x: pts[i].x, y: (hi - v) / span })) };
+  }
   const startsOf = v => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
   /* 정렬: "마감 임박=deadline, 상금 큰=-prize" → [{ label, key, desc }]. 값은 항목 vars[key]에서 읽는다. 틀린 조각은 bad에 */
   const sortsOf = v => startsOf(v).map(x => { const m = x.match(/^(.{1,12}?)\s*=\s*(-?)([a-z_][a-z0-9_]{0,40})$/); return m ? { label: m[1].trim(), key: m[3], desc: !!m[2] } : { bad: x }; });
@@ -196,7 +262,7 @@
         if (d.inputs && startsOf(d.inputs).some(k => !KEY_RE.test(k))) err(`${where}: inputs는 변수 이름을 쉼표로 나눠요`);
         if (d.dismiss && d.dismiss !== 'yes') err(`${where}: dismiss는 yes만 써요`);
         if (d.dismiss && d.start) err(`${where}: dismiss는 start가 없는 목록에만 써요`);
-        if (d.notify && !['yes', 'no'].includes(d.notify)) err(`${where}: notify는 yes 또는 no`);
+        if (d.notify && !['yes', 'no', 'push'].includes(d.notify)) err(`${where}: notify는 yes·no·push 중 하나`);
         if (d.reask && (d.reask !== 'yes' || !d.start)) err(`${where}: reask는 yes만, start가 있는 목록에 써요`);
         const sorts = sortsOf(d.sort);
         for (const x of sorts.filter(x => x.bad)) err(`${where}: sort는 "이름=키" 또는 "이름=-키"(큰 것부터)를 쉼표로 이어 써요: ${x.bad}`);
@@ -205,7 +271,7 @@
         if (d.tab != null && (!String(d.tab).trim() || String(d.tab).length > 20)) err(`${where}: tab은 탭 이름 20자까지예요`);   // 플러그인 화면에서 이 목록을 따로 볼 탭(없으면 첫 탭 '할 일')
         if (feeds.some(x => x.name === d.name)) err(`${where}: 피드 이름이 겹쳐요`);
         feeds.push({ name: d.name, file: f.path, description: d.description, run: String(d.run || ''), every: every || 60, days: d.days || 'daily', hours: d.hours || null,
-          ...(d.tab ? { tab: String(d.tab).trim().slice(0, 20) } : {}), start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null, notify: d.notify === 'yes' });
+          ...(d.tab ? { tab: String(d.tab).trim().slice(0, 20) } : {}), start: starts[0] || null, starts, start_mode: starts.length ? d.start_mode || 'button' : null, empty: d.empty || '', count: d.count || null, notify: ['yes', 'push'].includes(d.notify), ...(d.notify === 'push' ? { push: true } : {}) });
       }
     }
     // 검색 — 찾기 화면에서 사람이 누를 때만. {q}가 찾는 말
@@ -292,7 +358,32 @@
         links.push({ name: d.name, file: f.path, description: d.description, rules: String(d.rules || '') });
       }
     }
-    if (!workflows.length && !feeds.length && !searches.length && !editors.length && !chats.length && !links.length) warn('워크플로우·피드·검색·편집기·채팅·퀵링크가 하나도 없어요(workflows/ feeds/ searches/ editors/ chats/ links/)');
+    // 레인지 표 — 고를 것(포지션) 하나를 고르면 그 핸드 레인지를 13×13 표로 그린다. 실행되는 것은 없다
+    const ranges = [];
+    for (const f of list.filter(f => /^ranges\/[^/]+\.md$/.test(f.path))){
+      for (const d of parseRanges(f.text)){
+        const where = `${f.path} › ${d.name}`;
+        const two = d.then != null, max = two ? 100 : 12;
+        if (!d.spots.length) err(`${where}: 고를 것이 없어요("### 이름" 아래에 핸드를 적어 주세요)`);
+        if (d.spots.length > max) err(`${where}: 고를 것은 ${max}개까지예요`);
+        for (const k of ['pick', 'then', 'mark', 'rest']) if (d[k] != null && (!String(d[k]).trim() || String(d[k]).length > 12)) err(`${where}: ${k}는 12자까지예요`);
+        if (d.title != null && (!two || String(d.title).length > 40 || !String(d.title).includes('{a}') || !String(d.title).includes('{b}'))) err(`${where}: title은 then이 있을 때만, {a}와 {b}를 넣어 40자까지예요`);
+        const spots = d.spots.map(sp => {
+          const r = parseHands(sp.text), parts = sp.name.split(/\s*\/\s*/).map(x => x.trim());
+          if (two && (parts.length !== 2 || !parts[0] || !parts[1])) err(`${where}: "${sp.name}" — then이 있으면 이름은 "첫째 / 둘째" 꼴이에요`);
+          else if ((two ? parts : [sp.name]).some(x => x.length > 12)) err(`${where}: "${sp.name}" 이름은 12자까지예요`);
+          if (!sp.text) err(`${where} › ${sp.name}: 핸드가 없어요`);
+          if (r.bad.length) err(`${where} › ${sp.name}: 읽지 못한 핸드 "${r.bad.slice(0, 5).join(', ')}"`);
+          return { name: two ? parts.join(' / ') : sp.name, ...(two ? { a: parts[0] || '', b: parts[1] || '' } : {}), text: sp.text.split(/[,\n]/).map(x => x.trim()).filter(Boolean).join(', ') };
+        });
+        for (const n of new Set(spots.map(x => x.name))) if (spots.filter(x => x.name === n).length > 1) err(`${where}: "${n}" 이름이 겹쳐요`);
+        if (two){ const as = [...new Set(spots.map(x => x.a))]; if (as.length > 12 || as.some(a => spots.filter(x => x.a === a).length > 12)) err(`${where}: 고를 것은 단계마다 12개까지예요`); }
+        if (ranges.some(x => x.name === d.name)) err(`${where}: 레인지 표 이름이 겹쳐요`);
+        ranges.push({ name: d.name, file: f.path, description: d.description, pick: d.pick ? String(d.pick).trim() : '고르기', ...(two ? { then: String(d.then).trim(), title: d.title ? String(d.title) : '' } : {}),
+          mark: d.mark ? String(d.mark).trim() : '포함', ...(d.rest ? { rest: String(d.rest).trim() } : {}), note: d.note ? String(d.note).slice(0, 500) : '', spots });
+      }
+    }
+    if (!workflows.length && !feeds.length && !searches.length && !editors.length && !chats.length && !links.length && !ranges.length) warn('워크플로우·피드·검색·편집기·채팅·퀵링크·레인지 표가 하나도 없어요(workflows/ feeds/ searches/ editors/ chats/ links/ ranges/)');
     if (mode === 'full') warn('에이전트가 모든 확인을 건너뛰는 full 모드를 요구해요');
 
     const manifest = { spec: SPEC, id: String(fm.id || ''), name: String(fm.name || ''), version: String(fm.version || ''), description: String(fm.description || doc.pre || '').slice(0, 500),
@@ -301,7 +392,7 @@
       settings: settings.map(s => ({ key: String(s.key), label: String(s.label), hint: s.hint ? String(s.hint) : '', type: SETTING_TYPES.includes(String(s.type)) ? String(s.type) : 'text',
         default: s.default == null ? (s.type === 'toggle' ? false : '') : s.type === 'toggle' ? s.default === true : String(s.default), placeholder: s.placeholder ? String(s.placeholder) : '',
         ...(s.type === 'pairs' ? { columns: pairColumns(s) } : {}) })) };
-    return { ok: !errors.length, manifest, workflows, feeds, searches, editors, checkins, chats, links, scripts: bundled, errors, warnings };
+    return { ok: !errors.length, manifest, workflows, feeds, searches, editors, checkins, chats, links, ranges, scripts: bundled, errors, warnings };
   }
 
   /* 누른 항목의 실행 — 같은 목록·항목·워크플로우에서 누른 뒤에 만든 것 중 가장 새것(누르기 전에 있던 skip은 빼고). 시계 차이는 1분까지 본다 */
@@ -333,7 +424,7 @@
     return { phase: 'done', tone: 'ok', text: '끝났어요' };
   }
 
-  const api = { SPEC, DIR, MODES, LIMITS, validate, runOf, runFeedback, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, parseLinks, parseLinkRules, parseChoices, parseLintRules, startsOf, sortsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
+  const api = { SPEC, DIR, MODES, LIMITS, validate, runOf, runFeedback, parseWorkflows, parseFeeds, parseSearches, parseEditors, parseChats, parseLinks, parseRanges, parseHands, RANKS, HAND_COMBOS, parseLinkRules, parseChoices, parseLintRules, normChart, chartGeom, startsOf, sortsOf, ignored, DOC_EXT, SCRIPT_EXT, IMG_EXT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PKMPlugin = api;
 })(typeof self !== 'undefined' ? self : this);

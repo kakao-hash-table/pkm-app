@@ -129,3 +129,21 @@ test('노트에 붙은 그림을 이름으로 찾아 준다 — 그림이 아닌
   assert.equal(r.status, 200); assert.equal(r.headers.get('content-type'), 'image/svg+xml'); assert.match(r.headers.get('content-security-policy'), /default-src 'none'/);
   for (const n of ['../_설정.md', '_설정.md', 'a/곡선.svg', '없음.svg']) assert.notEqual((await fetch(base + '/api/profile/' + encodeURIComponent('개인') + '/image?name=' + encodeURIComponent(n))).status, 200, n);
 });
+
+test('큰 응답은 gzip으로 보내고, 플러그인 상태는 그대로면 304만 돌려준다', async () => {
+  const big = 'ㄱ'.repeat(3000);
+  await post('/api/profile/개인/save', { writes:{ '01_지식/큰 노트.md':`---\ntype: note\n---\n${big}\n` } });
+  const raw = await fetch(base + '/api/profile/' + encodeURIComponent('개인'), { headers:{ 'accept-encoding':'identity' } });
+  assert.equal(raw.headers.get('content-encoding'), null);
+  const zipped = await fetch(base + '/api/profile/' + encodeURIComponent('개인'));   // fetch는 gzip을 받는다
+  assert.equal(zipped.headers.get('content-encoding'), 'gzip');
+  assert.ok((await zipped.json()).files['01_지식/큰 노트.md'].includes(big), '풀어 읽으면 같은 내용');
+  const small = await fetch(base + '/api/profile/' + encodeURIComponent('개인') + '/version');
+  assert.equal(small.headers.get('content-encoding'), null, '작은 응답은 그대로');
+  const st = base + '/api/profile/' + encodeURIComponent('개인') + '/plugins/state';
+  const first = await fetch(st), etag = first.headers.get('etag');
+  assert.equal(first.status, 200); assert.match(etag, /^"[\w-]{20}"$/); assert.ok((await first.json()).plugins);
+  const again = await fetch(st, { headers:{ 'if-none-match':etag } });
+  assert.equal(again.status, 304); assert.equal(await again.text(), '');
+  assert.equal((await fetch(st, { headers:{ 'if-none-match':'"다른 것"'.replace('다른 것', 'x') } })).status, 200);
+});

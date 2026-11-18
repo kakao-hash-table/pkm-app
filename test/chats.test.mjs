@@ -105,7 +105,8 @@ before(async () => {
   const { createChats } = await import('../server/chats.js');
   const project = { id: 'pabc123', title: '쉐어링크 월 10만', goal: '하루 10분으로 월 10만원', status: 'running', file: '/x/pabc123.json', hub: '/x/설계.md', work: T,
     cards: [{ id: 't1', title: '쉐어링크 월 10만 · 오퍼 — 니치 정하기', status: '진행', path: '03_행동/단기보드/a.md', open: ['🙋 니치 고르기 (3분)'] }] };
-  chats = createChats({ DATA, readConf: () => conf, findCard: async (p, id) => id === card.id ? card : null, findProject: async (p, id) => id === project.id ? project : null, onPush: (p, m) => { pushed.push({ p, ...m }); } });
+  const plugin = { id: 'upbit-quant', name: '업비트 퀀트', version: '0.1.5', description: '전략으로 사고판다', installed: '/x/_플러그인/upbit-quant', src: T, kind: 'bundled', git: null, app: T, status: '- 목록 신호: 오류 — 업비트에 닿지 않아요' };
+  chats = createChats({ DATA, readConf: () => conf, findCard: async (p, id) => id === card.id ? card : null, findProject: async (p, id) => id === project.id ? project : null, findPlugin: async (p, id) => id === plugin.id ? plugin : null, onPush: (p, m) => { pushed.push({ p, ...m }); } });
 });
 after(() => { ai.close(); fs.rmSync(T, { recursive: true, force: true }); });
 
@@ -134,7 +135,7 @@ test('로컬 전용 — 루프백이 아니거나 다른 컴퓨터의 pkm-ai-ser
   me = { host: os.hostname(), user: os.userInfo().username }; chats.forget();
   st = await chats.status(P);
   assert.equal(st.ok, true, st.message); assert.equal(st.full, true); assert.equal(st.plugin.id, 'ai-chat');
-  assert.deepEqual(st.plugin.scopes.map(s => s.scope).sort(), ['card', 'profile', 'project']);
+  assert.deepEqual(st.plugin.scopes.map(s => s.scope).sort(), ['card', 'plugin', 'profile', 'project']);
 });
 
 test('데이터 방 — 확인 요청을 방에 올리고, 허락하면 이어서 끝내고, 다음 말은 같은 세션으로', async () => {
@@ -599,4 +600,23 @@ test('브라우저 — 못 했다고 하면 그 말이 가고, 승인에 브라�
   assert.equal((await chats.status(P)).browser.reason, 'old');
   await assert.rejects(chats.browser(P, 'data', 'info'), /옛 버전/);
   browserOn = true; chats.forget();
+});
+
+test('플러그인 세션 — 플러그인마다 방 하나, 작업 폴더는 원본(앱 내장이면 앱 폴더), 프롬프트에 원본·설치본·규격·지금 상태', async () => {
+  await assert.rejects(chats.open(P, { plugin: 'nope' }), /설치된 플러그인이 아니에요/);
+  const r = await chats.open(P, { plugin: 'upbit-quant' });
+  assert.deepEqual([r.id, r.kind, r.cwd, r.card.title], ['plugin-upbit-quant', 'plugin', T, '업비트 퀀트']);
+  assert.equal((await chats.open(P, { plugin: 'upbit-quant' })).id, r.id, '다시 열면 같은 방');
+  assert.equal(chats.status ? (await chats.status(P)).plugin.scopes.some(s => s.scope === 'plugin') : true, true);
+  await chats.send(P, r.id, { id: 'plug-01', text: '신호 탭에 지금 값도 보여 줘' });
+  await until(() => lastTurn(r.id).status === 'done');
+  const body = posted[posted.length - 1];
+  assert.equal(body.agent.cwd, T); assert.deepEqual(body.agent.add_dirs, [path.join(DATA, P)]);
+  assert.match(body.system, /플러그인: 업비트 퀀트 \(id upbit-quant, 버전 0\.1\.5\)/);
+  assert.match(body.system, new RegExp(`원본 폴더\\(고칠 곳\\): ${T.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+  assert.match(body.system, /설치본\(직접 고치지 않는다\): \/x\/_플러그인\/upbit-quant/);
+  assert.match(body.system, /docs\/PLUGIN\.md/); assert.match(body.system, /목록 신호: 오류 — 업비트에 닿지 않아요/);
+  assert.match(body.system, /실제로 돌리지 않는다/); assert.doesNotMatch(body.system, /\{plugin_[a-z]+\}/, '자리는 모두 채운다');
+  assert.equal((await chats.setCwd(P, r.id, null)).cwd, null, '플러그인 방도 작업 폴더를 바꿀 수 있다');
+  await chats.remove(P, r.id);
 });

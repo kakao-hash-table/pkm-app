@@ -18,3 +18,10 @@
 - mode: full
 - prompt: prompts/project.md
 - label: AI Chat
+
+## 플러그인 고치기
+플러그인마다 세션 하나. 플러그인 화면 맨 위의 [AI로 고치기]에서 열어요. 처음엔 그 플러그인의 원본 폴더(앱 내장이면 pkm-app)에서 해요.
+- scope: plugin
+- mode: full
+- prompt: prompts/plugin.md
+- label: AI로 고치기

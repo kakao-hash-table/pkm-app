@@ -63,6 +63,16 @@ test('AI 연결 없이는 켜지 않고, 켜면 돌리는 컴퓨터가 동기화
   assert.deepEqual(f.items.map(i => i.id), ['A-1']);
 });
 
+test('pkm 화면에서 고른 AI·모델은 이 컴퓨터 설정에 남고, AI 연결을 다시 넣어도 그대로다', async () => {
+  const { aiChoice, setAIChoice } = await import('../server/runner.js');
+  assert.deepEqual(setAIChoice({ provider: 'claude', model: 'opus', effort: 'high' }), { provider: 'claude', model: 'opus', effort: 'high' });
+  await runner.setRunner(P, { on: true, ai: conn });
+  assert.deepEqual(aiChoice(), { provider: 'claude', model: 'opus', effort: 'high' });
+  assert.deepEqual(setAIChoice({ provider: 'claude', model: 'default', effort: null }), { provider: 'claude' }, '계정 기본값으로 돌리면 모델을 지운다');
+  assert.throws(() => setAIChoice({ provider: 'claude', model: 'a b' }), /형식/);
+  setAIChoice({});
+});
+
 test('처음 가져온 목록은 자동 시작하지 않고, 그 뒤 새로 들어온 것만 자동으로', async () => {
   await runner.setLocal(P, ID, { auto: true });
   await runner.act(P, ID, { type: 'refresh', feed: '할 일' });

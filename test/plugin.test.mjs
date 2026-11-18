@@ -61,7 +61,7 @@ test('피드·비밀값·단계 폴더 — 선언한 스크립트로만 가져�
   assert.deepEqual(ok.manifest.permissions.secrets, ['DEMO_TOKEN', 'OTHER_TOKEN']);
   assert.deepEqual(ok.manifest.secrets[0], { name: 'DEMO_TOKEN', label: '데모 토큰', hint: '', url: 'https://example.com/tokens' });
   assert.deepEqual(ok.feeds[0], { name: '내 할 일', file: 'feeds/목록.md', description: '바뀐 것만 가져와요.', run: 'scripts/pr-body.mjs list {jira_project}', every: 30, days: 'weekdays', hours: '08:30-18:00', start: '배포', starts: ['배포'], start_mode: 'auto', empty: '', count: null, notify: false });
-  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- notify: maybe\n')).errors.join(), /notify는 yes 또는 no/);
+  assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- notify: maybe\n')).errors.join(), /notify는 yes·no·push 중 하나/);
   assert.match(P.validate(feed('## a\n- run: scripts/none.mjs\n')).errors.join(), /선언하지 않은 스크립트 "scripts\/none.mjs"/);
   assert.match(P.validate(feed('## a\n- run: scripts/pr-body.mjs\n- every: 1\n- start: 없는것\n')).errors.join(), /every는 5~1440분[\s\S]*워크플로우 "없는것"가 없어요/);
   assert.match(P.validate(manifest(t => t.replace('bundled: [scripts/pr-body.mjs]', 'bundled: [scripts/pr-body.mjs]\n  secrets: [token]'))).errors.join(), /영문 대문자/);
@@ -274,4 +274,59 @@ test('목록의 tab — 탭 이름을 받고 20자를 넘으면 막는다', () =
   assert.equal(ok.ok, true, ok.errors.join());
   assert.deepEqual(ok.feeds.map(f => f.tab), [undefined, '낸 것·뺀 것']);
   assert.match(P.validate(files('가'.repeat(21))).errors.join('\n'), /낸 것: tab은 탭 이름 20자까지예요/);
+});
+
+test('목록 항목의 그래프(chart) — 숫자나 { t, v } 점을 받고, 0을 포함한 자리로 바꾼다', () => {
+  assert.equal(P.normChart(null), null); assert.equal(P.normChart({ points: [1] }), null); assert.equal(P.normChart({ points: ['a', {}, { v: '' }] }), null);
+  const c = P.normChart({ label: '누적 손익', unit: '원', signed: true, points: [{ t: '2026-11-01T00:00:00Z', v: 0 }, { t: '2026-11-02T00:00:00Z', v: '100' }, { t: 'x', v: NaN }, { t: '2026-11-04T00:00:00Z', v: -100 }], extra: 1 });
+  assert.deepEqual(c, { label: '누적 손익', unit: '원', signed: true, points: [{ t: '2026-11-01T00:00:00.000Z', v: 0 }, { t: '2026-11-02T00:00:00.000Z', v: 100 }, { t: '2026-11-04T00:00:00.000Z', v: -100 }] });
+  assert.equal(P.normChart({ points: Array.from({ length: 300 }, (_, i) => i) }).points.length, 200);
+  const g = P.chartGeom(c);
+  assert.deepEqual([g.timed, g.min, g.max, g.zero], [true, -100, 100, 0.5]);
+  assert.deepEqual(g.pts.map(p => [Math.round(p.x * 1000) / 1000, p.y]), [[0, 0.5], [0.333, 0], [1, 1]], '가로는 시각 간격대로');
+  // 기준선과 0을 넣지 않는 세로축 — 가격과 조건 값을 한 그래프에
+  const pr = P.normChart({ zero: false, points: [100, 110, 105], lines: [{ label: '위', values: [120, 120, 120] }, { label: '아래', values: [null, 90, 90] }, { label: '길이 틀림', values: [1] }, { label: '빈 선', values: [null, null, null] }] });
+  assert.deepEqual([pr.zero, pr.lines.map(l => l.label), pr.lines[1].values], [false, ['위', '아래'], [null, 90, 90]]);
+  const pg = P.chartGeom(pr);
+  assert.equal(pg.zero, null); assert.deepEqual([pg.min, pg.max], [100, 110]);
+  assert.ok(pg.lines[0][0].y < pg.pts[1].y && pg.pts[0].y < pg.lines[1][1].y, '위 선은 값보다 위, 아래 선은 값보다 아래에 그려진다');
+  assert.ok(pg.lines[0][0].y > 0 && pg.lines[1][1].y < 1, '위아래 여유'); assert.equal(pg.lines[1][0], null);
+  assert.equal(P.normChart({ points: [1, 'x', 3], lines: [{ label: '선', values: [1, 2, 3] }] }).lines, undefined, '버린 점이 있으면 자리가 어긋나므로 선도 버린다');
+  const flat = P.chartGeom(P.normChart({ points: [5, 5, 10] }));
+  assert.deepEqual([flat.timed, flat.zero, flat.pts.map(p => p.x), flat.pts.map(p => p.y)], [false, 1, [0, 0.5, 1], [0.5, 0.5, 0]], '시각이 없으면 순서대로, 0이 바닥');
+});
+
+test('레인지 표 — 핸드 표기를 169칸으로 풀고, 틀린 조각은 설치를 막는다', () => {
+  const man = '---\npkm_plugin: 1\nid: rg-test\nname: 레인지\nversion: 0.1.0\n---\n';
+  const files = body => [{ path: 'plugin.md', size: 1, text: man }, { path: 'ranges/r.md', size: 1, text: body }];
+  const good = P.validate(files('## 오픈\n앞이 다 접었을 때.\n- pick: 포지션\n- mark: 오픈\n\n### UTG\n66+, A2s+,\nKQo\n\n### BTN\n22+, AK\n'));
+  assert.deepEqual(good.errors, []); assert.deepEqual(good.warnings, []);
+  assert.deepEqual(good.ranges, [{ name: '오픈', file: 'ranges/r.md', description: '앞이 다 접었을 때.', pick: '포지션', mark: '오픈', note: '',
+    spots: [{ name: 'UTG', text: '66+, A2s+, KQo' }, { name: 'BTN', text: '22+, AK' }] }]);
+  const h = t => P.parseHands(t);
+  assert.deepEqual(h('TT+').hands, ['AA', 'KK', 'QQ', 'JJ', 'TT']);
+  assert.deepEqual(h('KTs+').hands, ['KQs', 'KJs', 'KTs']);
+  assert.deepEqual(h('A5s-A2s, 87o').hands, ['A5s', 'A4s', 'A3s', 'A2s', '87o']);
+  assert.deepEqual(h('99-77').hands, ['99', '88', '77']);
+  assert.deepEqual(h('ak').hands, ['AKs', 'AKo']);
+  assert.equal(h('22+, A2s+, A2o+').combos, 13 * 6 + 12 * 4 + 12 * 12);
+  assert.equal(h('22+, A2+, K2+, Q2+, J2+, T2+, 92+, 82+, 72+, 62+, 52+, 42+, 32').combos, P.HAND_COMBOS);
+  assert.deepEqual(h('KAs, 77s, AKx, A5s-K2s, A5s-A2o').bad, ['KAs', '77s', 'AKx', 'A5s-K2s', 'A5s-A2o']);
+  assert.match(P.validate(files('## 오픈\n### UTG\n66+, ZZ\n')).errors.join(), /읽지 못한 핸드 "ZZ"/);
+  assert.match(P.validate(files('## 오픈\n- pick: 포지션\n')).errors.join(), /고를 것이 없어요/);
+  assert.match(P.validate(files('## 오픈\n### UTG\nAA\n### UTG\nKK\n')).errors.join(), /이름이 겹쳐요/);
+  // 두 번 고르기 — then이 있으면 이름은 "첫째 / 둘째"
+  const two = P.validate(files('## 3벳\n- pick: 오픈한 자리\n- then: 내 자리\n- title: {a} 오픈 → {b} 3벳\n- mark: 3벳\n- rest: 콜 또는 폴드\n### UTG / BTN\nQQ+\n### UTG/BB\nKK+\n### CO  /  BB\nAA\n'));
+  assert.deepEqual(two.errors, []);
+  assert.deepEqual(two.ranges[0].spots, [{ name: 'UTG / BTN', a: 'UTG', b: 'BTN', text: 'QQ+' }, { name: 'UTG / BB', a: 'UTG', b: 'BB', text: 'KK+' }, { name: 'CO / BB', a: 'CO', b: 'BB', text: 'AA' }]);
+  assert.equal(two.ranges[0].then, '내 자리'); assert.equal(two.ranges[0].title, '{a} 오픈 → {b} 3벳'); assert.equal(two.ranges[0].rest, '콜 또는 폴드');
+  assert.match(P.validate(files('## 3벳\n- then: 내 자리\n### UTG\nAA\n')).errors.join(), /"첫째 \/ 둘째" 꼴/);
+  assert.match(P.validate(files('## 3벳\n- title: {a} → {b}\n### UTG\nAA\n')).errors.join(), /title은 then이 있을 때만/);
+  assert.match(P.validate(files('## 3벳\n- then: 내 자리\n### UTG / BB\nAA\n### UTG /  BB\nKK\n')).errors.join(), /이름이 겹쳐요/);
+  const bundled = P.validate(['plugin.md', 'ranges/레인지.md'].map(p => { const text = fs.readFileSync(new URL(`../plugins/holdem-ranges/${p}`, import.meta.url), 'utf8'); return { path: p, size: text.length, text }; }));
+  assert.equal(bundled.ok, true, bundled.errors.join('\n'));
+  assert.deepEqual(bundled.ranges[0].spots.map(sp => [sp.name, P.parseHands(sp.text).combos]), [['UTG', 178], ['UTG+1', 204], ['LJ', 238], ['HJ', 298], ['CO', 374], ['BTN', 582], ['SB', 574]]);
+  // 3벳: 오픈한 자리 뒤의 모든 자리(7+6+…+1 = 28)가 있다
+  const pos = ['UTG', 'UTG+1', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+  assert.deepEqual(bundled.ranges[1].spots.map(sp => sp.name), pos.flatMap((a, i) => pos.slice(i + 1).map(b => `${a} / ${b}`)));
 });
