@@ -439,7 +439,13 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           }
           step.note = clip(e.message, 300); return;
         }
-        if (j.status === 'waiting'){ Object.assign(step, { status: 'waiting', reason: j.reason, until: j.until || null }); Object.assign(run, { status: 'waiting', updated: now() }); return; }
+        if (j.status === 'waiting'){
+          Object.assign(step, { status: 'waiting', reason: j.reason, until: j.until || null }); Object.assign(run, { status: 'waiting', updated: now() });
+          // AI 로그인이 풀렸다 — 사람이 다시 로그인해야 풀린다. 지켜보는 사람이 없으니 휴대폰으로 알린다(6시간에 한 번)
+          if (j.reason === 'login' && Date.now() - loginToldAt > 6 * 3600000){ loginToldAt = Date.now();
+            Promise.resolve().then(() => onNotify(p, { plugin: x.id, name: x.manifest.name, title: 'AI 로그인이 풀려 작업이 멈췄어요', text: '돌리는 컴퓨터에서 Claude에 다시 로그인하면 멈춘 데서 이어서 해요', run: run.id })).catch(() => {}); }
+          return;
+        }
         const web = d.kind === 'browser', my = web && d.browser ? { ...(stepValue(run, d.browser.slice(1, -1)) || {}).vars, ...step.given } : web ? step.given : null;   // my: 내 정보와 사람이 알려 준 값 — 이 단계가 남기는 글에서 가린다
         if (web && !['done', 'error', 'canceled'].includes(j.status)){
           // 브라우저 도구만 쓰는 단계 — 다른 확인 요청은 거절하고, 사람에게 넘긴 일은 내 확인으로 올린다(작업은 답을 기다리며 살아 있다)
@@ -678,6 +684,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
   /* ---------- 독립 검토(자동화 기능 ai_review) ----------
      AI 단계가 답을 내면, 작업 과정을 보지 않는 다른 AI가 [요청]과 [결과]만 보고 예/아니오로 채점한다(생성과 검증을 나눈다).
      짚은 점이 있으면 그 점을 붙여 한 번만 다시 만든다. 검토가 안 되면(서버 재시작으로 요청을 잊음·검토 실패) 막지 않고 그대로 쓴다 */
+  let loginToldAt = 0;   // AI 로그인 풀림을 마지막으로 알린 때(같은 일로 여러 번 깨우지 않게)
   const asked = new Map();   // AI 작업 id → 보낸 요청(메모리에만 — 서버를 다시 켜면 그 단계는 검토 없이 끝난다)
   const REVIEW_SCHEMA = { type: 'object', properties: { pass: { type: 'boolean' }, issues: { type: 'array', items: { type: 'string' } } }, required: ['pass', 'issues'] };
   const squeeze = (t, n) => { t = String(t || ''); return t.length > n ? `${t.slice(0, n * 0.7)}\n…(가운데 ${t.length - n}자 줄임)…\n${t.slice(-n * 0.3)}` : t; };

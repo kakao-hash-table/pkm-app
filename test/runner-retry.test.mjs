@@ -15,7 +15,8 @@ fs.mkdirSync(path.join(DATA, P), { recursive: true });
 // 가짜 pkm-ai-server — AI 요청은 처음 한 번 시간 초과로 실패하고, 스크립트는 그 자리에서 실행한다
 const jobs = new Map();
 let n = 0, aiCalls = 0, verdict = { pass: true, issues: [] };
-const prompts = [], reviews = [];
+const prompts = [], reviews = [], notified = [];
+let waitLogin = false;
 const ai = http.createServer(async (req, res) => {
   const send = (s, b) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); };
   let body = ''; for await (const c of req) body += c; body = body ? JSON.parse(body) : {};
@@ -28,6 +29,7 @@ const ai = http.createServer(async (req, res) => {
     if (!body.plugin_script) prompts.push(body.prompt);
     const job = body.plugin_script
       ? { id, status: 'done', result: { exit_code: 0, stdout: execFileSync(process.execPath, [path.join(body.plugin.root, body.plugin_script), ...body.args], { encoding: 'utf8' }), stderr: '' } }
+      : waitLogin ? { id, status: 'waiting', reason: 'login', until: null }
       : ++aiCalls === 1 ? { id, status: 'error', reason: 'timeout', error: '30분 안에 끝나지 않았어요' } : { id, status: 'done', result: { text: '한 줄 요약' } };
     jobs.set(id, job); return send(201, { job });
   }
@@ -43,7 +45,7 @@ before(async () => {
   const ins = await plugins.inspect({ local: new URL('./fixtures/plugin-retry/', import.meta.url).pathname });
   assert.equal(ins.ok, true, ins.errors.join());
   await plugins.install(path.join(DATA, P), ins.stage);
-  runner = createRunner({ DATA, listProfiles: async () => [{ name: P }] });
+  runner = createRunner({ DATA, listProfiles: async () => [{ name: P }], onNotify: (p, m) => notified.push(m) });
   await runner.setRunner(P, { on: true, ai: { url: `http://127.0.0.1:${ai.address().port}`, token: 'test-token-0123456789' } });
   await runner.approve(P, ID);
   await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
@@ -163,4 +165,17 @@ test('again으로 AI 단계에 되돌리면 고칠 점을 붙여 다시 만든�
     assert.equal(prompts.length, 2); assert.match(prompts[1], /검토에서 짚은 점[\s\S]*20자 이내로 줄여 주세요/);
     assert.deepEqual(r.again_ai, { 요약: 1 });
   } finally { delete process.env.SAVE_AGAIN; delete process.env.LIST_ITEMS; await runner.setLocal(P, ID, { features: { ai_review: true } }); }
+});
+
+test('AI 로그인이 풀려 작업이 기다리면 휴대폰으로 한 번 알린다(같은 일로 또 깨우지 않는다)', async () => {
+  waitLogin = true; notified.length = 0; process.env.LIST_ITEMS = 'A-1';
+  try {
+    await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
+    const st = (await runner.status(P)).plugins[ID].state; for (const r of st.runs.filter(r => !['done', 'canceled'].includes(r.status))) await runner.act(P, ID, { type: 'cancel', run: r.id });
+    await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', workflow: '처리' });
+    for (let i = 0; i < 6; i++){ await runner.tick(); await new Promise(z => setTimeout(z, 10)); }
+    assert.equal((await runner.status(P)).plugins[ID].state.runs[0].status, 'waiting');
+    await new Promise(z => setTimeout(z, 30));
+    assert.equal(notified.length, 1); assert.match(notified[0].title, /로그인이 풀려/);
+  } finally { waitLogin = false; delete process.env.LIST_ITEMS; }
 });
