@@ -2611,7 +2611,11 @@ function aiLogin(p){
   return [v, AI_LOGIN[p.auth_method] || '로그인됨', p.plan && `${p.plan} 요금제`].filter(Boolean).join(' · ') + (p.auth_method === 'api_key' ? ' — 요금은 그 키의 요금제를 따라요' : '');
 }
 function aiBlocked(p){
-  const b = p.blocked; if (!b) return '';
+  const b = p.blocked;
+  if (!b){   // 모델 하나만 한도(예: Fable) — 다른 모델은 그대로 쓸 수 있다
+    const m = Object.entries(p.blocked_models || {}).filter(([, v]) => v && (!v.until || v.until > Date.now()));
+    return m.length ? m.map(([f, v]) => `${f[0].toUpperCase() + f.slice(1)}만 한도라 ${v.until ? `${aiWhen(v.until)}까지 ` : ''}쉬어요`).join(' · ') + ' — 다른 모델은 그대로 써요' : '';
+  }
   return b.reason === 'login' ? '로그인이 풀려 기다리는 중이에요' : `사용 한도에 걸려 기다리는 중이에요${b.until ? ` · ${aiWhen(b.until)}에 다시 시작해요` : ''}`;
 }
 function aiMore(p, pr){   // 쉬는 이유 다음에 붙일 '언제 다시 쓰나'

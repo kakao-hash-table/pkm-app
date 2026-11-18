@@ -127,6 +127,8 @@
     if (!p.installed) return `${p.via}가 그 컴퓨터에 없어요`;
     if (!p.logged_in) return `${p.via}에 로그인돼 있지 않아요`;
     if (p.blocked) return p.blocked.reason === 'login' ? `${p.via} 로그인이 풀려 기다리는 중이에요` : `${p.label} 사용 한도에 걸려 기다리는 중이에요`;
+    const fam = (String(pr.model || '').match(/fable|mythos|opus|sonnet|haiku/i) || [])[0], mb = fam && (p.blocked_models || {})[fam.toLowerCase()];   // 고른 모델만 한도 — 다른 모델로 바꾸면 바로 쓸 수 있다
+    if (mb && (!mb.until || mb.until > now)) return `고른 모델(${fam})이 사용 한도라 쉬는 중이에요. 다른 모델을 고르면 바로 써요`;
     // 리셋 시각이 지난 창은 빼야 한다 — 쉬는 동안엔 요청이 없어 사용률이 갱신되지 않으므로, 빼지 않으면 영영 쉰다
     if (pr.pause_at != null){ const hi = windows(p).find(w => w.used != null && w.used >= pr.pause_at && !(w.resets_at && w.resets_at <= now)); if (hi) return `사용률이 정해 둔 ${Math.round(pr.pause_at * 100)}%를 넘었어요`; }
     if (pr.daily_max != null && p.today && p.today.requests >= pr.daily_max) return `오늘 요청이 정해 둔 ${pr.daily_max}회에 닿았어요`;
