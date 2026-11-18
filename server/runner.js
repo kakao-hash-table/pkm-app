@@ -171,7 +171,7 @@ export const askTitle = m => `${m.kind === 'value' ? '알려 주세요' : '브�
 export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = () => {}, onNotify = () => {} }){
   // 스크립트가 결과에 notify: { title, text }를 내면 휴대폰 알림으로 보낸다(예: 주문이 체결됐다) — 승인한 스크립트(목록·스크립트 단계)의 결과만, 결과 하나에 한 번
   const tell = (p, x, out, run) => { const n = out && typeof out === 'object' ? out.notify : null; if (!n || typeof n !== 'object' || !String(n.title || '').trim()) return;
-    Promise.resolve().then(() => onNotify(p, { plugin: x.id, name: x.manifest.name, title: clip(n.title, 80), text: clip(n.text || '', 200), run: run ? run.id : null })).catch(() => {}); };
+    Promise.resolve().then(() => onNotify(p, { plugin: x.id, name: x.manifest.name, title: clip(n.title, 80), text: clip(n.text || '', 200), run: run ? run.id : null, urgent: n.urgent !== false })).catch(() => {}); };   // 스크립트가 알리라고 한 일(체결 등)은 밤에도 바로 — 끄려면 notify.urgent: false
   const stateDir = p => path.join(DATA, p, P.DIR, '.state');
   const statePath = (p, id) => path.join(stateDir(p), `${id}.json`);
   const readJSON = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };

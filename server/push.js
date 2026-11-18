@@ -9,7 +9,10 @@ import crypto from 'node:crypto';
 const HOME = process.env.PKM_HOME ? path.resolve(process.env.PKM_HOME) : path.join(os.homedir(), '.pkm-app');
 const FILE = path.join(HOME, 'push.json');
 const SUB = process.env.PKM_PUSH_SUB || 'mailto:pkm-app@users.noreply.github.com';
-export const KINDS = { ask: true, done: true, run: false };
+export const KINDS = { ask: true, done: true, run: false, quiet: true };   // quiet: 밤에는 모아 두었다가 아침에 한 번에(종류가 아니라 기기 설정)
+// 밤(이 컴퓨터 시각 23시~8시)에 오는 알림은 기기마다 모아 두었다가 8시가 지나면 한 묶음으로 보낸다. 돈이 걸린 일처럼 바로 알아야 하는 것(urgent)은 바로
+const QUIET = [Number(process.env.PKM_QUIET_FROM ?? 23), Number(process.env.PKM_QUIET_TO ?? 8)];
+const nightAt = (t = new Date()) => { const h = t.getHours(); return QUIET[0] > QUIET[1] ? h >= QUIET[0] || h < QUIET[1] : h >= QUIET[0] && h < QUIET[1]; };
 const SEEN_MS = 70000;   // 앱이 보인다고 알린 뒤 이만큼은 그 기기에 보내지 않는다(화면이 켜져 있으면 30초마다 다시 알린다)
 const b64u = b => Buffer.from(b).toString('base64url');
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -32,7 +35,7 @@ export function encrypt(sub, payload, { salt = crypto.randomBytes(16), ecdh = nu
   return Buffer.concat([salt, rs, Buffer.from([as.length]), as, body]);
 }
 
-export function createPush({ file = FILE, fetchImpl = (...a) => fetch(...a), log = m => console.log(m) } = {}){
+export function createPush({ file = FILE, fetchImpl = (...a) => fetch(...a), log = m => console.log(m), night = nightAt } = {}){
   let st = null;
   const seen = new Map();   // 기기(dev) → 앱이 보인다고 알린 시각
   function load(){
@@ -98,12 +101,25 @@ export function createPush({ file = FILE, fetchImpl = (...a) => fetch(...a), log
     if (!r.ok){ const t = await r.text().catch(() => ''); return { ok: false, status: r.status, error: t.slice(0, 200) }; }
     return { ok: true };
   }
-  // 프로필의 구독 중 그 종류를 켠 기기에, 지금 앱을 보고 있지 않으면 보낸다
+  // 프로필의 구독 중 그 종류를 켠 기기에, 지금 앱을 보고 있지 않으면 보낸다. 밤이면 모아 둔다(기기의 quiet이 켜져 있고 urgent가 아니면)
+  const send = (x, msg) => deliver(x, msg).catch(e => ({ ok: false, error: e.message })).then(r => { if (!r.ok && !r.gone) log(`알림을 보내지 못했어요(${new URL(x.endpoint).host}): ${r.status || ''} ${r.error || ''}`); return r; });
   async function notify(p, msg){
     const s = load(), at = Date.now();
+    await flush();
     const to = s.subs.filter(x => x.profile === p && x.kinds && x.kinds[msg.kind] && !(at - (seen.get(x.dev) || 0) < SEEN_MS));
-    return Promise.all(to.map(x => deliver(x, msg).catch(e => ({ ok: false, error: e.message })).then(r => { if (!r.ok && !r.gone) log(`알림을 보내지 못했어요(${new URL(x.endpoint).host}): ${r.status || ''} ${r.error || ''}`); return r; })));
+    const hold = to.filter(x => x.kinds.quiet !== false && !msg.urgent && night());
+    if (hold.length){ for (const x of hold) x.held = [...(x.held || []), { title: String(msg.title || '').slice(0, 120), url: msg.url || '/', at }].slice(-30); write(); }
+    return Promise.all(to.filter(x => !hold.includes(x)).map(x => send(x, msg)));
   }
+  // 밤이 지나면 모아 둔 것을 기기마다 한 묶음으로
+  async function flush(){
+    if (night()) return;
+    const s = load(), due = s.subs.filter(x => (x.held || []).length);
+    if (!due.length) return;
+    const out = due.map(x => { const h = x.held; delete x.held; return [x, h]; }); write();
+    await Promise.all(out.map(([x, h]) => send(x, { kind: 'done', title: `밤사이 알림 ${h.length}건`, body: h.slice(-4).map(z => z.title).join('\n').slice(0, 300), tag: 'pkm-night', url: h.length === 1 ? h[0].url : `/?profile=${encodeURIComponent(x.profile)}#/plugins` })));
+  }
+  const flushTimer = setInterval(() => flush().catch(() => {}), 5 * 60000); flushTimer.unref();
   async function test(p, endpoint){
     const x = load().subs.find(z => z.endpoint === endpoint && z.profile === p);
     if (!x) throw fail(404, '이 기기는 알림을 켜지 않았어요');
@@ -112,5 +128,5 @@ export function createPush({ file = FILE, fetchImpl = (...a) => fetch(...a), log
     if (!r.ok) throw fail(502, `푸시 서버가 받지 않았어요(${r.status || r.error})`);
     return { ok: true };
   }
-  return { status, subscribe, unsubscribe, mark, notify, test, publicKey, jwt };
+  return { status, subscribe, unsubscribe, mark, notify, flush, test, publicKey, jwt };
 }

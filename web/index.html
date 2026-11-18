@@ -7757,6 +7757,7 @@ function puPaint(){
     const none = !PU_KINDS.some(([k]) => on.kinds[k]);
     body.innerHTML = `<fieldset style="border:0;margin:0;padding:0"><legend class="faint" style="padding:0;margin-bottom:4px">이럴 때 알려요</legend>${PU_KINDS.map(([k, l, d]) =>
       `<label class="check opt"><input type="checkbox" data-pu-kind="${k}" ${on.kinds[k] ? 'checked' : ''} ${busy}><span>${l}<br><span class="faint" style="font-weight:400;font-size:.8125rem">${d}</span></span></label>`).join('')}</fieldset>
+      <label class="check opt"><input type="checkbox" data-pu-kind="quiet" ${on.kinds.quiet !== false ? 'checked' : ''} ${busy}><span>밤에는 모아서 아침에 한 번에<br><span class="faint" style="font-weight:400;font-size:.8125rem">23시~8시에 온 알림은 8시가 지나면 묶어서 보내요. 체결처럼 바로 알아야 하는 것은 바로 보내요</span></span></label>
       ${none ? '<p class="faint" style="margin:8px 0 0">켜진 알림이 없어요. 위에서 하나를 골라 주세요.</p>' : ''}${err}
       <button class="btn btn-text btn-sm pl-danger" type="button" data-pu="off" style="margin-top:8px" ${busy}>이 기기 알림 끄기</button>`;
     acts.innerHTML = close + `<button class="btn btn-tonal" type="button" data-pu="test" ${busy}>테스트 알림 보내기</button>`;

@@ -38,14 +38,14 @@ test('암호화 — 브라우저가 자기 키로 풀 수 있고, 머리에 레�
 test('구독·보내기 — VAPID 서명, 종류와 보는 중 거르기, 404·410이면 구독을 지운다', async () => {
   const sent = [];
   let status = 201;
-  const push = createPush({ file: path.join(T, 'push.json'), log: () => {}, fetchImpl: async (url, opt) => { sent.push({ url, opt }); return new Response('', { status }); } });
+  const push = createPush({ file: path.join(T, 'push.json'), log: () => {}, night: () => false, fetchImpl: async (url, opt) => { sent.push({ url, opt }); return new Response('', { status }); } });
   const a = browser(), b = browser();
   const st = push.status('개인');
   assert.equal(Buffer.from(st.key, 'base64url').length, 65); assert.equal(st.sub, null);
   assert.equal(fs.statSync(path.join(T, 'push.json')).mode & 0o777, 0o600);
   await assert.rejects(async () => push.subscribe('개인', { subscription: { endpoint: 'http://x', keys: a.keys } }), /구독 정보/);
   const sa = push.subscribe('개인', { subscription: { endpoint: 'https://web.push.apple.com/a', keys: a.keys } });
-  assert.deepEqual(sa.kinds, { ask: true, done: true, run: false }); assert.equal(sa.dev, devOf('https://web.push.apple.com/a'));
+  assert.deepEqual(sa.kinds, { ask: true, done: true, run: false, quiet: true }); assert.equal(sa.dev, devOf('https://web.push.apple.com/a'));
   push.subscribe('개인', { subscription: { endpoint: 'https://fcm.googleapis.com/b', keys: b.keys }, kinds: { done: false } });
   push.subscribe('회사', { subscription: { endpoint: 'https://fcm.googleapis.com/c', keys: b.keys } });
 
@@ -82,4 +82,25 @@ test('구독·보내기 — VAPID 서명, 종류와 보는 중 거르기, 404·4
   // 다시 켜도 같은 서명 키(구독이 그대로 유효하게)
   assert.equal(createPush({ file: path.join(T, 'push.json') }).publicKey(), st.key);
   assert.deepEqual(push.unsubscribe('회사', 'https://fcm.googleapis.com/c'), { removed: 1 });
+});
+
+test('밤에는 모아 두었다가 밤이 지나면 기기마다 한 묶음으로 — 급한 것(urgent)·끈 기기는 바로', async () => {
+  const sent = [], F = path.join(T, 'push-night.json');
+  let dark = true;
+  const push = createPush({ file: F, log: () => {}, night: () => dark, fetchImpl: async (url, opt) => { sent.push({ url, opt }); return new Response('', { status: 201 }); } });
+  const a = browser(), b = browser();
+  push.subscribe('개인', { subscription: { endpoint: 'https://web.push.apple.com/n1', keys: a.keys } });
+  push.subscribe('개인', { subscription: { endpoint: 'https://fcm.googleapis.com/n2', keys: b.keys }, kinds: { quiet: false } });
+  await push.notify('개인', { kind: 'done', title: '공모전 · 끝났어요', url: '/x' });
+  await push.notify('개인', { kind: 'ask', title: '코드 리뷰 · 승인할까요?', url: '/y' });
+  assert.deepEqual(sent.map(x => x.url), ['https://fcm.googleapis.com/n2', 'https://fcm.googleapis.com/n2'], '밤에 모으기를 끈 기기에만 바로');
+  await push.notify('개인', { kind: 'done', urgent: true, title: '업비트 퀀트 · 체결' });
+  assert.equal(sent.filter(x => x.url.includes('apple')).length, 1, '급한 것은 밤에도 바로');
+  assert.equal(JSON.parse(fs.readFileSync(F, 'utf8')).subs.find(x => x.endpoint.includes('apple')).held.length, 2, '모아 둔 것은 이 컴퓨터 파일에');
+  dark = false; sent.length = 0;
+  await push.flush();
+  assert.equal(sent.length, 1);
+  assert.deepEqual(a.decrypt(sent[0].opt.body).title, '밤사이 알림 2건');
+  assert.match(a.decrypt(sent[0].opt.body).body, /공모전 · 끝났어요\n코드 리뷰 · 승인할까요\?/);
+  await push.flush(); assert.equal(sent.length, 1, '한 번만');
 });

@@ -236,7 +236,7 @@ const runner = createRunner({ DATA, listProfiles, onWrite:async p => { if ((awai
   // 브라우저 단계에서 AI가 사람에게 넘긴 일 — 채팅의 넘겨받기와 같은 알림(내 답이 필요할 때)으로
   onAsk:(p, m) => push.notify(p, { kind:'ask', title:askTitle(m), body:String(m.question).slice(0, 160), tag:`plugin:${m.plugin}:${m.run}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}/run/${m.run}` }),
   // 스크립트가 알리라고 한 일(예: 주문 체결) — 끝남 알림을 켠 기기로. 알림마다 따로 보이게 tag는 매번 다르게
-  onNotify:(p, m) => push.notify(p, { kind:'done', title:`${m.name} · ${m.title}`, body:m.text, tag:`plugin:${m.plugin}:notify:${Date.now()}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}${m.run ? `/run/${m.run}` : ''}` }) });
+  onNotify:(p, m) => push.notify(p, { kind:'done', urgent:m.urgent === true, title:`${m.name} · ${m.title}`, body:m.text, tag:`plugin:${m.plugin}:notify:${Date.now()}`, url:`/?profile=${encodeURIComponent(p)}#/plugins/${m.plugin}${m.run ? `/run/${m.run}` : ''}` }) });
 /* ---------- AI 예약 작업: 돌리는 컴퓨터가 정한 때에 AI에 맡기고 결과를 인박스로 ---------- */
 const jobs = createJobs({ DATA, listProfiles, settingsOf, here:p => runner.here(p), onWrite:async p => { if ((await settingsOf(p)).storage === 'github') scheduleSync(p); } });
 
