@@ -7,6 +7,9 @@ export const FEATURES = [
   { key: 'remember_answers', label: '한 번 알려 준 내 정보는 다시 묻지 않기',
     hint: '브라우저에서 AI가 물어 적어 준 값(예: 생년월일)을 이 컴퓨터에만 기억해 두고, 다음에 같은 것을 물으면 묻지 않고 넣어요. 기억한 값은 플러그인 관리에서 보고 지울 수 있어요',
     default: true },
+  { key: 'close_gone', label: '끝난 일의 대기는 알아서 닫기',
+    hint: '목록에서 빠진 지(PR이 닫힘·지난 회차·마감 지남) 하루가 지난 대기 작업을 닫아 내 차례에서 치워요. 닫은 작업도 [다시 하기]로 살릴 수 있어요',
+    default: true },
 ];
 const BY = new Map(FEATURES.map(f => [f.key, f]));
 

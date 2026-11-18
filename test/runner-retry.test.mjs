@@ -1,4 +1,4 @@
-// 자동화 기능 — 잠깐 실패하면 알아서 다시 하기(auto_retry). 끄면 예전처럼 멈춘다
+// 자동화 기능 — 잠깐 실패하면 알아서 다시 하기(auto_retry), 끝난 일의 대기 닫기(close_gone). 끄면 예전처럼
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,7 +8,7 @@ import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-retry-'));
-Object.assign(process.env, { PKM_HOME: path.join(T, 'home'), PKM_HOST_NAME: '시험맥', PKM_RUNNER_TICK: '999999', PKM_RETRY_UNIT_MS: '20', SAVE_COUNT: path.join(T, 'save-count') });
+Object.assign(process.env, { PKM_HOME: path.join(T, 'home'), PKM_HOST_NAME: '시험맥', PKM_RUNNER_TICK: '999999', PKM_RETRY_UNIT_MS: '20', PKM_GONE_CLOSE_MS: '40', SAVE_COUNT: path.join(T, 'save-count') });
 const DATA = path.join(T, 'data'), P = '개인', ID = 'retry-demo';
 fs.mkdirSync(path.join(DATA, P), { recursive: true });
 
@@ -78,4 +78,26 @@ test('끄면 예전처럼 그 자리에서 멈춘다', async () => {
   const r = await until(r => r.status === 'stopped', '멈춤');
   assert.equal(r.steps[0].status, 'failed'); assert.equal(r.steps[0].retries, undefined);
   await runner.setLocal(P, ID, { features: { auto_retry: true } });
+});
+
+test('목록에서 빠진 지 오래된 대기는 알아서 닫고, 닫은 것도 다시 할 수 있다(끄면 남겨 둔다)', async () => {
+  const refresh = () => runner.act(P, ID, { type: 'refresh', feed: '할 일' });
+  const run = async rid => (await runner.status(P)).plugins[ID].state.runs.find(r => r.id === rid);
+  process.env.LIST_ITEMS = 'A-1'; await refresh();
+  let rid = (await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', workflow: '확인' })).state.runs[0].id;
+  await runner.tick(); assert.equal((await run(rid)).status, 'input');
+  process.env.LIST_ITEMS = ''; await refresh();
+  assert.ok((await run(rid)).gone, '빠졌다고 표시만');
+  assert.equal((await run(rid)).status, 'input', '바로 닫지는 않는다');
+  await new Promise(z => setTimeout(z, 60)); await refresh();
+  const r = await run(rid);
+  assert.equal(r.status, 'canceled'); assert.equal(r.closed_gone, true); assert.match(r.note, /자동으로 닫았어요/);
+  await runner.act(P, ID, { type: 'retry', run: rid, step: '확인' }); await runner.tick();
+  assert.equal((await run(rid)).status, 'input', '[다시 하기]로 살린다');
+
+  await runner.setLocal(P, ID, { features: { close_gone: false } });
+  try {
+    await new Promise(z => setTimeout(z, 60)); await refresh(); await refresh();
+    assert.equal((await run(rid)).status, 'input', '끄면 남겨 둔다');
+  } finally { await runner.setLocal(P, ID, { features: { close_gone: true } }); delete process.env.LIST_ITEMS; }
 });

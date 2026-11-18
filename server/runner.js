@@ -79,6 +79,7 @@ const LOST = 'AI 서버에서 이 작업을 찾지 못했어요. 이 단계를 �
 // 멈춰 둔 넘겨받기에 답했을 때 에이전트에게 하는 말(같은 대화를 이어 간다)
 const RESUME = { done: '사용자가 부탁한 일을 끝냈다고 해요. snapshot으로 화면을 확인하고, 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.', fail: '사용자가 하지 못했다고 해요. 더 진행하지 말고 지금 상태로 결과를 돌려주세요.' };
 const AGAIN_MAX = 5;
+const GONE_CLOSE_MS = Number(process.env.PKM_GONE_CLOSE_MS || 24 * 3600000);
 // 멈춰 둔 값 묻기에 답했을 때 — 값은 vars에 합쳐 보내고 에이전트는 자리표시로 넣는다
 const RESUME_VALUE = (name, given) => given ? `사용자가 ${name}을(를) 알려 줬어요. {{${name}}} 자리표시로 넣고 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.` : `사용자가 ${name}을(를) 건너뛰었어요. 그 칸은 비워 두고 할 수 있는 데까지 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.`;
 const ASKS = ['handoff', 'value'];   // 에이전트가 사람을 기다리는 내 확인 — 넘겨받기와 값 묻기
@@ -102,10 +103,17 @@ function browserOpts(v){
   return { opts: out, tab: o.tab == null || o.tab === '' ? null : String(o.tab) };
 }
 // 브라우저 단계가 남기는 글에서 내 정보 값을 자리표시로 되돌린다(화면에 찍힌 값을 에이전트가 옮겨 적었더라도 상태 파일에는 남지 않게 — 상태 파일은 동기화된다)
-function scrub(v, vars){
-  const pairs = Object.entries(vars && typeof vars === 'object' ? vars : {}).map(([k, x]) => [k, String(x ?? '')]).filter(([, x]) => x.length >= 2).sort((a, b) => b[1].length - a[1].length);
-  const walk = z => typeof z === 'string' ? pairs.reduce((t, [k, x]) => t.split(x).join(`{{${k}}}`), z) : Array.isArray(z) ? z.map(walk) : z && typeof z === 'object' ? Object.fromEntries(Object.entries(z).map(([k, y]) => [k, walk(y)])) : z;
-  return pairs.length ? walk(v) : v;
+// 흔한 짧은 답(예·동의·있음…)은 내 정보가 아니다 — 글 곳곳의 같은 낱말을 자리표시로 바꿔 글이 깨지지 않게 가리지 않는다
+const PLAIN = /^(예|네|아니오|아니요|아니|동의|동의함|미동의|비동의|동의안함|있음|없음|해당\s?없음|모름|o|x|y|n|yes|no|true|false|남|여|남자|여자|남성|여성)$/i;
+export function scrub(v, vars){
+  const key = new Map();   // 값 → 이름(같은 값이면 먼저 것)
+  for (const [k, x] of Object.entries(vars && typeof vars === 'object' ? vars : {}).map(([k, x]) => [k, String(x ?? '').trim()]).sort((a, b) => b[1].length - a[1].length))
+    if (x.length >= 2 && !PLAIN.test(x) && !key.has(x)) key.set(x, k);
+  if (!key.size) return v;
+  // 한 번에 훑어 바꾼다 — 이미 있는 자리표시({{…}})는 그대로 두어 겹쳐 바꾸지 않는다
+  const re = new RegExp(`\\{\\{[^{}]*\\}\\}|${[...key.keys()].map(x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}`, 'g');
+  const walk = z => typeof z === 'string' ? z.replace(re, m => key.has(m) ? `{{${key.get(m)}}}` : m) : Array.isArray(z) ? z.map(walk) : z && typeof z === 'object' ? Object.fromEntries(Object.entries(z).map(([k, y]) => [k, walk(y)])) : z;
+  return walk(v);
 }
 
 /* ---------- 같은 컴퓨터의 pkm-ai-server ----------
@@ -314,6 +322,11 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         if (r.feed !== feed.name) continue;
         if (r.status === 'queued' && !live.has(r.item.id)) Object.assign(r, { status: 'canceled', note: '목록에서 빠져서 시작하지 않았어요', updated: now() });
         else if (['input', 'stopped'].includes(r.status)) r.gone = live.has(r.item.id) ? undefined : r.gone || now();   // 할당이 풀렸거나 끝났을 수 있다 — 사람에게 보인다
+        // 빠진 지 하루가 지난 대기는 닫는다(자동화 기능 close_gone) — 끝난 PR·지난 회차가 '내 차례'를 막지 않게. 닫은 실행도 [다시 하기]로 살릴 수 있다
+        if (r.gone && ['input', 'stopped'].includes(r.status) && featureOn(pc, 'close_gone') && Date.now() - Date.parse(r.gone) > GONE_CLOSE_MS){
+          for (const z of r.steps) if (z.job && ['running', 'waiting', 'input'].includes(z.status)) await ai(conn, `/v1/jobs/${z.job}`, { method: 'DELETE' }).catch(() => {});
+          Object.assign(r, { status: 'canceled', note: '목록에서 빠진 지 하루가 지나 자동으로 닫았어요', closed_gone: true, updated: now() }); slim(r);
+        }
       }
       if (feed.start_mode === 'auto' && pc.auto && pc.auto_since){
         for (const it of f.items){
