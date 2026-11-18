@@ -101,3 +101,25 @@ test('목록에서 빠진 지 오래된 대기는 알아서 닫고, 닫은 것�
     assert.equal((await run(rid)).status, 'input', '끄면 남겨 둔다');
   } finally { await runner.setLocal(P, ID, { features: { close_gone: true } }); delete process.env.LIST_ITEMS; }
 });
+
+test('같은 설정은 한 번만 — 비어 있는 플러그인은 다른 플러그인에 넣은 값을 형식에 맞춰 빌려 쓰고, 직접 넣으면 그 값을 쓴다', async () => {
+  const plugins = await import('../server/plugins.js');
+  for (const d of ['plugin-share-a', 'plugin-share-b']){
+    const ins = await plugins.inspect({ local: new URL(`./fixtures/${d}/`, import.meta.url).pathname });
+    assert.equal(ins.ok, true, ins.errors.join()); await plugins.install(path.join(DATA, P), ins.stage);
+  }
+  const local = async id => (await runner.status(P)).plugins[id].local;
+  await runner.setLocal(P, 'share-a', { settings: { jira_url: 'https://team.atlassian.net/', github_api: 'https://api.github.com' } });
+  let b = await local('share-b');
+  assert.equal(b.settings.jira_url, 'https://team.atlassian.net/browse/', '형식(…/browse/)에 맞춰 빌린다');
+  assert.equal(b.borrowed.jira_url, 'share-a');
+  assert.equal(b.settings.github_api, 'https://github.example.com/api/v3', '빌려 줄 쪽이 기본값 그대로면 빌리지 않는다');
+  await runner.setLocal(P, 'share-a', { settings: { jira_url: 'https://other.atlassian.net' } });
+  assert.equal((await local('share-b')).settings.jira_url, 'https://other.atlassian.net/browse/', '빌려 준 쪽을 바꾸면 따라 바뀐다');
+  await runner.setLocal(P, 'share-b', { settings: { jira_url: 'https://mine.atlassian.net/browse/' } });
+  await runner.setLocal(P, 'share-a', { settings: { jira_url: 'https://third.atlassian.net' } });
+  b = await local('share-b');
+  assert.equal(b.settings.jira_url, 'https://mine.atlassian.net/browse/', '직접 넣은 값은 덮지 않는다'); assert.equal(b.borrowed.jira_url, undefined);
+  await runner.setLocal(P, 'share-b', { features: { share_settings: false } });
+  assert.equal((await local('share-b')).features.share_settings, false);
+});

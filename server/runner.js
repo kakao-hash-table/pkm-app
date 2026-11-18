@@ -212,6 +212,32 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     return Object.fromEntries(x.manifest.settings.map(s => [s.key, v[s.key] ?? s.default]));
   }
 
+  /* ---------- 같은 설정은 한 번만 — 다른 플러그인 값을 빌려 쓴다(자동화 기능 share_settings) ----------
+     jira_url·github_api처럼 뜻이 같은 키가 이 플러그인에 아직 없으면(사람이 넣은 적 없으면) 같은 프로필에서 그 값을 넣어 둔 플러그인 값을 쓴다.
+     빌린 값은 borrowed에 어디서 왔는지 남기고, 빌려 준 쪽이 값을 바꾸면 따라 바뀐다. 사람이 직접 넣은 값은 덮지 않는다 */
+  const SHARED = new Set(['jira_url', 'jira_email', 'github_api', 'agit_url']);
+  const sameKind = (a, b) => a.key === b.key && (a.type || 'text') === (b.type || 'text') && (SHARED.has(a.key) || (!!a.placeholder && a.placeholder === b.placeholder));
+  const ADAPT = { jira_url: (v, s) => { const base = String(v).trim().replace(/\/browse\/?$/, '').replace(/\/+$/, ''); return /\/browse\/?$/.test(s.default || '') ? `${base}/browse/` : base; } };
+  function borrowSettings(c, p, list){
+    const changed = new Set(), own = (pc, k) => k in (pc.settings || {}) && !(pc.borrowed && pc.borrowed[k]);
+    for (const x of list){
+      const pc = plugConf(c, p, x.id);
+      for (const s of x.manifest.settings || []){
+        if (['toggle', 'pairs'].includes(s.type) || own(pc, s.key)) continue;
+        if (!featureOn(pc, 'share_settings')){ if (pc.borrowed && pc.borrowed[s.key]){ delete pc.settings[s.key]; delete pc.borrowed[s.key]; changed.add(x.id); } continue; }
+        // 빌려 줄 값은 사람이 그 플러그인 기본값과 다르게 넣은 것만(기본값을 저장해 둔 것을 남에게 퍼뜨리지 않게)
+        const lend = y => { const z = (y.manifest.settings || []).find(z => sameKind(z, s)), v = z && own(plugConf(c, p, y.id), s.key) ? String(plugConf(c, p, y.id).settings[s.key] ?? '').trim() : '';
+          return v && v !== String(z.default ?? '').trim(); };
+        const src = list.find(y => y.id !== x.id && lend(y));
+        if (!src) continue;
+        const v = ADAPT[s.key] ? ADAPT[s.key](plugConf(c, p, src.id).settings[s.key], s) : plugConf(c, p, src.id).settings[s.key];
+        if (pc.settings[s.key] === v && pc.borrowed && pc.borrowed[s.key] === src.id) continue;
+        pc.settings[s.key] = v; (pc.borrowed ||= {})[s.key] = src.id; changed.add(x.id);
+      }
+    }
+    return changed;
+  }
+
   /* ---------- 자리 채우기: {title} {키.필드} {설정키} ---------- */
   // 채우지 못한 자리는 misses에 모은다(설정값 안의 {key}처럼 채운 값 속 중괄호는 스크립트 몫이라 다시 보지 않는다)
   // blank면 못 채운 자리를 빈 값으로 넘긴다 — 사람이 "빈 값은 두고 이 단계 하기"를 골랐을 때
@@ -805,11 +831,12 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
   }
   async function status(p){
     const list = await installed(p).catch(() => []), c = readConf();
+    if (borrowSettings(c, p, list).size) writeConf(c);
     const out = {};
     for (const x of list){
       const st = readState(p, x.id), pc = plugConf(c, p, x.id), full = await pluginOf(p, x.id);
       out[x.id] = { state: st, feeds: full.feeds.map(f => ({ ...f, input_values: !!f.inputs, every: everyOf(pc, f), every_default: f.every })), searches: full.searches.map(s => ({ name: s.name, description: s.description, limit: s.limit })), editors: full.editors, checkins: full.checkins, links: full.links, ranges: full.ranges, chats: (x.chats || []).map(c => ({ scope: c.scope, name: c.name, label: c.label })), workflows: full.workflows.map(w => ({ name: w.name, note: w.note || '', ok: w.ok || '', steps: w.steps.map(s => ({ key: s.key, name: s.name, kind: s.kind, ...(s.kind === 'ask' ? { placeholder: s.body } : {}) })) })),
-        local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null, every: pc.every || {}, gates: pc.gates || {}, features: featureState(pc) } };
+        local: { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since || null, every: pc.every || {}, gates: pc.gates || {}, features: featureState(pc), borrowed: pc.borrowed || {} } };
     }
     return { here: here(p), plugins: out, features: FEATURES.map(({ key, label, hint }) => ({ key, label, hint })) };
   }
@@ -858,14 +885,18 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     if (settings && typeof settings === 'object'){
       for (const s of x.manifest.settings) if (s.key in settings){
         const v = settings[s.key];
-        pc.settings[s.key] = s.type === 'toggle' ? v === true : String(v ?? '').slice(0, 20000);
+        const nv = s.type === 'toggle' ? v === true : String(v ?? '').slice(0, 20000);
+        if (pc.borrowed && pc.borrowed[s.key] && pc.settings[s.key] === nv) continue;   // 빌린 값을 그대로 저장했으면 계속 빌려 쓴다
+        pc.settings[s.key] = nv; if (pc.borrowed) delete pc.borrowed[s.key];
       }
     }
+    const lent = borrowSettings(c, p, await installed(p).catch(() => []));   // 넣은 값을 비어 있는 다른 플러그인도 쓰게(끈 기능이면 빌린 값을 거둔다)
     if (auto != null){ pc.auto = !!auto; pc.auto_since = auto ? (pc.auto_since && pc.auto ? pc.auto_since : now()) : null; }
     writeConf(c);
     if (auto != null && mine(p)){ const st = readState(p, id); st.auto = !!auto; writeState(p, id, st); }
     if (settings && typeof settings === 'object') kick(p, id, 'all');   // 주소·토픽이 바뀌면 목록도 새로
-    return { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since, every: pc.every || {}, gates: pc.gates || {}, features: featureState(pc) };
+    for (const y of lent) if (y !== id) kick(p, y, 'all');
+    return { settings: settingsFor(x, pc), auto: !!pc.auto, auto_since: pc.auto_since, every: pc.every || {}, gates: pc.gates || {}, features: featureState(pc), borrowed: pc.borrowed || {} };
   }
   // 누른 것 — 켠 컴퓨터면 바로, 아니면 이 컴퓨터 이름의 받은편지함에 남겨 동기화로 보낸다
   async function act(p, id, a){

@@ -5385,8 +5385,9 @@ function vPluginSetup(id){
         <p class="err" id="pl-sec-err-${esc(sv.name)}" hidden>값을 붙여 넣어 주세요</p>
         <button class="btn ${left[0] === sv.label ? 'btn-primary' : 'btn-ghost'} btn-sm" type="submit">저장하기</button></form>`).join('');
   const settings = mf.settings.map(s => {
-    const v = x ? x.local.settings[s.key] : s.default, idf = `pl-set-${s.key}`, hint = s.hint ? ` <span class="hint">${esc(s.hint)}</span>` : '';
-    if (s.type === 'toggle') return `<label class="check"><input type="checkbox" name="${s.key}" ${v ? 'checked' : ''}><span>${esc(s.label)}</span></label>`;
+    const from = x && x.local.borrowed && x.local.borrowed[s.key];   // 다른 플러그인에 넣은 값을 빌려 쓰는 중
+    const v = x ? x.local.settings[s.key] : s.default, idf = `pl-set-${s.key}`, hint = `${s.hint ? ` <span class="hint">${esc(s.hint)}</span>` : ''}${from ? ` <span class="hint">${esc(plName(from))}에 넣은 값을 같이 써요</span>` : ''}`;
+    if (s.type === 'toggle') return `<label class="check opt"><input type="checkbox" name="${s.key}" ${v ? 'checked' : ''}><span>${esc(s.label)}</span></label>`;
     if (s.type === 'lines') return `<label class="field"><span>${esc(s.label)}${hint}</span><textarea name="${s.key}" id="${idf}" rows="4" placeholder="${esc(s.placeholder)}" spellcheck="false">${esc(v)}</textarea></label>`;
     if (s.type === 'pairs') return plPairs(s, v);
     return `<label class="field"><span>${esc(s.label)}${hint}</span><input name="${s.key}" id="${idf}" value="${esc(v)}" placeholder="${esc(s.placeholder)}" autocomplete="off" spellcheck="false" ${s.type === 'path' ? 'autocapitalize="off"' : ''}></label>`;
