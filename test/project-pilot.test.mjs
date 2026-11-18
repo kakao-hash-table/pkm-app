@@ -21,7 +21,8 @@ const profile = path.join(tmp, '개인'), work = path.join(tmp, 'work');
 write(path.join(profile, '_설정.md'), '---\ntype: settings\nformat: 1\nfolders:\n  project: "03_행동/단기보드"\n  area: "03_행동/장기보드"\n  routine: "03_행동/루틴보드"\n  context: "01_지식/맥락노트"\n---\n');
 write(path.join(profile, '03_행동/단기보드/스레드 키우기.md'), '---\ntype: project\nid: tflag01\ntitle: 스레드 키우기\nstatus: todo\n---\n\n# 할 일\n\n# 완료 조건\n\n# 메모\n- 팔로워 1천 명 #설계\n');
 
-const run = (cmd, a = {}) => JSON.parse(execFileSync(process.execPath, [path.join(PLUGIN, 'scripts/pilot.mjs'), cmd, `--profile=${profile}`, `--work-root=${work}`, ...Object.entries(a).map(([k, v]) => `--${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)], { encoding: 'utf8' }));
+// 시각을 안 주면 고정한 날(11월 첫 월요일)로 — 실제 오늘이 지나가도 '만들기 전 회차는 건너뛴다' 규칙에 걸려 결과가 바뀌지 않게
+const run = (cmd, a = {}) => JSON.parse(execFileSync(process.execPath, [path.join(PLUGIN, 'scripts/pilot.mjs'), cmd, `--profile=${profile}`, `--work-root=${work}`, ...Object.entries({ now: '2026-11-02T09:00:00', ...a }).map(([k, v]) => `--${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)], { encoding: 'utf8' }));
 const files = () => { const out = {}; const walk = (d, b = '') => { for (const e of fs.readdirSync(d, { withFileTypes: true })){ if (e.name.startsWith('.')) continue; const r = b ? `${b}/${e.name}` : e.name; if (e.isDirectory()) walk(path.join(d, e.name), r); else if (r.endsWith('.md')) out[r] = fs.readFileSync(path.join(d, e.name), 'utf8'); } }; walk(profile); return out; };
 const db = () => MD.parse(files()).db;
 const rec = pid => JSON.parse(fs.readFileSync(path.join(profile, '_플러그인/.data/project-pilot', `${pid}.json`), 'utf8'));
