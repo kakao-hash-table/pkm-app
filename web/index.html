@@ -4964,7 +4964,7 @@ function plInlineFeed(id, x, f){
     else if ((['input', 'done'].includes(r.status) || plFindAct(r, vd)) && vd){
       tone = vd.v.tone === 'bad' ? 'bad' : 'ok'; head = esc(vd.v.title || ''); body = `${vd.v.text ? `<span>${esc(vd.v.text)}</span>` : ''}${plFinds(vd.findings, id, plFoldOf(r, vd), plFindAct(r, vd))}`;
       const oc = vd.step.output.outcome;
-      acts = r.status === 'done' ? `<span class="pl-outcome">✓ ${esc((oc && oc.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>${multi}`
+      acts = r.status === 'done' ? `<span class="pl-outcome">✓ ${esc((oc && oc.title) || '끝')} · ${plTime(r.finished || r.updated)}</span>${plLastChange(r) && (plIsRunner() || plRunner()) ? plChangeBtn(id, r, plLastChange(r)) : ''}${multi}`
         : r.status !== 'input' ? `<span class="pl-acts-note" role="status">${esc(s.name)} 하는 중…</span>` : s.ask && s.ask.inline ? plChoices(id, r, s) : `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`;
     }
     else if (r.status === 'input' && s.ask && s.ask.type === 'gate'){ tone = 'wait'; head = `${esc(s.name)} 하기 전에 확인해 주세요`; body = '<span>자동 시작에서 이 단계는 내 확인을 받게 해 뒀어요</span>';
@@ -4988,6 +4988,9 @@ function plInlineFeed(id, x, f){
   return section(`${esc(f.name)}${rows.length ? ` <span class="count">${rows.filter(z => !z.gone).length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${err}${bulk}${f.search && rows.length ? plFindBox(id, f, rows.map(z => plFindText(z.it))) : ''}${list}`);
 }
 
+// 단계 결과의 change 버튼 — 끝난 작업에서는 마지막 단계의 것만(뒤 단계가 없어 다시 해도 되는 것: 예 데일리 글 다시 만들기)
+const plChangeBtn = (id, r, chg) => `<button class="btn btn-ghost btn-sm" type="button" data-pl="change" data-id="${id}" data-run="${r.id}" data-step="${esc(chg.key)}" data-value="${esc(chg.output.change.value ?? '')}" data-label="${esc(chg.output.change.label)}"${chg.output.change.note ? ` data-note="${esc(chg.output.change.note)}"` : ''}>${esc(chg.output.change.label)}</button>`;
+const plLastChange = r => { const z = r.steps[r.steps.length - 1]; return z && z.status === 'done' && z.output && z.output.change && z.output.change.label ? z : null; };
 // 주소 끝 두세 마디(저장소/번호 등) — 제목이 같은 항목을 가르는 데 쓴다
 const plShortUrl = u => { try { const p = new URL(u).pathname.split('/').filter(Boolean); return p.length > 3 ? `${p[p.length - 3]}#${p[p.length - 1]}` : p.join('/'); } catch { return ''; } };
 // 추천대로 한 번에 — 같은 단계가 같은 추천 답(예: 큰 문제 없음 → 승인하기)을 기다리는 작업이 둘 이상이면 목록 위에 버튼 하나로 모은다.
@@ -5300,7 +5303,7 @@ function vPluginRun(id, rid){
   const chg = r.steps.find(z => z.status === 'done' && z.output && z.output.change && z.output.change.label), frk = r.steps.find(z => z.output && z.output.fork && z.output.fork.label);
   const busy = ['queued', 'running', 'waiting'].includes(r.status);
   const tools = sent || !(plIsRunner() || plRunner()) ? '' : [
-    chg && !busy && r.status !== 'done' ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="change" data-id="${id}" data-run="${r.id}" data-step="${esc(chg.key)}" data-value="${esc(chg.output.change.value ?? '')}" data-label="${esc(chg.output.change.label)}"${chg.output.change.note ? ` data-note="${esc(chg.output.change.note)}"` : ''}>${esc(chg.output.change.label)}</button>` : '',
+    chg && !busy && (r.status !== 'done' || chg === r.steps[r.steps.length - 1]) ? plChangeBtn(id, r, chg) : '',
     frk ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="fork" data-id="${id}" data-feed="${esc(r.feed)}" data-item="${esc(r.item.id)}" data-wf="${esc(r.workflow)}" data-step="${esc(frk.key)}" data-value="${esc(frk.output.fork.value ?? '')}" data-label="${esc(frk.output.fork.label)}">${esc(frk.output.fork.label)}</button>` : ''
   ].join('');
   // 답하는 폼(고르기·적기)

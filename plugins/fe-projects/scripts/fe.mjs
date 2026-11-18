@@ -5,7 +5,7 @@
 //                       [--days=183] [--dirs=$'~/code/*'] [--exclude=$'gitops/*'] [--refresh=yes] [--profile=<프로필 폴더>]
 //   node fe.mjs refresh --repo=owner/name (나머지는 list와 같다) — [최신화] 버튼: 활동을 지금 다시 모으고 그 레포 노트를 맞춘다
 //   node fe.mjs add     --input=<GitHub 주소|owner/name> --group= --api= --dirs= --exclude= — 직접 더하기: 노트를 만들고 빼 둘 레포에서 지운다
-//   node fe.mjs remove  --repo=owner/name --group= --exclude= [--answer=yes] — 빼기: 묻고, 노트를 프로필 휴지통으로, 빼 둘 레포에 더한다
+//   node fe.mjs remove  --repo=owner/name --group= --exclude= [--answer=undo:<휴지통 경로>] — 빼기: 묻지 않고 노트를 프로필 휴지통으로, 빼 둘 레포에 더한다. undo면 되돌린다
 //   node fe.mjs add-item — '레포 더하기' 목록의 버튼 줄 하나
 //   node fe.mjs get     --repo=owner/name --clone_dir=~/code --group= --api= — 받기: 로컬이 없으면 clone(노트의 로컬 줄을 채운다), 있으면 fetch + 깨끗하고 뒤처졌으면 fast-forward
 // 클론은 clone_dir(노트 폴더 밖)에만 둔다 — 프로필은 GitHub로 동기화될 수 있어서 코드가 섞이면 안 된다
@@ -202,11 +202,20 @@ async function main(){
   const profile = profileDir(opt.profile);
 
   if (cmd === 'remove'){
+    // 되돌리기 — 휴지통에 넣은 노트를 제자리로, "빼 둘 레포"에서도 지운다
+    if (String(opt.answer || '').startsWith('undo:')){
+      const rel = String(opt.answer).slice(5), from = path.resolve(profile, rel), back = path.join(profile, path.relative(path.join(profile, '.trash'), from)).replace(/ \d{13}\.md$/, '.md');
+      if (!from.startsWith(path.join(profile, '.trash') + path.sep) || !fs.existsSync(from)) done({ error: '휴지통에서 그 노트를 찾지 못했어요. 이미 비웠다면 [레포 더하기]로 다시 넣어 주세요' }, 1);
+      if (fs.existsSync(back)) done({ error: '같은 자리에 노트가 이미 있어요' }, 1);
+      fs.mkdirSync(path.dirname(back), { recursive: true }); fs.renameSync(from, back);
+      done({ restored: opt.repo, settings_patch: { exclude: excludeWith(opt.exclude, String(opt.repo || ''), false) }, outcome: { title: '되돌렸어요', text: String(opt.repo || '') }, summary: `${opt.repo}를 다시 넣었어요` });
+    }
     const n = readNotes(groupDir(profile, opt.group)).find(n => n.fields.레포.toLowerCase() === String(opt.repo || '').toLowerCase());
     if (!n) done({ error: `${opt.repo || '(레포 없음)'} 노트를 찾지 못했어요` }, 1);
-    if (opt.answer !== 'yes') done({ ask: { question: `${n.fields.레포}를 목록에서 뺄까요?`, hint: '노트는 프로필 휴지통(.trash)으로 옮기고, "빼 둘 레포"에 더해 다시 만들지 않아요. 다시 넣으려면 [레포 더하기]', choices: [{ value: 'yes', label: '빼기', recommended: true }], inline: true } });
-    trash(profile, n.file);
-    done({ removed: n.fields.레포, settings_patch: { exclude: excludeWith(opt.exclude, n.fields.레포, true) }, outcome: { title: '뺐어요', text: n.fields.레포 }, summary: `${n.fields.레포}를 뺐어요` });
+    // 묻지 않고 뺀다 — 노트는 휴지통으로 가서 되돌릴 수 있다(되돌리기 버튼)
+    const to = trash(profile, n.file);
+    done({ removed: n.fields.레포, settings_patch: { exclude: excludeWith(opt.exclude, n.fields.레포, true) }, outcome: { title: '뺐어요', text: `${n.fields.레포} · 노트는 휴지통에` }, summary: `${n.fields.레포}를 뺐어요`,
+      change: { label: '되돌리기', value: `undo:${path.relative(profile, to)}`, note: '노트를 휴지통에서 꺼내고 "빼 둘 레포"에서도 지워요' } });
   }
 
   if (cmd === 'get'){

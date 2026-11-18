@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 아지트 데일리 — 이 프로필의 데일리노트(오늘 계획)·약속·단기보드·쉬는 날로 아지트에 붙여 넣을 데일리 글을 만든다. 결과는 JSON 한 줄.
 //   node daily.mjs today [--tag=hash] [--jira=https://…/browse/] [--agit=https://…] [--profile=폴더] [--date=YYYY-MM-DD]
-//   node daily.mjs draft --date=YYYY-MM-DD [--answer=doing|plain|done|done+doing] …
+//   node daily.mjs draft --date=YYYY-MM-DD [--answer=doing|plain] …   글을 만들고 끝(묻지 않음). doing이면 진행 중 카드를 할 일에 더한다
 // 한 일 = 직전 근무일(주말·쉬는 날, 기록이 빈 날은 건너뜀)의 약속과 계획, 할 일 = 오늘 약속과 계획(+ 고르면 진행 중 카드).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -117,9 +117,9 @@ function main(){
       verdict:{ tone:'ok', title:`${md(date)} 데일리`, text:`한 일은 ${md(c.prev)} 약속과 계획, 할 일은 오늘 약속과 계획${withDoing ? '과 진행 중 카드' : ''}이에요. 붙여 넣은 뒤 아지트에서 고쳐도 돼요.` },
       findings:[{ title:'아지트에 붙여 넣을 글', copy:text, rich:true, ...(opts.agit ? { where:'아지트 열기', url:opts.agit } : {}) }]
     };
-    if (ans.startsWith('done')) return { ...out, outcome:{ title:'다 썼어요', text:'' } };
-    const toggle = c.doing.length ? [withDoing ? { value:'plain', label:'진행 중 카드 빼기' } : { value:'doing', label:`진행 중 카드 ${c.doing.length}개 더하기` }] : [];
-    return { ...out, ask:{ question:'아지트에 붙여 넣었나요?', inline:true, choices:[{ value:withDoing ? 'done+doing' : 'done', label:'다 썼어요', recommended:true }, ...toggle] } };
+    // 붙여 넣었는지는 묻지 않는다 — 글을 만들면 끝. 진행 중 카드 더하기·빼기는 작업 화면 버튼(change)으로 다시 만든다
+    const change = c.doing.length ? (withDoing ? { label:'진행 중 카드 빼고 다시 만들기', value:'plain', note:'진행 중 카드를 뺀 글로 다시 만들어요' } : { label:`진행 중 카드 ${c.doing.length}개 더해 다시 만들기`, value:'doing', note:'진행 중 카드를 할 일에 더한 글로 다시 만들어요' }) : null;
+    return { ...out, outcome:{ title:'글 준비됨', text:'[문구 복사]로 아지트에 붙여 넣어요' }, ...(change ? { change } : {}) };
   }
   return { error:`모르는 명령이에요: ${cmd}` };
 }

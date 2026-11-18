@@ -153,15 +153,18 @@ test('레포 주소 읽기와 빼 둘 레포 줄 고치기', () => {
   assert.equal(fe.excludeWith('', 'w/x', true), 'w/x');
 });
 
-test('빼기는 묻고 나서 노트를 휴지통으로 옮기고 빼 둘 레포에 더한다 · 더하기는 노트를 만들고 빼 둘 레포에서 지운다', async () => {
+test('빼기는 묻지 않고 노트를 휴지통으로 옮기고 빼 둘 레포에 더하며 되돌리기를 남긴다 · 더하기는 노트를 만들고 빼 둘 레포에서 지운다', async () => {
   const profile = path.join(tmp, 'edit-profile'), dir = fe.groupDir(profile, 'FE 프로젝트');
   write(path.join(dir, 'old.md'), fe.newNote({ repo: 'w/old' }));
   const base = [`--profile=${profile}`, '--group=FE 프로젝트'];
 
-  const ask = await run('remove', ...base, '--repo=w/old', '--exclude=gitops/*');
-  assert.equal(ask.ask.choices[0].value, 'yes');
-  assert.ok(fs.existsSync(path.join(dir, 'old.md')), '묻기만 하고 지우지 않는다');
-  const rm = await run('remove', ...base, '--repo=W/OLD', '--exclude=gitops/*', '--answer=yes');
+  const first = await run('remove', ...base, '--repo=w/old', '--exclude=gitops/*');
+  assert.equal(first.ask, undefined, '묻지 않는다');
+  assert.equal(first.change.label, '되돌리기');
+  const undo = await run('remove', ...base, '--repo=w/old', '--exclude=gitops/*\nw/old', `--answer=${first.change.value}`);
+  assert.equal(undo.outcome.title, '되돌렸어요'); assert.deepEqual(undo.settings_patch, { exclude: 'gitops/*' });
+  assert.ok(fs.existsSync(path.join(dir, 'old.md')), '되돌리면 제자리로');
+  const rm = await run('remove', ...base, '--repo=W/OLD', '--exclude=gitops/*');
   assert.deepEqual(rm.settings_patch, { exclude: 'gitops/*\nw/old' });
   assert.equal(fs.existsSync(path.join(dir, 'old.md')), false);
   assert.ok(fs.existsSync(path.join(profile, '.trash', '01_지식', '맥락노트', 'FE 프로젝트', 'old.md')));
