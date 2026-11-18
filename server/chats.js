@@ -350,14 +350,14 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     switching.add(key);
     try {
       if (!['queued', 'waiting'].includes(t.status)) throw fail(409, '이미 실행을 시작한 메시지예요. 진행 중인 작업은 그만두기로 멈춰 주세요');
-      if (t.job) await stopTurn(r, t, readConf().ai, true);
+      if (t.job) await stopTurn(r, t, readConf().ai, true, p);
       Object.assign(t, { status: 'canceled', cancel_kind: 'send', finished: now(), pending: [], until: null });
       if (r.priority_turn === t.id) delete r.priority_turn;
       r.updated = now(); touch(p, true);
       return t;
     } finally { switching.delete(key); pump(p); }
   }
-  async function stopTurn(r, t, conn, idleOnly = false){
+  async function stopTurn(r, t, conn, idleOnly = false, p = null){
     if (!conn?.url || !conn.token) throw fail(409, '작업을 중단하려면 AI 서버 연결이 필요해요');
     // run()이 작업 생성 요청 중이면 job id를 받을 때까지 기다린다. 중단 확인 전에는 새 작업을 시작하지 않는다.
     for (let checks = 0; !t.job && !FINAL.has(t.status) && checks < 75; checks++) await new Promise(resolve => setTimeout(resolve, 200));
@@ -370,7 +370,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       j = (await ai(conn, `/v1/jobs/${t.job}`)).job;
     }
     if (!j || !FINAL.has(j.status) || (idleOnly && j.status !== 'canceled')) throw fail(409, '작업의 중단을 확인하지 못했어요. 새 작업은 시작하지 않았어요');
-    applyJob(r, t, j);
+    applyJob(r, t, j, p);
   }
   async function runNow(p, id, { turn_id } = {}){
     const r = roomOf(p, id), key = `${p}|${id}`, t = r.turns.find(t => t.id === turn_id);
@@ -386,7 +386,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       const active = r.turns.find(x => x !== t && !FINAL.has(x.status) && (x.status === 'running' || x.status === 'waiting' || x.job));
       const inherited = active ? [...(active.attachments || []), ...(active.immediate?.attachments || [])] : [];
       if ((inherited.length || t.attachments?.length) && (!chosen.input_images || !['claude', 'codex'].includes(t.provider))) throw fail(409, '기존 첨부를 읽을 수 있는 Claude·GPT로 메시지를 보내 주세요');
-      if (active) await stopTurn(r, active, readConf().ai);
+      if (active) await stopTurn(r, active, readConf().ai, false, p);
       if (!state(p).rooms.includes(r) || !r.turns.includes(t) || t.status !== 'queued' || t.job) throw fail(409, '대기 메시지의 상태가 바뀌었어요. 새 상태를 확인해 주세요');
       const history = r.turns.filter(x => x !== t && x !== active && x.status === 'done').slice(-6).map(x => `사용자: ${clip(x.text, 1000)}\nAI: ${clip(x.reply, 2000)}`).join('\n\n');
       const previous = active ? `${active.immediate?.prompt || active.handoff?.prompt || active.text}\n\n최근 진행:\n${(active.log || []).slice(-20).map(l => `${l.tool || l.kind}: ${clip(l.text, 800)}`).join('\n')}${active.reply ? `\nAI 답변:\n${clip(active.reply, 6000)}` : ''}` : '';
@@ -436,7 +436,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
           stopped = (await ai(conn, `/v1/jobs/${source.job}`)).job;
         }
         if (stopped?.status !== 'canceled') throw fail(409, '기존 요청의 중단을 확인하지 못해 다른 AI를 시작하지 않았어요');
-        applyJob(r, source, stopped);
+        applyJob(r, source, stopped, p);
       }
       Object.assign(source, { status: 'canceled', finished: now(), pending: [], until: null, continued_by: tid });
       note(source, '다른 AI로 이어서 실행하도록 대기 요청을 취소했어요');
@@ -455,7 +455,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     const j = (await ai(conn, `/v1/jobs/${t.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id, allow: allow === true, input: input && typeof input === 'object' ? input : undefined,
       message: allow ? said : said || (hand ? '사용자가 브라우저에서 하지 못했다고 했어요' : '사용자가 채팅에서 거절했어요') }) })).job;
     note(t, hand ? (allow ? `다 했어요 · ${q.description || '브라우저'}` : `못 했어요 · ${q.description || '브라우저'}`) : allow ? `허락함 · ${q.title || q.tool}` : `거절함 · ${q.title || q.tool}`);
-    applyJob(r, t, j); emit(p, r, t); touch(p, true);
+    applyJob(r, t, j, p); emit(p, r, t); touch(p, true);
     return t;
   }
 
@@ -494,7 +494,29 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     }
   }
   function note(t, text){ t.log.push({ at: now(), kind: 'note', text: clip(text, 300) }); if (t.log.length > KEEP_LOG) t.log.splice(0, t.log.length - KEEP_LOG); }
-  function applyJob(r, t, j){
+  // 답의 ![설명](경로)·[글](경로)가 이 컴퓨터의 파일이면 방 보관함에 복사하고 pkm-file:<id>로 바꾼다 — 화면은 이 id로만 그림·파일을 연다
+  // 경로는 절대 경로·~/·file://, 아니면 작업 폴더(없으면 프로필 폴더) 기준. 코드 칸 안은 건드리지 않고, 없는 파일·너무 큰 파일은 글 그대로 둔다
+  function linkFiles(p, r, text){
+    const files = [], seen = new Map(), base = r.cwd || path.join(DATA, p);
+    const put = raw => {
+      let f = raw.trim().replace(/^<(.*)>$/, '$1').replace(/\s+"[^"]*"$/, '');
+      if (/^file:\/\//i.test(f)){ try { f = decodeURIComponent(new URL(f).pathname); } catch { return null; } }
+      else if (/^[a-z][a-z0-9+.-]*:/i.test(f) || f.startsWith('#') || f.startsWith('//')) return null;
+      f = f.startsWith('~/') ? path.join(os.homedir(), f.slice(2)) : path.resolve(base, f);
+      if (seen.has(f)) return seen.get(f);
+      const a = files.length < 12 ? media.attach(p, r.id, f) : null;
+      if (a) files.push(a);
+      seen.set(f, a ? a.id : null); return seen.get(f);
+    };
+    let fence = false;
+    const out = String(text || '').split('\n').map(l => {
+      if (/^\s*(```|~~~)/.test(l)){ fence = !fence; return l; }
+      if (fence || !l.includes('](')) return l;
+      return l.split(/(`[^`]*`)/).map((s, i) => i % 2 ? s : s.replace(/(!?)\[([^\]\n]*)\]\(([^)\n]+)\)/g, (m, bang, label, target) => { const id = put(target); return id ? `${bang}[${label}](pkm-file:${id})` : m; })).join('');
+    }).join('\n');
+    return { text: out, files };
+  }
+  function applyJob(r, t, j, p){
     if (FINAL.has(t.status) && !FINAL.has(j.status)) return;   // 중단 뒤 늦게 온 진행 이벤트로 되살리지 않는다
     t.provider = j.provider || t.provider || 'claude';
     if (j.result?.model) t.model = j.result.model;
@@ -504,7 +526,9 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
     else if (j.status === 'queued' || j.status === 'running') Object.assign(t, { status: j.status, until: null });
     else if (j.status === 'done'){
       const { text, summary } = splitSummary((j.result && j.result.text) || t.reply || '');
-      Object.assign(t, { status: 'done', reply: text, finished: now(), pending: [], until: null });
+      const linked = t.status === 'done' || !p ? { text: t.status === 'done' ? t.reply : text, files: t.files || [] } : linkFiles(p, r, text);   // 끝난 답을 다시 받아도 한 번만 복사한다
+      Object.assign(t, { status: 'done', reply: linked.text, finished: now(), pending: [], until: null });
+      if (linked.files.length) t.files = linked.files;
       if (summary) t.summary = summary;
     }
     else if (j.status === 'canceled') Object.assign(t, { status: 'canceled', finished: now(), pending: [] });
@@ -572,7 +596,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
       const body = { plugin: { id: pl.id, root: pl.path }, provider, model: t.model || 'default', ...(t.effort ? { effort: t.effort } : {}), ...(attached.images.length ? { images:attached.images.map(({ path, mime }) => ({ path, mime })) } : {}), prompt, system: ctx.system, tag: `plugin:${pl.id}`, agent };
       const j = (await ai(conn, '/v1/jobs', { method: 'POST', body: JSON.stringify(body) })).job;
       r.carry = false;
-      t.job = j.id; applyJob(r, t, j); emit(p, r, t); touch(p, true);
+      t.job = j.id; applyJob(r, t, j, p); emit(p, r, t); touch(p, true);
     }
     // 끝날 때까지 진행 상황을 받는다. 스트림이 끊기면 상태를 다시 읽고 이어 받는다(이 서버를 다시 켜도 같은 작업에 다시 붙는다)
     for (let tries = 0; !FINAL.has(t.status) && state(p).rooms.includes(r); tries++){
@@ -586,7 +610,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
             const line = buf.slice(0, i).split('\n').find(l => l.startsWith('data: ')); buf = buf.slice(i + 2);
             if (!line) continue;
             let ev; try { ev = JSON.parse(line.slice(6)); } catch { continue; }
-            if (ev.type === 'status'){ applyJob(r, t, ev.job); emit(p, r, t); touch(p, FINAL.has(t.status) || !!t.pending.length); }
+            if (ev.type === 'status'){ applyJob(r, t, ev.job, p); emit(p, r, t); touch(p, FINAL.has(t.status) || !!t.pending.length); }
             else if (ev.type === 'text' && ev.text){ const x = splitSummary(ev.text).text; if (x.trim()) t.log.push({ at: now(), kind: 'text', text: clip(x, 4000) }); touch(p); }
             else if (ev.type === 'tool'){ t.log.push({ at: now(), kind: 'tool', tool: clip(ev.tool, 60), text: clip(ev.summary, 300) }); touch(p); }
             if (t.log.length > KEEP_LOG) t.log.splice(0, t.log.length - KEEP_LOG);
@@ -594,7 +618,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
         }
       } catch (e) { if (e.status === 404){ Object.assign(t, { status: 'error', error: 'AI 서버에서 이 작업을 찾지 못했어요', finished: now(), pending: [] }); emit(p, r, t); touch(p); return; } }
       if (FINAL.has(t.status)) break;
-      try { applyJob(r, t, (await ai(conn, `/v1/jobs/${t.job}`)).job); emit(p, r, t); touch(p); } catch {}
+      try { applyJob(r, t, (await ai(conn, `/v1/jobs/${t.job}`)).job, p); emit(p, r, t); touch(p); } catch {}
       if (!FINAL.has(t.status)) await new Promise(res => setTimeout(res, Math.min(30000, 1000 * 2 ** Math.min(tries, 5))));
     }
     touch(p, true);

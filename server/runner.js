@@ -417,7 +417,13 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         if (d.kind === 'script' && !out && /^\s*\{/.test(j.result.stdout || '')){ Object.assign(step, { status: 'failed', error: '스크립트 결과를 읽지 못했어요. 출력이 중간에 잘렸을 수 있어요', text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (out && out.error){ Object.assign(step, { status: 'failed', error: clip(out.error, 500), output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (out && out.ask){
-          Object.assign(step, { status: 'input', ask: normAsk(out.ask), output: out, text, job: null }); Object.assign(run, { status: 'input', updated: now() });
+          const waiting = (step.queue || []).filter(v => chooseValues(out).includes(v));   // 그새 끝났거나 없어진 줄은 버린다
+          if (waiting.length){
+            const take = out.ask.batch === true ? waiting : waiting.slice(0, 1);
+            Object.assign(step, { status: 'pending', answer: take.join('\n'), answer_label: null, ask: null, output: out, text, job: null, queue: waiting.slice(take.length) }); Object.assign(run, { status: 'running', updated: now() });
+            return advance(p, x, conf, st, conn);
+          }
+          Object.assign(step, { status: 'input', ask: normAsk(out.ask), output: out, text, job: null, queue: undefined }); Object.assign(run, { status: 'input', updated: now() });
           const fd = x.feeds.find(f => f.name === run.feed), fs_ = st.feeds[run.feed];   // 앞 단계가 항목을 바꿨을 수 있다(예: AI 안 저장) — 내 확인을 묻는 동안 목록도 맞게 다시 가져온다
           if (fd && (fd.starts.length > 1 || fd.start_mode !== 'auto') && fs_) fs_.at = null;
           return;
@@ -496,6 +502,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     for (const k of Object.keys(s.output)) if (k.startsWith('_')) delete s.output[k];
     if (Array.isArray(s.output.findings)) s.output.findings = s.output.findings.filter(f => !(f && f.private));
   } };
+  const chooseValues = out => (out && Array.isArray(out.findings) ? out.findings : []).map(f => f && f.choose && typeof f.choose === 'object' ? String(f.choose.value ?? '') : '').filter(Boolean);
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true, confirm: c.confirm ? clip(c.confirm, 200) : '' }),
     free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true, value: a.value ? clip(a.value, 2000) : '' });   // value: 적는 칸에 미리 채울 글(고쳐서 보낸다)   // inline: 목록 줄에서 바로 고르는 버튼으로
@@ -599,6 +606,12 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         newRun(st, x, feed, selected, 'button', wname, a.answer); return;
       }
       case 'answer': case 'confirm': {
+        // 짚은 곳의 답 버튼(findings[].choose)은 그 단계가 도는 중에도 누를 수 있다 — 줄 세워 뒀다가 다시 물을 때 차례로(ask.batch면 한 번에) 넘긴다
+        if (step && a.type === 'answer' && ['pending', 'running'].includes(step.status) && step.kind === 'script' && chooseValues(step.output).includes(String(a.value ?? ''))){
+          const v = String(a.value);
+          if (!String(step.answer ?? '').split('\n').includes(v) && !(step.queue || []).includes(v)) step.queue = [...(step.queue || []), v].slice(0, 50);
+          return;
+        }
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
         // 값 묻기의 답 — 적은 글이 값, 빈 글이나 skip: true면 건너뛰기. 값은 이 단계의 given에 모은다(끝나면 출력의 _given으로)
         const asked = handed(step) && step.ask.type === 'value' ? step.ask.name : null, val = asked && a.skip !== true ? String(a.value ?? '').trim().slice(0, 4000) : '';

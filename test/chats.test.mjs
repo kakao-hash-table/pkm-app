@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { Readable } from 'node:stream';
+import { Readable, Writable } from 'node:stream';
 import { execFileSync } from 'node:child_process';
 
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-chats-'));
@@ -619,4 +619,31 @@ test('플러그인 세션 — 플러그인마다 방 하나, 작업 폴더는 �
   assert.match(body.system, /실제로 돌리지 않는다/); assert.doesNotMatch(body.system, /\{plugin_[a-z]+\}/, '자리는 모두 채운다');
   assert.equal((await chats.setCwd(P, r.id, null)).cwd, null, '플러그인 방도 작업 폴더를 바꿀 수 있다');
   await chats.remove(P, r.id);
+});
+
+test('AI 답의 그림·파일 — 이 컴퓨터의 경로를 방 보관함에 복사해 id로 바꾸고, 그림은 그대로·그 밖은 내려받게 내려준다', async () => {
+  const dir = path.join(T, 'out dir'); fs.mkdirSync(dir, { recursive: true });
+  const png = path.join(dir, '그림 1.png'), svg = path.join(dir, 'a.svg'), txt = path.join(dir, '보고서.txt');
+  fs.writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'));
+  fs.writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'); fs.writeFileSync(txt, '내용');
+  const opened = await chats.open(P, { card: card.id }); await chats.setCwd(P, opened.id, dir);
+  const text = `![그림](${png}) [보고서](보고서.txt) ![벡터](<file://${encodeURI(svg)}>) 다시 ![그림](${png}) [없음](/no/such/file.png) [웹](https://example.com/a.png) \`![코드](${png})\`\n\`\`\`\n![코드](${png})\n\`\`\``;
+  const t = await chats.send(P, opened.id, { text });
+  await until(() => t.status === 'done');
+  assert.deepEqual(t.files.map(f => [f.name, f.kind]), [['그림 1.png', 'image'], ['보고서.txt', 'file'], ['a.svg', 'image']], '같은 파일은 한 번만 복사한다');
+  const [a, b, c] = t.files.map(f => f.id);
+  assert.ok(t.reply.includes(`![그림](pkm-file:${a}) [보고서](pkm-file:${b}) ![벡터](pkm-file:${c}) 다시 ![그림](pkm-file:${a}) [없음](/no/such/file.png) [웹](https://example.com/a.png) \`![코드](${png})\``), t.reply);
+  assert.ok(t.reply.includes(`\`\`\`\n![코드](${png})\n\`\`\``), '코드 칸 안은 그대로');
+  assert.ok(!t.reply.replace(/`[^`]*`/g, '').replace(/```[\s\S]*?```/g, '').includes(dir), '바꾼 자리에 경로가 남지 않는다');
+  fs.rmSync(png);   // 원본을 지워도 기록에서 보인다
+  const get = async id => { const chunks = [], head = {}; let status;
+    const res = Object.assign(new Writable({ write(ch, e, cb){ chunks.push(ch); cb(); } }), { writeHead(s, h){ status = s; Object.assign(head, h); } });
+    await new Promise(done => { res.on('finish', done); chats.attachment(P, opened.id, id, { url: `/x/${id}?preview=1`, headers: {} }, res); });
+    return { status, head, body: Buffer.concat(chunks) }; };
+  const img = await get(a), file = await get(b), vec = await get(c);
+  assert.equal(img.head['content-type'], 'image/png'); assert.equal(img.body.length, t.files[0].size); assert.equal(img.head['content-disposition'], undefined);
+  assert.match(file.head['content-disposition'], /^attachment; filename\*=UTF-8''%EB%B3%B4/); assert.equal(file.head['content-type'], 'application/octet-stream'); assert.equal(String(file.body), '내용');
+  assert.equal(vec.head['content-type'], 'image/svg+xml'); assert.match(vec.head['content-security-policy'], /^sandbox;/, 'SVG를 새 탭으로 열어도 스크립트가 돌지 않는다');
+  await assert.rejects(chats.send(P, opened.id, { text: '다시 보내기', attachments: [a] }), { status: 400 });
+  assert.throws(() => chats.attachment(P, 'data', a, { url: '/x', headers: {} }, {}), { status: 404 }, '다른 방에서는 열 수 없다');
 });

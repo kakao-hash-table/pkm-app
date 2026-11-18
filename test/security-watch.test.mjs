@@ -106,9 +106,9 @@ test('검사기가 보안 공지 대응 플러그인을 받는다', () => {
   const r = P.validate(walk(PLUGIN).map(f => ({ path: path.relative(PLUGIN, f), size: fs.statSync(f).size, text: fs.readFileSync(f, 'utf8') })));
   assert.equal(r.ok, true, r.errors.join('\n'));
   assert.equal(r.manifest.id, 'security-watch');
-  assert.deepEqual(r.manifest.permissions.secrets, ['AGIT_TOKEN']);
+  assert.deepEqual(r.manifest.permissions.secrets, ['AGIT_TOKEN', 'JIRA_TOKEN', 'GITHUB_TOKEN']);
   assert.deepEqual(r.feeds.map(f => [f.name, f.starts, f.start_mode, f.notify]), [['보안 공지', ['보안 공지 대응'], 'auto', true]]);
-  assert.deepEqual(r.workflows.map(w => [w.name, w.steps.map(x => x.kind)]), [['보안 공지 대응', ['script', 'ai', 'agent', 'script', 'manual']]]);
+  assert.deepEqual(r.workflows.map(w => [w.name, w.steps.map(x => x.kind)]), [['보안 공지 대응', ['script', 'ai', 'agent', 'script', 'script']]]);
   const agent = r.workflows[0].steps[2];
   assert.equal(agent.when, '{판단.relevant}');
   assert.equal(agent.cwd, '{공지.dir}');
