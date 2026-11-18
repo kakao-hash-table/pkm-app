@@ -16,6 +16,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import * as plugins from './plugins.js';
+import * as memory from './memory.js';
 import { FEATURES, featureOn, featureState, transient, RETRY_MIN, retryDelay } from './features.js';
 
 const P = createRequire(import.meta.url)('../web/js/pkm-plugin.js');
@@ -396,6 +397,14 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           const ask1 = (j.pending || []).find(q => ['BrowserHandoff', 'BrowserValue'].includes(q.tool) && !(step.answered || []).includes(q.id)), h = ask1 && ask1.tool === 'BrowserHandoff' ? ask1 : null;
           if (ask1 && !h){   // 모자란 값을 묻는다 — 입력창으로 올린다. 적은 값은 에이전트가 아니라 pkm-ai-server가 받아 넣는다
             const inp = ask1.input || {}, name = clip(inp.name || '값', 60), what = scrub(clip(inp.question || ask1.description || `${name}을(를) 알려 주세요`, 300), my);
+            const known = featureOn(conf, 'remember_answers') ? memory.recall(p, name) : null;
+            if (known){   // 전에 알려 준 값 — 묻지 않고 넣는다(작업 화면에 "기억한 값으로 채웠어요"로 남는다)
+              try {
+                await ai(conn, `/v1/jobs/${step.job}/answer`, { method: 'POST', body: JSON.stringify({ request_id: ask1.id, allow: true, value: known.value }) });
+                Object.assign(step, { given: { ...step.given, [name]: known.value }, answered: [...(step.answered || []), ask1.id].slice(-20), recalled: [...new Set([...(step.recalled || []), name])].slice(0, 20) });
+                run.updated = now(); return;
+              } catch (e) { if (e.status !== 409) step.note = clip(e.message, 300); }   // 못 넣었으면 평소처럼 묻는다
+            }
             Object.assign(step, { status: 'input', told: step.job, ask: { type: 'value', name, question: what, request_id: String(ask1.id), url: httpUrl(inp.url), title: clip(inp.title || '', 120) } });
             Object.assign(run, { status: 'input', updated: now() });
             Promise.resolve().then(() => onAsk(p, { kind: 'value', plugin: x.id, name: x.manifest.name, run: run.id, step: step.key, title: run.item.title, question: what })).catch(() => {});
@@ -640,7 +649,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         if (!step || step.status !== 'input') throw fail(409, '이미 답했거나 기다리는 단계가 아니에요');
         // 값 묻기의 답 — 적은 글이 값, 빈 글이나 skip: true면 건너뛰기. 값은 이 단계의 given에 모은다(끝나면 출력의 _given으로)
         const asked = handed(step) && step.ask.type === 'value' ? step.ask.name : null, val = asked && a.skip !== true ? String(a.value ?? '').trim().slice(0, 4000) : '';
-        if (asked && val) step.given = { ...step.given, [asked]: val };
+        if (asked && val){ step.given = { ...step.given, [asked]: val }; if (featureOn(conf, 'remember_answers')) memory.remember(p, asked, val, x.id); }
         if (handed(step) && step.ask.parked){   // 멈춰 둔 넘겨받기 — 그 대화를 이어 새 작업을 만든다(탭과 채운 내용은 그대로다)
           const bs = await browserState(p, x.id), d = (x.workflows.find(w => w.name === run.workflow) || { steps: [] }).steps.find(z => z.key === step.key);
           if (!bs.ok) throw fail(409, bs.message);   // 승인이 풀렸다 — 멈춰 둔 채로 두고 알려 준다

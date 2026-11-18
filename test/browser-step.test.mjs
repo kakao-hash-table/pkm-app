@@ -96,7 +96,7 @@ async function start(item, workflow = '내기'){
   const st = (await runner.act(P, ID, { type: 'start', feed: '낼 곳', item, workflow })).state;
   return st.runs[0].id;
 }
-const reset = () => Object.assign(fake, { approved: true, browser: true, hand: null, value: null, hold: false, gone: [], posts: [], answers: [], deleted: [], tabs: [] });
+const reset = () => (fs.rmSync(path.join(process.env.PKM_HOME, 'memory.json'), { force: true }), Object.assign(fake, { approved: true, browser: true, hand: null, value: null, hold: false, gone: [], posts: [], answers: [], deleted: [], tabs: [] }));
 const MINE = /홍길동|010-9999-8888/;
 
 test('브라우저 단계 — 계약대로 보낸다(브라우저 도구만 · 내 정보 · 갈 수 있는 곳 · 올릴 파일 · 탭 키)', async () => {
@@ -352,6 +352,29 @@ test('값 묻기 — 입력창으로 멈추고, 적은 값은 서버에 보내�
   } finally { fake.result = keep; }
 });
 
+test('값 묻기 — 한 번 알려 준 값은 기억해 두고, 다음 작업이 같은 것을 물으면 묻지 않고 넣는다(끄면 다시 묻는다)', async () => {
+  reset(); fake.value = { name: '소속', question: '소속을 알려 주세요' }; asked.length = 0;
+  const rid = await start('cm-2026');
+  await until(rid, r => r.status === 'input', '처음엔 묻는다');
+  await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', value: '한빛대학교' });
+  await until(rid, r => r.status === 'done', '끝난다');
+  const mem = JSON.parse(fs.readFileSync(path.join(process.env.PKM_HOME, 'memory.json'), 'utf8'));
+  assert.equal(Object.values(mem.profiles[P])[0].value, '한빛대학교', '이 컴퓨터에만 기억한다');
+  assert.doesNotMatch(stateFile(), /한빛대학교/, '동기화되는 상태 파일에는 없다');
+  fake.value = { name: ' 소 속 ', question: '소속은요?' }; fake.answers.length = 0; asked.length = 0;   // 띄어쓰기가 달라도 같은 것
+  const rid2 = await start('cm-2026');
+  const r2 = await until(rid2, r => r.status === 'done', '묻지 않고 끝난다');
+  assert.equal(asked.length, 0, '사람에게 묻지 않았다');
+  assert.equal(fake.answers[0].value, '한빛대학교');
+  assert.deepEqual(stepOf(r2, '브라우저').recalled, [' 소 속 '], '작업 화면에 기억한 값으로 채웠다고 남는다');
+  await runner.setLocal(P, ID, { features: { remember_answers: false } });
+  try {
+    const rid3 = await start('cm-2026');
+    await until(rid3, r => r.status === 'input', '끄면 다시 묻는다');
+    await runner.act(P, ID, { type: 'cancel', run: rid3 });
+  } finally { await runner.setLocal(P, ID, { features: { remember_answers: true } }); }
+});
+
 test('값 묻기 — _given이 뒤 단계 인자로 가고, 건너뛰면 allow: false로 답한다', async () => {
   reset(); fake.value = { name: '소속', question: '소속을 알려 주세요' };
   let rid = await start('위비티:12/3');
@@ -363,6 +386,7 @@ test('값 묻기 — _given이 뒤 단계 인자로 가고, 건너뛰면 allow: 
   assert.match(stepOf(r, '결과').output.summary, /given=소속/, '{브라우저._given}이 뒤 스크립트로 넘어간다');
   assert.equal('_given' in stepOf(r, '브라우저').output, false);
 
+  fs.rmSync(path.join(process.env.PKM_HOME, 'memory.json'), { force: true });   // 기억한 값이 있으면 묻지 않으니, 건너뛰기를 보려고 비운다
   rid = await start('cm-2026'); r = await until(rid, r => r.status === 'input', '멈춘다');
   const req = stepOf(r, '브라우저').ask.request_id;
   await runner.act(P, ID, { type: 'answer', run: rid, step: '브라우저', skip: true });

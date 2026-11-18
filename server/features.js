@@ -4,6 +4,9 @@ export const FEATURES = [
   { key: 'auto_retry', label: '잠깐 실패하면 알아서 다시 하기',
     hint: 'AI 서버 연결 끊김·시간 초과·네트워크 오류는 1분·5분·15분 뒤 세 번까지 다시 해요. 제출처럼 되돌릴 수 없는 스크립트 단계는 스크립트가 다시 해도 된다고 할 때만 해요',
     default: true },
+  { key: 'remember_answers', label: '한 번 알려 준 내 정보는 다시 묻지 않기',
+    hint: '브라우저에서 AI가 물어 적어 준 값(예: 생년월일)을 이 컴퓨터에만 기억해 두고, 다음에 같은 것을 물으면 묻지 않고 넣어요. 기억한 값은 플러그인 관리에서 보고 지울 수 있어요',
+    default: true },
 ];
 const BY = new Map(FEATURES.map(f => [f.key, f]));
 

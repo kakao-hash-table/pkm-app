@@ -26,6 +26,7 @@
 // POST /api/profile/:p/plugins/:id/search {name, q}   플러그인 검색 한 번(이 컴퓨터의 pkm-ai-server, 60초까지) → { items, note }
 // GET  /api/profile/:p/plugins/:id/browser?tab=  플러그인의 브라우저 탭(tab을 비우면 쓸 수 있는지와 로그인 탭 키만) · GET …/browser/frame?tab=  지금 화면(JPEG)
 // POST …/plugins/:id/browser/open?tab= {url?} · POST …/browser/input?tab= {type, …}  누르기·적기(server/runner.js browser — tab은 그 플러그인의 탭만)
+// GET  /api/profile/:p/memory            기억해 둔 내 정보 { items:[{ key, name, masked, at, from, used }] } · DELETE …/memory/:key 하나, …/memory 모두
 // GET  /api/ai/choice                    pkm 화면에서 고른 AI·모델·생각하는 정도 { provider, model, effort } · POST 저장(플러그인 AI 단계가 따른다)
 // GET  /api/ai/local                     같은 컴퓨터에 켠 pkm-ai-server를 찾았는지 { found, ok, url, connected } · POST  연결 코드 없이 그곳에 연결(server/runner.js)
 // GET  /api/profile/:p/gcal              구글 캘린더 연결 상태
@@ -55,6 +56,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
+import * as memory from './memory.js';
 import { createRunner, askTitle, readConf, localAI, connectLocalAI, aiChoice, setAIChoice } from './runner.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
@@ -456,6 +458,10 @@ async function api(req, res, url){
       if (act === 'off' && req.method === 'POST') return send(res, 200, push.unsubscribe(p, String((await body(req)).endpoint || '')));
       if (act === 'test' && req.method === 'POST') return send(res, 200, await push.test(p, String((await body(req)).endpoint || '')));
       if (act === 'seen' && req.method === 'POST'){ const b = await body(req); push.mark(b.dev, b.visible !== false); return send(res, 200, { ok:true }); }
+    }
+    if (sub === 'memory'){   // 기억해 둔 내 정보(이 컴퓨터에만) — 값은 가려서 내보낸다
+      if (req.method === 'GET' && !parts[3]) return send(res, 200, { items:memory.list(p) });
+      if (req.method === 'DELETE') return send(res, 200, { ok:memory.forget(p, parts[3] ? decodeURIComponent(parts[3]) : null) });
     }
     if (sub === 'plugins' && parts[3] && parts[4]){
       const id = parts[3], what = parts[4];

@@ -5305,7 +5305,7 @@ function vPluginRun(id, rid){
   const steps = `<ol class="run-steps" aria-label="단계, ${n}개 중 ${i}번째 ${RUN_WORD[r.status] ? RUN_WORD[r.status][0] : ''}">${r.steps.map((z, k) => {
     const [sym, word] = { pending:['○', '대기'], running:['●', '하는 중'], waiting:['‖', '기다림'], input:['!', '내 차례'], failed:['!', '멈춤'], done:['✓', '완료'], skipped:['–', '건너뜀'] }[z.status] || ['○', '대기'];
     const note = z.status === 'failed' ? String(z.error || '').split('\n')[0] : z.status === 'done' ? (z.output && (z.output.summary || z.output.how) ? z.output.summary || z.output.how : '') : z.status === 'running' ? `${plMin(z.started || r.updated)}분째` : z.status === 'input' ? (sent ? '답을 보냄' : z.ask && z.ask.type === 'gate' ? '내 확인을 기다려요' : z.ask && z.ask.type === 'confirm' ? '확인할 차례' : z.ask && z.ask.type === 'handoff' ? '브라우저에서 내가 할 일이 있어요' : z.ask && z.ask.type === 'value' ? '알려 줄 것이 있어요' : '답이 필요해요') : '';
-    return `<li class="rs-${z.status}" ${z === s && !['done', 'canceled'].includes(r.status) ? 'aria-current="step"' : ''}><span class="rs-sym" aria-hidden="true">${sym}</span><span><b>${k + 1} ${esc(z.name)}</b> <span class="sr-only">${word}</span>${note ? `<small>${esc(note)}</small>` : ''}${z.answer ? `<small>내 답: ${esc(z.answer_label || z.answer)}</small>` : ''}</span></li>`;
+    return `<li class="rs-${z.status}" ${z === s && !['done', 'canceled'].includes(r.status) ? 'aria-current="step"' : ''}><span class="rs-sym" aria-hidden="true">${sym}</span><span><b>${k + 1} ${esc(z.name)}</b> <span class="sr-only">${word}</span>${note ? `<small>${esc(note)}</small>` : ''}${z.answer ? `<small>내 답: ${esc(z.answer_label || z.answer)}</small>` : ''}${z.recalled && z.recalled.length ? `<small>기억해 둔 값으로 채웠어요: ${esc(z.recalled.join(', '))}</small>` : ''}${z.retries && z.status !== 'waiting' ? `<small>잠깐 실패해서 ${z.retries}번 다시 했어요</small>` : ''}</span></li>`;
   }).join('')}</ol>`;
   const files = co && co.files && co.files.length ? section(`바뀐 파일 <span class="count">${co.files.length + (co.more_files || 0)}</span>`, plList(co.files.map(f => `<li><div class="row pl-file"><code>${esc(f.file)}</code><span class="num">+${f.add} −${f.del}</span></div></li>`), 15)) : '';
   return `<div class="page">
@@ -5433,10 +5433,16 @@ function vPluginManage(){
   const idle = list.map(z => [z, plIdle(z)]), wait = idle.some(([, w]) => w === null);
   const used = idle.filter(([, w]) => !w).map(([z]) => row(z)), unused = idle.filter(([, w]) => w).map(([z, w]) => row(z, w));
   const part = (title, rows, hint) => section(`${title} <span class="count">${rows.length}</span>`, `${hint ? `<p class="faint" style="margin:-4px 0 12px">${hint}</p>` : ''}<ul class="list">${rows.join('')}</ul>`);
+  // 기억해 둔 내 정보 — 브라우저에서 AI가 물어 적어 준 값. 다음엔 묻지 않고 넣는다(이 컴퓨터에만, 값은 가려서)
+  if (PL.mem === undefined){ PL.mem = null; papi('/memory').then(r => { PL.mem = r.items; plRepaint(); }).catch(() => { PL.mem = []; }); }
+  const mem = PL.mem || [];
+  const memBody = !mem.length ? '' : section(`기억해 둔 내 정보 <span class="count">${mem.length}</span>`, `<p class="faint" style="margin:-4px 0 12px">브라우저에서 AI가 물어 알려 준 값이에요. 다음엔 묻지 않고 넣어요. 이 컴퓨터에만 있어요.</p>
+    <ul class="list pl-mem">${mem.map(m => `<li class="row"><span class="body"><span class="title">${esc(m.name)} <span class="faint num">${esc(m.masked)}</span></span><span class="meta"><span>${plTime(m.at)} 받음</span>${m.from ? `<span>${esc(plName(m.from))}</span>` : ''}${m.used ? `<span>${m.used}번 넣음</span>` : ''}</span></span><button class="btn btn-text btn-sm" type="button" data-pl="mem-del" data-key="${esc(m.key)}" aria-label="${esc(m.name)} 잊기">잊기</button></li>`).join('')}</ul>`);
   return `<div class="page">
     ${plIds().length ? `<a class="back" href="#/plugins"><span aria-hidden="true">‹</span> 플러그인</a>` : ''}
     <header class="page-head"><div><h1 tabindex="-1">플러그인 관리</h1><p class="sub">${esc(S.profile)} 프로필에 설치한 플러그인이에요</p></div>${list.length ? '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>' : ''}</header>
     ${!PL.list || (list.length && wait) ? '<p class="muted" role="status">불러오는 중이에요</p>' : list.length ? `${used.length ? part('쓰는 중', used) : ''}${unused.length ? part('안 쓰는 중', unused, '토큰이나 준비가 빠져서 아직 돌지 않아요. 눌러서 마저 준비하거나, 필요 없으면 지워요.') : ''}` : empty('아직 설치한 플러그인이 없어요', '플러그인은 리뷰 모아 보기처럼 한 가지 일에 맞춘 목록과 작업을 pkm에 더해요.', '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>')}
+    ${memBody}
   </div>`;
 }
 // 특성 한 줄 — 자기 화면이 있는지, 기존 화면 어디에 더해지는지, 무엇을 바꿀 수 있는지
@@ -5726,6 +5732,10 @@ document.addEventListener('click', async e => {
     case 'remove': plAsk({ title:`${plName(id)} 플러그인을 지울까요?`, body:'<p>플러그인 파일을 휴지통으로 옮겨요. 가져오기와 자동 시작이 멈춰요. 만든 작업 폴더와 브랜치, 이 컴퓨터에 넣어 둔 토큰은 그대로 남아요.</p>', ok:'플러그인 지우기', danger:true },
       async () => { try { await STORE.json(`/api/profile/${encodeURIComponent(S.profile)}/plugins/${id}`, { method:'DELETE' }); await plLoad(true); chLoad(); go('#/plugins/_manage'); toast('플러그인을 지웠어요'); } catch (er) { toast(er.message); } }); break;
     case 'inspect-path': plInspect({ local:b.dataset.path }); break;
+    case 'mem-del': {
+      try { await papi(`/memory/${encodeURIComponent(b.dataset.key)}`, undefined, 'DELETE'); PL.mem = (PL.mem || []).filter(m => m.key !== b.dataset.key); render(); toast('잊었어요. 다음엔 다시 물어요'); } catch (er) { toast(er.message); }
+      break;
+    }
     case 'every-all': {
       const v = Number($('#pl-ev-all').value), x = PL.st.plugins[id], every = Object.fromEntries(x.feeds.map(f => [f.name, v === f.every_default ? null : v]));
       try { await papi(`/plugins/${id}/local`, { every }); await plLoad(true); render(); toast(`목록 ${x.feeds.length}개를 모두 ${plEvery(v)}마다로 맞췄어요`); } catch (er) { toast(er.message); }
