@@ -57,6 +57,15 @@ export function resolveProjects(spec, exclude){
 // report.json → 판정과 레포별 짚은 곳. 고친 것·실패를 먼저, 괜찮은 것은 뒤로
 const STATUS = { fixed: '고침', failed: '실패', ok: '괜찮음', skip: '해당 없음' };
 const RISK = { server: '서버', ci: 'CI 빌드', none: '' };
+// 레포 한 줄 요약: 에이전트가 적은 core, 없으면 고친 값에서 바뀐 버전만 뽑아 "24.22.1 → 24.22.3 · 3곳"
+export function coreOf(r){
+  if (r.core && String(r.core).trim()) return String(r.core).trim().slice(0, 80);
+  const ch = (Array.isArray(r.changes) ? r.changes : []).filter(c => c && c.file);
+  if (r.status !== 'fixed' || !ch.length) return String(r.problem || '').split(/(?<=[.。])\s|\n/)[0].slice(0, 80);
+  const ver = v => { const m = String(v ?? '').match(/\d+(?:\.\d+)*/g); return m ? m[m.length - 1] : String(v ?? '').trim().slice(0, 20); };
+  const pairs = [...new Set(ch.map(c => `${ver(c.before)} → ${ver(c.after)}`))];
+  return `${pairs.slice(0, 2).join(', ')}${pairs.length > 2 ? ` 외 ${pairs.length - 2}` : ''} · ${ch.length}곳`;
+}
 export function summarize(report){
   const repos = (report && Array.isArray(report.repos) ? report.repos : []).filter(r => r && typeof r === 'object' && r.name);
   const order = { fixed: 0, failed: 1, ok: 2, skip: 3 };
@@ -70,7 +79,8 @@ export function summarize(report){
     if (r.base || r.commit) rows.push(`브랜치: ${[r.branch, r.base && `(기준 ${r.base})`, r.commit].filter(Boolean).join(' ')}`);
     if (r.todo) rows.push(`할 일: ${r.todo}`);
     const where = [r.name, RISK[r.risk]].filter(Boolean).join(' · ');
-    const f = { where, tag: STATUS[r.status] || String(r.status || ''), title: String(r.problem || '').slice(0, 300), text: rows.join('\n').slice(0, 1500) };
+    // 줄에는 한 줄 요약만, 문제 설명·고친 곳·검증은 접어 둔다(more)
+    const f = { where, tag: STATUS[r.status] || String(r.status || ''), title: coreOf(r), text: [r.problem && `문제: ${r.problem}`, ...rows].filter(Boolean).join('\n').slice(0, 1800), more: true, ...(['ok', 'skip'].includes(r.status) ? { fold: true } : {}) };
     if (r.status === 'fixed' && r.path && r.branch) f.copy = `git -C ${r.path} show ${r.branch}`;
     return f;
   });
@@ -158,7 +168,7 @@ async function main(){
       const report = readJSON(file);
       if (!report) failWith(`에이전트가 결과 파일을 남기지 않았어요: ${file}`);
       const s = summarize(report);
-      done({ verdict: s.verdict, findings: s.findings, fixed: s.fixed, failed: s.failed, summary: s.summary });
+      done({ verdict: s.verdict, findings: s.findings, fold_label: '고칠 곳이 없는 레포', fixed: s.fixed, failed: s.failed, summary: s.summary });
     }
 
     failWith('명령은 list, fetch, report 중 하나예요');
