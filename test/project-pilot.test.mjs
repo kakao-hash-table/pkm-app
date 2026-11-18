@@ -332,6 +332,22 @@ test('점검이 사람 몫을 예산보다 늘리면 루프 변경은 되돌린�
   assert.equal(rec(pid).loops.some(l => l.key === 'heavy'), false);
 });
 
+test('주간 점검 — 루프만 바꾸는 제안은 묻지 않고 바꾸고, [되돌리기]로 바꾸기 전으로 돌린다', () => {
+  const prep = run('loop-prep', { pid, loop: 'review', period: 'loops-only', now: '2026-11-09T11:00:00' });
+  const before = JSON.stringify(rec(pid).loops);
+  const on = rec(pid).loops.find(l => l.kind !== 'review' && l.on);
+  write(path.join(prep.work, prep.out), JSON.stringify({ summary: '안 쓰는 루프 끄기', items: [], changes: [{ type: 'loop_off', loop: on.key, why: '안 씀' }] }));
+  const r = run('loop-done', { pid, loop: 'review', period: prep.period });
+  assert.equal(r.ask, undefined, '묻지 않는다');
+  assert.match(r.outcome.title, /바꿨어요 · 1개/); assert.equal(r.change.value, 'undo');
+  assert.equal(rec(pid).loops.find(l => l.key === on.key).on, false);
+  assert.equal(run('loop-done', { pid, loop: 'review', period: prep.period }).change.value, 'undo', '다시 봐도 되돌리기가 남는다');
+  const u = run('loop-done', { pid, loop: 'review', period: prep.period, answer: 'undo' });
+  assert.equal(u.outcome.title, '되돌렸어요');
+  assert.equal(JSON.stringify(rec(pid).loops), before);
+  assert.equal(run('loop-done', { pid, loop: 'review', period: prep.period }).change, undefined, '되돌린 뒤에는 버튼이 없다');
+});
+
 test('숫자 기록 — 회차 날짜로 장기에 쌓고, 다시 해도 두 번 쌓지 않는다', () => {
   const it = run('checkins-list', { now: '2026-11-09T08:00:00' }).items[0];   // 일요일 숫자를 월요일에 적는다
   assert.equal(it.title, '이번 주 쉐어링크 확정 수익은 얼마였나요?');

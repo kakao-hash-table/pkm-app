@@ -540,8 +540,24 @@ function loopDone(){
   const verdict = { tone: empty ? 'bad' : 'ok', title: empty ? `${l.title} — 준비한 게 없어요` : l.title, text: `${E.str(out.summary, 300) || '요약이 없어요'}${l.me_minutes && !empty ? `\n내 몫: ${l.me} (${l.me_minutes}분)` : ''}` };
   const findings = [...items, ...files.map(f => ({ where: '만든 파일', title: f, text: `${pr.work}/${f}` })), ...changes.map(c => ({ where: '제안', note: '바꿀 것', title: changeText(c), text: E.str(c.why || c.text || '', 200) }))];
   if (l.kind === 'review' && changes.length){
+    // 되돌리기 — 묻지 않고 바꾼 루프를 바꾸기 전으로
+    if (args.answer === 'undo' && (pr.undo || {})[key]){
+      pr.loops = JSON.parse(pr.undo[key]); delete pr.undo[key];
+      pr.plan.loops = pr.loops.filter(x => x.kind !== 'review');
+      pr.hub = S.upsertContext(profile, F, { ref: pr.hub, title: `${pr.plan.name} 설계`, summary: pr.plan.one_liner, body: E.planMarkdown(pr), today, what: '주간 점검에서 바꾼 루프를 되돌림', why: '되돌리기' }); writeContext(pr, pr.work);
+      const oc = { title: '되돌렸어요', text: '루프를 바꾸기 전으로' };
+      (pr.applied ||= {})[key] = oc; S.logTo(pr, '점검', '루프 변경을 되돌림'); S.saveProject(profile, pr);
+      return { summary: oc.title, verdict, findings, outcome: oc };
+    }
     const applied = (pr.applied || {})[key];
-    if (applied) return { summary: '이미 정했어요', verdict, findings, outcome: { title: applied.title, text: applied.text || '' } };
+    if (applied) return { summary: '이미 정했어요', verdict, findings, outcome: { title: applied.title, text: applied.text || '' }, ...((pr.undo || {})[key] ? { change: { label: '되돌리기', value: 'undo', note: '이번 점검에서 바꾼 루프를 바꾸기 전으로 돌려요' } } : {}) };
+    // 루프만 바꾸는 제안(켜기·끄기·바꾸기·더하기)은 묻지 않고 바꾸고 되돌리기를 남긴다 — 카드·할 일처럼 노트를 만드는 제안만 묻는다
+    if (!args.answer && changes.every(c => ['loop_on', 'loop_off', 'loop_edit', 'loop_add'].includes(c.type))){
+      const snap = JSON.stringify(pr.loops), d = applyChanges(pr, changes);
+      const oc = { title: `바꿨어요 · ${d.length}개`, text: d.join(', ') };
+      (pr.applied ||= {})[key] = oc; (pr.undo ||= {})[key] = snap; S.logTo(pr, '점검', `루프 제안을 바로 바꿈: ${d.join(', ')}`); S.saveProject(profile, pr);
+      return { summary: oc.title, verdict, findings, outcome: oc, change: { label: '되돌리기', value: 'undo', note: '이번 점검에서 바꾼 루프를 바꾸기 전으로 돌려요' } };
+    }
     if (args.answer === 'apply' || args.answer === 'keep'){
       const d = args.answer === 'apply' ? applyChanges(pr, changes) : [];
       const oc = args.answer === 'apply' ? { title: `바꿨어요 · ${d.length}개`, text: d.join(', ') } : { title: '그대로 뒀어요', text: '' };
