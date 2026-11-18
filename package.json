@@ -10,6 +10,6 @@
   },
   "scripts": {
     "start": "node server/index.js",
-    "test": "node --test test/*.test.mjs"
+    "test": "GIT_AUTOPUSH=0 node --test test/*.test.mjs"
   }
 }

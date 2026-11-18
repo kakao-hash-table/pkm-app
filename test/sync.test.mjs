@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+process.env.GIT_AUTOPUSH = '0';   // 시험 저장소의 커밋을 전역 자동 푸시 훅이 뒤에서 또 올리지 않게
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-sync-'));
 const sh = (cwd, ...a) => execFileSync('git', a, { cwd, encoding:'utf8', stdio:['ignore', 'pipe', 'pipe'] }).trim();
