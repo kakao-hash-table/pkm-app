@@ -554,6 +554,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           if (rj){ Object.assign(step, { job: rj, phase: 'review', draft: { out, text, session: j.result.session || undefined } }); run.updated = now(); return; }
         }
         if (step.revised && step.reviewed && step.reviewed.after === undefined) step.reviewed = { ...step.reviewed, after: true };   // 짚은 점을 붙여 다시 만든 답
+        if (['agent', 'browser'].includes(d.kind)) step.saw = sawOf(j.log, my);   // AI가 한 일 — 읽은 파일·고친 곳·명령·브라우저 조작 수
         Object.assign(step, { status: 'done', output: out, text, finished: now(), session: j.result.session || undefined, until: null, reason: null, feedback: undefined });
         run.updated = now();
         continue;
@@ -564,6 +565,18 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     const fd = x.feeds.find(f => f.name === run.feed), fs_ = st.feeds[run.feed];
     if (fd && (fd.starts.length > 1 || fd.start_mode !== 'auto') && fs_) fs_.at = null;   // 늘 남는 목록(자동 시작이 아닌 것)
     slim(run);
+  }
+  // AI가 한 일 요약 — pkm-ai-server 작업 기록(log: [{ tool, summary }])을 세어 작업 화면에 "AI가 한 일"로 보인다. 내 정보 값은 가린다
+  const SAW = [['read', /^(Read|Glob|Grep|LS|NotebookRead)$/], ['edit', /^(Edit|Write|MultiEdit|NotebookEdit)$/], ['run', /^(Bash|BashOutput)$/], ['web', /^(WebFetch|WebSearch)$/], ['browser', /browser|Browser/]];
+  function sawOf(log, my){
+    if (!Array.isArray(log) || !log.length) return undefined;
+    const n = {}, files = [];
+    for (const e of log){
+      const k = (SAW.find(([, re]) => re.test(String(e.tool || ''))) || ['other'])[0];
+      n[k] = (n[k] || 0) + 1;
+      if (k === 'read' && e.summary && files.length < 6 && !files.includes(e.summary)) files.push(clip(scrub(String(e.summary), my), 120));
+    }
+    return { ...n, files };
   }
   // 잠깐 실패 — 조금 뒤 이 단계를 처음부터 다시 한다(자동화 기능 auto_retry). 끈 경우·횟수를 다 쓴 경우는 false(멈춘다)
   function retryLater(run, step, pc, why){

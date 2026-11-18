@@ -25,7 +25,7 @@ const ROOT = path.join(DATA, P, '_플러그인', ID);
 /* 가짜 pkm-ai-server — 에이전트 작업은 fake.hand가 있으면 사람에게 넘기고(BrowserHandoff) 답을 받으면 끝낸다 */
 const fake = { approved: true, browser: true, hand: null, result: { text: '', structured: { _result: { sent: 'yes', proof: '홍길동님 접수 완료 · 접수 번호 77' } } }, posts: [], answers: [], deleted: [], tabs: [] };
 const jobs = new Map(); let n = 0;
-const finish = j => Object.assign(j, { status: 'done', pending: [], result: { ...fake.result, session: 'sess-1' } });
+const finish = j => Object.assign(j, { status: 'done', pending: [], log: fake.log || [], result: { ...fake.result, session: 'sess-1' } });
 // 에이전트가 답을 기다리다 쉬러 갔다 — 작업은 끝났고(done) 멈춰 둔 넘겨받기(parked)가 남는다
 const parkJob = (j, message) => Object.assign(j, { status: 'done', pending: [], session: 'sess-park', result: { text: '사용자를 기다리다 쉬어요', structured: null, session: 'sess-park' },
   parked: { message, tab: j.agent.browser.tab, url: 'https://apply.example.com/login', title: '로그인', at: new Date().toISOString() } });
@@ -234,12 +234,14 @@ test('옵션 없는 브라우저 단계(browser())는 탭과 브라우저 도구
 
 test('에이전트 단계도 옆의 .schema.json 모양으로 답하게 하고, 그 결과가 단계 결과가 된다', async () => {
   reset(); const keep = fake.result; fake.result = { text: '', structured: { found: true, summary: '쓸 만한 글이 있어요' } };
+  fake.log = [{ tool: 'Read', summary: '/w/notes/a.md' }, { tool: 'Read', summary: '/w/notes/b.md' }, { tool: 'Grep', summary: '공모' }, { tool: 'Bash', summary: 'ls' }];
   try {
     const r = await until(await start('cm-2026', '살피기'), r => r.status === 'done', '끝난다');
+    assert.deepEqual(stepOf(r, '살피기').saw, { read: 3, run: 1, files: ['/w/notes/a.md', '/w/notes/b.md', '공모'] }, 'AI가 한 일을 세어 남긴다');
     assert.deepEqual(fake.posts[0].json_schema, JSON.parse(fs.readFileSync(path.join(FIX, 'prompts/살피기.schema.json'), 'utf8')));
     assert.deepEqual(fake.posts[0].agent, { cwd: ROOT, mode: 'read' }, '브라우저는 browser 단계에만 붙는다');
     assert.deepEqual(stepOf(r, '살피기').output, { found: true, summary: '쓸 만한 글이 있어요' });
-  } finally { fake.result = keep; }
+  } finally { fake.result = keep; fake.log = null; }
 });
 
 test('멈춰 둔 넘겨받기 — 에이전트가 쉬러 가도 내 확인으로 남고, 답하면 같은 대화·같은 브라우저 옵션으로 이어 한다', async () => {
