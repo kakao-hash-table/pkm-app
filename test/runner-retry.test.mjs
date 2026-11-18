@@ -14,7 +14,8 @@ fs.mkdirSync(path.join(DATA, P), { recursive: true });
 
 // 가짜 pkm-ai-server — AI 요청은 처음 한 번 시간 초과로 실패하고, 스크립트는 그 자리에서 실행한다
 const jobs = new Map();
-let n = 0, aiCalls = 0;
+let n = 0, aiCalls = 0, verdict = { pass: true, issues: [] };
+const prompts = [], reviews = [];
 const ai = http.createServer(async (req, res) => {
   const send = (s, b) => { res.writeHead(s, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); };
   let body = ''; for await (const c of req) body += c; body = body ? JSON.parse(body) : {};
@@ -23,6 +24,8 @@ const ai = http.createServer(async (req, res) => {
   if (u.pathname === '/v1/secrets') return send(200, { secrets: [] });
   if (u.pathname === '/v1/jobs' && req.method === 'POST'){
     const id = `job${++n}`;
+    if (String(body.tag || '').endsWith(':review')){ reviews.push(body); const job = { id, status: 'done', result: { structured: verdict, text: '' } }; jobs.set(id, job); return send(201, { job }); }
+    if (!body.plugin_script) prompts.push(body.prompt);
     const job = body.plugin_script
       ? { id, status: 'done', result: { exit_code: 0, stdout: execFileSync(process.execPath, [path.join(body.plugin.root, body.plugin_script), ...body.args], { encoding: 'utf8' }), stderr: '' } }
       : ++aiCalls === 1 ? { id, status: 'error', reason: 'timeout', error: '30분 안에 끝나지 않았어요' } : { id, status: 'done', result: { text: '한 줄 요약' } };
@@ -122,4 +125,27 @@ test('같은 설정은 한 번만 — 비어 있는 플러그인은 다른 플�
   assert.equal(b.settings.jira_url, 'https://mine.atlassian.net/browse/', '직접 넣은 값은 덮지 않는다'); assert.equal(b.borrowed.jira_url, undefined);
   await runner.setLocal(P, 'share-b', { features: { share_settings: false } });
   assert.equal((await local('share-b')).features.share_settings, false);
+});
+
+test('독립 검토 — 다른 AI가 요청과 결과만 보고 짚으면 그 점을 붙여 한 번 다시 만들고, 무엇을 봤는지 남긴다(끄면 검토하지 않는다)', async () => {
+  aiCalls = 1; prompts.length = 0; reviews.length = 0; verdict = { pass: false, issues: ['한 줄이 아니에요'] }; fs.rmSync(process.env.SAVE_COUNT, { force: true });
+  process.env.LIST_ITEMS = 'A-1'; await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
+  const rid = (await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', workflow: '처리' })).state.runs[0].id;
+  const run = async () => (await runner.status(P)).plugins[ID].state.runs.find(r => r.id === rid);
+  for (let i = 0; i < 60 && (await run()).status !== 'done'; i++){ await runner.tick(); await new Promise(z => setTimeout(z, 15)); }
+  const s = (await run()).steps[0];
+  assert.equal(reviews.length, 1, '다시 만든 답은 또 검토하지 않는다');
+  assert.match(reviews[0].prompt, /\[요청\][\s\S]*할 일 A-1[\s\S]*\[결과\]/, '검토는 요청과 결과만 본다');
+  assert.equal(prompts.length, 2); assert.match(prompts[1], /검토에서 짚은 점[\s\S]*한 줄이 아니에요/);
+  assert.deepEqual(s.reviewed, { pass: false, issues: ['한 줄이 아니에요'], after: true });
+  assert.equal(s.feedback, undefined); assert.equal(s.draft, undefined);
+
+  await runner.setLocal(P, ID, { features: { ai_review: false } });
+  try {
+    reviews.length = 0; fs.rmSync(process.env.SAVE_COUNT, { force: true });
+    await runner.act(P, ID, { type: 'dismiss', run: rid });
+    const rid2 = (await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', workflow: '처리' })).state.runs[0].id;
+    for (let i = 0; i < 60 && (await runner.status(P)).plugins[ID].state.runs.find(r => r.id === rid2).status !== 'done'; i++){ await runner.tick(); await new Promise(z => setTimeout(z, 15)); }
+    assert.equal(reviews.length, 0, '끄면 검토하지 않는다');
+  } finally { await runner.setLocal(P, ID, { features: { ai_review: true } }); verdict = { pass: true, issues: [] }; delete process.env.LIST_ITEMS; }
 });

@@ -459,6 +459,19 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         }
         if (!['done', 'error', 'canceled'].includes(j.status)){ if (step.status !== 'running'){ step.status = 'running'; run.status = 'running'; run.updated = now(); } return; }
         // 이어 하던 대화가 실패했으면 그 대화는 버린다 — 다시 하면 새 대화로
+        if (step.phase === 'review'){   // 독립 검토의 결과 — 통과면 아까 낸 답으로 끝, 짚은 점이 있으면 한 번만 다시 만든다
+          const v = j.status === 'done' ? (j.result.structured || parseOut(j.result.text)) : null, draft = step.draft || {};
+          const issues = v && Array.isArray(v.issues) ? v.issues.map(z => clip(z, 300)).filter(Boolean).slice(0, 5) : [];
+          if (v && v.pass === false && issues.length && !step.revised){
+            Object.assign(step, { phase: undefined, draft: undefined, revised: true, feedback: issues, reviewed: { pass: false, issues } });
+            try { step.job = await startStep(conn, x, run, step, d, settings, p); run.updated = now(); return; }
+            catch { /* 다시 만들기를 시작하지 못하면 아까 답으로 끝낸다 */ }
+          }
+          if (!step.reviewed) step.reviewed = { pass: v ? v.pass !== false : null, issues: v ? issues : [] };
+          Object.assign(step, { status: 'done', output: draft.out, text: draft.text, finished: now(), session: draft.session, until: null, reason: null, phase: undefined, draft: undefined });
+          run.updated = now();
+          continue;
+        }
         if (j.status === 'error' && safeAgain(d) && ['timeout', 'provider', 'restart'].includes(j.reason) && retryLater(run, step, conf, jobError(j))) return;
         if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : scrub(jobError(j), my), text: scrub(clip(j.result && (j.result.stdout || j.result.text), 4000), my), finished: now(), ...(web ? { session: undefined } : {}) }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (web && j.parked){   // 넘긴 일을 보기 전에 에이전트가 이미 쉬러 갔다 — 알림은 지금 보낸다
@@ -513,7 +526,12 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           run.lane = lane;
         }
         if (out && Array.isArray(out.forget)) forgetAnswers(run, step, out.forget);
-        Object.assign(step, { status: 'done', output: out, text, finished: now(), session: j.result.session || undefined, until: null, reason: null });
+        if (d.kind === 'ai' && !step.reviewed && !(out && out.error) && featureOn(conf, 'ai_review')){   // 독립 검토를 맡기고 결과는 그때까지 붙잡아 둔다
+          const rj = await reviewJob(conn, x, step.job, out, text).catch(() => null);
+          if (rj){ Object.assign(step, { job: rj, phase: 'review', draft: { out, text, session: j.result.session || undefined } }); run.updated = now(); return; }
+        }
+        if (step.revised && step.reviewed && step.reviewed.after === undefined) step.reviewed = { ...step.reviewed, after: true };   // 짚은 점을 붙여 다시 만든 답
+        Object.assign(step, { status: 'done', output: out, text, finished: now(), session: j.result.session || undefined, until: null, reason: null, feedback: undefined });
         run.updated = now();
         continue;
       }
@@ -619,6 +637,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     const lost = pm.filter(k => k.includes('.') && run.steps.some(z => z.key === k.slice(1, -1).split('.')[0] && z.status !== 'skipped'));   // JSON 예시 같은 중괄호와 사람이 건너뛴 단계는 두고, 끝난 단계에 빠진 결과만 본다
     if (lost.length && !step.lenient) throw fail(400, `채우지 못한 값이 있어요: ${lost.join(' ')}`);
     if (step.answer != null && !resume) prompt += `\n\n사용자 추가 요청: ${step.answer}`;
+    if (d.kind === 'ai' && step.feedback && !resume) prompt += `\n\n## 검토에서 짚은 점 — 이 점을 고쳐 처음부터 다시 답하세요\n${step.feedback.map(f => `- ${f}`).join('\n')}`;   // 독립 검토(ai_review)가 짚은 것
     const provider = web ? 'claude' : settings.provider || 'claude';   // 브라우저 도구는 Claude만
     const body = { plugin: { id: x.id, root: x.path }, provider, prompt, tag: `plugin:${x.id}` };
     if ((conn.provider || 'claude') === provider){   // pkm 화면에서 고른 모델·생각하는 정도(runner.json ai) — 고른 AI와 같을 때만. 없으면 AI 서버의 계정 기본값
@@ -631,6 +650,34 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     }
     if (d.kind === 'agent') body.agent = { cwd: cwd || x.path, mode: d.mode || 'read', ...(step.session ? { session: step.session } : {}) };
     if (web) body.agent = { cwd: x.path, mode: 'read', approvals: true, browser: web, ...(step.session ? { session: step.session } : {}) };
+    const jid = (await ai(conn, '/v1/jobs', { method: 'POST', body: JSON.stringify(body) })).job.id;
+    if (d.kind === 'ai'){ asked.set(jid, { prompt: body.prompt, model: body.model, provider }); if (asked.size > 50) asked.delete(asked.keys().next().value); }
+    return jid;
+  }
+  /* ---------- 독립 검토(자동화 기능 ai_review) ----------
+     AI 단계가 답을 내면, 작업 과정을 보지 않는 다른 AI가 [요청]과 [결과]만 보고 예/아니오로 채점한다(생성과 검증을 나눈다).
+     짚은 점이 있으면 그 점을 붙여 한 번만 다시 만든다. 검토가 안 되면(서버 재시작으로 요청을 잊음·검토 실패) 막지 않고 그대로 쓴다 */
+  const asked = new Map();   // AI 작업 id → 보낸 요청(메모리에만 — 서버를 다시 켜면 그 단계는 검토 없이 끝난다)
+  const REVIEW_SCHEMA = { type: 'object', properties: { pass: { type: 'boolean' }, issues: { type: 'array', items: { type: 'string' } } }, required: ['pass', 'issues'] };
+  const squeeze = (t, n) => { t = String(t || ''); return t.length > n ? `${t.slice(0, n * 0.7)}\n…(가운데 ${t.length - n}자 줄임)…\n${t.slice(-n * 0.3)}` : t; };
+  async function reviewJob(conn, x, jid, out, text){
+    const a = asked.get(jid); if (!a) return null;
+    const result = out && typeof out === 'object' ? JSON.stringify(Object.fromEntries(Object.entries(out).filter(([k]) => !k.startsWith('_'))), null, 1) : text;
+    const prompt = `너는 검토자다. 아래 [요청]을 받은 AI가 낸 [결과]를 채점한다. 작업 과정은 보지 않고 요청과 결과만 본다.
+아래를 예/아니오로 본다.
+1. 요청이 정한 형식·범위·금지 사항을 지켰나
+2. 요청에 없는 사실을 지어내거나 근거 없이 단정했나
+3. 요청이 꼭 내라고 한 항목을 빠뜨렸나
+4. 결과 안에서 서로 모순되나
+문제가 없으면 pass: true, issues: []. 있으면 pass: false와 고칠 점을 한 줄씩(5개까지, 무엇을 어떻게 고칠지 구체적으로). 문체·취향은 문제로 보지 않는다. 답은 한국어로.
+
+[요청]
+${squeeze(a.prompt, 30000)}
+
+[결과]
+${squeeze(result, 12000)}`;
+    const body = { plugin: { id: x.id, root: x.path }, provider: a.provider, prompt, tag: `plugin:${x.id}:review`, ...(a.model ? { model: a.model } : {}) };
+    if (a.provider === 'claude') body.json_schema = REVIEW_SCHEMA; else body.prompt += `\n\n답은 이 JSON 하나로만: ${JSON.stringify(REVIEW_SCHEMA)}`;
     return (await ai(conn, '/v1/jobs', { method: 'POST', body: JSON.stringify(body) })).job.id;
   }
 
@@ -725,7 +772,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         const i = run.steps.indexOf(step);
         for (const s of run.steps.slice(i)) await cancelJob(s);
         // lenient: 못 채운 값은 빈 값으로 두고 이 단계를 한다(앞 단계 결과가 비었을 때 처음부터 다시 말고 이어 가는 길)
-        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, answered: undefined, given: undefined, retries: undefined, retry_why: undefined, reason: null, until: null, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
+        for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, answered: undefined, given: undefined, retries: undefined, retry_why: undefined, reason: null, until: null, phase: undefined, draft: undefined, reviewed: undefined, revised: undefined, feedback: undefined, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
         Object.assign(run, { status: 'queued', note: null, finished: null, again: undefined, updated: now() }); return;
       }
       case 'skip': {
