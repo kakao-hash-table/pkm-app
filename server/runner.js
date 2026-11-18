@@ -99,6 +99,16 @@ function browserOpts(v){
   }
   return { opts: out, tab: o.tab == null || o.tab === '' ? null : String(o.tab) };
 }
+// ai({단계.필드}) — 앞 스크립트 단계가 낸 그림 [{ path, mime }]. 그 플러그인 데이터 폴더 안의 그림만 받는다. 없어진 파일은 빼고(다시 하기 전에 지워졌을 수 있다) 글만으로 한다
+const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+function aiImages(v, root){
+  if (v == null || v === '') return [];
+  if (!Array.isArray(v) || v.length > 24 || v.some(i => !i || typeof i.path !== 'string' || !path.isAbsolute(i.path) || !IMAGE_MIME.has(i.mime))) throw fail(400, 'AI 단계의 그림은 [{ path(절대 경로), mime(png·jpeg·webp·gif) }] 24장까지예요');
+  let base; try { base = fs.realpathSync(root) + path.sep; } catch { return []; }
+  return v.flatMap(i => { let real; try { real = fs.realpathSync(i.path); } catch { return []; }
+    if (!real.startsWith(base)) throw fail(400, 'AI 단계의 그림은 플러그인 데이터 폴더 안의 파일만 보낼 수 있어요');
+    return [{ path: real, mime: i.mime }]; });
+}
 // 브라우저 단계가 남기는 글에서 내 정보 값을 자리표시로 되돌린다(화면에 찍힌 값을 에이전트가 옮겨 적었더라도 상태 파일에는 남지 않게 — 상태 파일은 동기화된다)
 function scrub(v, vars){
   const pairs = Object.entries(vars && typeof vars === 'object' ? vars : {}).map(([k, x]) => [k, String(x ?? '')]).filter(([, x]) => x.length >= 2).sort((a, b) => b[1].length - a[1].length);
@@ -548,6 +558,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
     if (schema){   // ai·agent·browser 모두 — 결과(구조화 출력)가 단계 결과가 된다
       if (provider === 'claude') body.json_schema = schema;   // 지원하는 AI만. 나머지는 글 끝의 JSON을 읽는다
       else body.prompt += `\n\n답은 아래 JSON 스키마에 맞는 JSON 하나로만 써 주세요.\n${JSON.stringify(schema)}`;
+    }
+    if (d.kind === 'ai' && d.images && ['claude', 'codex'].includes(provider)){   // 그림을 읽는 AI만 — 나머지는 글만으로
+      const images = aiImages(stepValue(run, d.images.slice(1, -1)), path.join(DATA, p, P.DIR, '.data', x.id));
+      if (images.length) body.images = images;
     }
     if (d.kind === 'agent') body.agent = { cwd: cwd || x.path, mode: d.mode || 'read', ...(step.session ? { session: step.session } : {}) };
     if (web) body.agent = { cwd: x.path, mode: 'read', approvals: true, browser: web, ...(step.session ? { session: step.session } : {}) };

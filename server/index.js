@@ -213,7 +213,7 @@ async function syncNow(p){
       await recoverRepo();
       const branch = (await git('rev-parse', '--abbrev-ref', 'HEAD')).stdout.trim();
       if (branch === 'HEAD') throw new Error('저장소가 브랜치 밖(detached HEAD)에 있어서 동기화를 멈췄어요');
-      await git('add', '-A', '--', rel, `:(exclude)${rel}/.trash`);
+      await git('add', '-A', '--', rel, `:(exclude)${rel}/.trash`, `:(exclude,glob)${rel}/_플러그인/.data/*/.cache/**`);   // 플러그인이 이 컴퓨터에만 두는 캐시(받은 그림 등)는 올리지 않는다
       const staged = await git('diff', '--cached', '--name-only', '--', rel);
       if (staged.stdout.trim()) await git('commit', '-m', `pkm(${p}): 자동 저장 ${new Date().toLocaleString('ko-KR', { hour12:false })}`, '--', rel);
       await pullMerge(branch);

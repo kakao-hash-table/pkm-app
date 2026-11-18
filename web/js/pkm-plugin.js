@@ -17,7 +17,8 @@
   const HOURS_RE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;
   const ignored = p => p.split('/').some(s => s.startsWith('.')) || /(^|\/)(node_modules|__pycache__)\//.test(p);
 
-  /* 워크플로우 문서: "## 이름" 아래 (설명 줄) "- [키] 단계명 · 종류 [when {단계.필드}] [in 폴더]: 내용" (종류 = manual | ask | script | ai | agent(read|auto|full) | browser({단계.필드})). ask는 사람에게 글을 받는다(내용 = 예시 문구).
+  /* 워크플로우 문서: "## 이름" 아래 (설명 줄) "- [키] 단계명 · 종류 [when {단계.필드}] [in 폴더]: 내용" (종류 = manual | ask | script | ai | ai({단계.필드}) | agent(read|auto|full) | browser({단계.필드})). ask는 사람에게 글을 받는다(내용 = 예시 문구).
+     ai({단계.필드})는 앞 스크립트 단계가 낸 그림 목록([{ path, mime }])을 AI에게 함께 보인다.
      browser는 브라우저 도구만 가진 에이전트 단계 — 괄호 안은 앞 스크립트 단계가 낸 옵션 객체({ vars, allow, files, tab })의 자리, 비우면 옵션 없음 */
   function parseWorkflows(text){
     const out = []; let cur = null, step = null;
@@ -26,8 +27,8 @@
       if (h){ cur = { name: h[1], steps: [] }; out.push(cur); step = null; continue; }
       const ok = line.match(/^-\s+ok:\s*(.+?)\s*$/);   // 시작할 때 묻는 창의 확인 버튼 글자(첫 단계 앞에서만)
       if (ok && cur && !cur.steps.length){ cur.ok = ok[1].slice(0, 20); continue; }
-      const m = line.match(/^-\s+\[([^\]]+)\]\s+(.+?)\s+·\s+(?:(manual|ask|script|ai|agent)(?:\((read|auto|full)\))?|(browser)(?:\(\s*(\{[^{}\s]+\})?\s*\))?)(?:\s+when\s+(\{[^{}\s]+\}))?(?:\s+in\s+(\S+?))?\s*(?::\s*(.*))?$/);
-      if (m && cur){ step = { key: m[1].trim(), name: m[2].trim(), kind: m[3] || m[5], mode: m[4] || null, ...(m[5] ? { browser: m[6] || null } : {}), when: m[7] || null, cwd: m[8] || null, body: (m[9] || '').trim() }; cur.steps.push(step); continue; }
+      const m = line.match(/^-\s+\[([^\]]+)\]\s+(.+?)\s+·\s+(?:(manual|ask|script|ai|agent)(?:\((read|auto|full)\))?|(browser)(?:\(\s*(\{[^{}\s]+\})?\s*\))?|(ai)\(\s*(\{[^{}\s]+\})\s*\))(?:\s+when\s+(\{[^{}\s]+\}))?(?:\s+in\s+(\S+?))?\s*(?::\s*(.*))?$/);
+      if (m && cur){ step = { key: m[1].trim(), name: m[2].trim(), kind: m[3] || m[5] || m[7], mode: m[4] || null, ...(m[5] ? { browser: m[6] || null } : {}), ...(m[7] ? { images: m[8] } : {}), when: m[9] || null, cwd: m[10] || null, body: (m[11] || '').trim() }; cur.steps.push(step); continue; }
       if (step && /^\s{2,}\S/.test(line)) step.body += (step.body ? '\n' : '') + line.trim();   // 두 칸 들여 쓴 줄은 앞 단계 내용에 이어 붙인다
       else if (cur && !cur.steps.length && line.trim() && !/^-\s/.test(line)) cur.note = (cur.note ? cur.note + ' ' : '') + line.trim();   // 단계 앞 줄은 설명 — 시작할 때 묻는 창에 보인다
     }
@@ -230,6 +231,10 @@
             // 옵션(내 정보·갈 수 있는 곳·올릴 파일)은 승인한 스크립트가 낸 값만 — AI가 낸 값으로 정하지 않는다
             const from = s.browser && w.steps.slice(0, w.steps.indexOf(s)).find(z => z.key === s.browser.slice(1, -1).split('.')[0]);
             if (s.browser && (!s.browser.includes('.') || !from || from.kind !== 'script')) err(`${where}: browser(${s.browser})는 앞 스크립트 단계의 결과({단계.필드})여야 해요`);
+          }
+          if (s.images){   // 그림도 승인한 스크립트가 낸 값만
+            const from = w.steps.slice(0, w.steps.indexOf(s)).find(z => z.key === s.images.slice(1, -1).split('.')[0]);
+            if (!s.images.includes('.') || !from || from.kind !== 'script') err(`${where}: ai(${s.images})는 앞 스크립트 단계의 결과({단계.필드})여야 해요`);
           }
           if (['ai', 'agent', 'browser'].includes(s.kind) && /^prompts\/\S+\.md$/.test(s.body) && !byPath[s.body]) err(`${where}: 프롬프트 파일이 없어요 ${s.body}`);
           if (!['manual', 'ask'].includes(s.kind) && !s.body) err(`${where}: 내용이 비어 있어요`);
