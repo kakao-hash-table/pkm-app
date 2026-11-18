@@ -1,0 +1,7 @@
+[
+  {
+    "spec": "or:keltner-breakout(period=20,mult=2.5)+disparity",
+    "interval": "1h",
+    "added": "2026-11-14"
+  }
+]
