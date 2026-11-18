@@ -10,3 +10,17 @@ node_modules/
 *.tmp
 *.log
 .DS_Store
+
+# 개인정보·비밀값 — 커밋하면 자동으로 원격에 올라가므로(전역 자동 푸시 훅) 저장소에 넣지 않는다
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.auth.json
+*.auth.json
+cookies*.json
+.cache/
+secrets.json
+tokens.json
