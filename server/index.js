@@ -20,12 +20,13 @@
 // GET  /api/profile/:p/notifications      알림(notify: yes 목록의 새 항목·내 차례·멈춤·끝남)   POST …/notifications/read {ids?}  읽음(없으면 모두)
 // POST /api/profile/:p/runner {on, ai}     이 컴퓨터에서 돌리기 켜기·끄기, AI 연결 넣기
 // GET  /api/profile/:p/plugins/:id/machine 이 컴퓨터의 승인·비밀값 상태     POST …/approve  승인     POST …/secret {name, value|null}
-// POST /api/profile/:p/plugins/:id/local {settings, auto}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
+// POST /api/profile/:p/plugins/:id/local {settings, auto, every, gates, features}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
 // GET  /api/profile/:p/plugins/:id/scripts  가져오는 스크립트 내용(승인 전에 보여 준다)
 // GET  /api/profile/:p/plugins/:id/file?name=  플러그인이 만든 파일(<프로필>/_플러그인/.data/<id>/files/ — 프로필 데이터와 함께 동기화. 없으면 예전 자리 ~/.pkm-app/plugin-files/<프로필>/<id>/) · &download=1이면 내려받기
 // POST /api/profile/:p/plugins/:id/search {name, q}   플러그인 검색 한 번(이 컴퓨터의 pkm-ai-server, 60초까지) → { items, note }
 // GET  /api/profile/:p/plugins/:id/browser?tab=  플러그인의 브라우저 탭(tab을 비우면 쓸 수 있는지와 로그인 탭 키만) · GET …/browser/frame?tab=  지금 화면(JPEG)
 // POST …/plugins/:id/browser/open?tab= {url?} · POST …/browser/input?tab= {type, …}  누르기·적기(server/runner.js browser — tab은 그 플러그인의 탭만)
+// GET  /api/profile/:p/memory            기억해 둔 내 정보 { items:[{ key, name, masked, at, from, used }] } · DELETE …/memory/:key 하나, …/memory 모두
 // GET  /api/ai/choice                    pkm 화면에서 고른 AI·모델·생각하는 정도 { provider, model, effort } · POST 저장(플러그인 AI 단계가 따른다)
 // GET  /api/ai/local                     같은 컴퓨터에 켠 pkm-ai-server를 찾았는지 { found, ok, url, connected } · POST  연결 코드 없이 그곳에 연결(server/runner.js)
 // GET  /api/profile/:p/gcal              구글 캘린더 연결 상태
@@ -55,6 +56,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
+import * as memory from './memory.js';
 import { createRunner, askTitle, readConf, localAI, connectLocalAI, aiChoice, setAIChoice } from './runner.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
@@ -168,7 +170,7 @@ async function syncTemplates(p){
 
 /* ---------- git 동기화 (storage: github 프로필만) ---------- */
 const SYNC = {};   // 프로필 → { state, at, error, timer }
-const git = (...args) => run('git', ['-C', DATA, ...args], { timeout:60000 });   // data 폴더가 들어 있는 저장소에서
+const git = (...args) => run('git', ['-C', DATA, ...args], { timeout:60000, env:{ ...process.env, GIT_AUTOPUSH:'0' } });   // data 폴더가 들어 있는 저장소에서. 받고 합치고 올리는 것은 여기서 직접 하므로 커밋 뒤 자동 푸시 훅(전역 git 설정)은 끈다
 function scheduleSync(p, ms = 8000){
   const s = SYNC[p] || (SYNC[p] = { state:'idle' });
   clearTimeout(s.timer); s.state = 'pending';
@@ -456,6 +458,10 @@ async function api(req, res, url){
       if (act === 'off' && req.method === 'POST') return send(res, 200, push.unsubscribe(p, String((await body(req)).endpoint || '')));
       if (act === 'test' && req.method === 'POST') return send(res, 200, await push.test(p, String((await body(req)).endpoint || '')));
       if (act === 'seen' && req.method === 'POST'){ const b = await body(req); push.mark(b.dev, b.visible !== false); return send(res, 200, { ok:true }); }
+    }
+    if (sub === 'memory'){   // 기억해 둔 내 정보(이 컴퓨터에만) — 값은 가려서 내보낸다
+      if (req.method === 'GET' && !parts[3]) return send(res, 200, { items:memory.list(p) });
+      if (req.method === 'DELETE') return send(res, 200, { ok:memory.forget(p, parts[3] ? decodeURIComponent(parts[3]) : null) });
     }
     if (sub === 'plugins' && parts[3] && parts[4]){
       const id = parts[3], what = parts[4];

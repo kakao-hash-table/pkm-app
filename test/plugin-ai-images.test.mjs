@@ -39,7 +39,7 @@ const ai = http.createServer(async (req, res) => {
   if (u.pathname === '/v1/secrets') return send(200, { secrets: [] });
   if (u.pathname === '/v1/jobs' && req.method === 'POST'){
     const id = `job${++n}`;
-    const result = body.plugin_script ? { exit_code: 0, stdout: execFileSync(process.execPath, [path.join(body.plugin.root, body.plugin_script), ...body.args], { encoding: 'utf8' }), stderr: '' } : (asked.push(body), { text: '읽었어요' });
+    const result = body.plugin_script ? { exit_code: 0, stdout: execFileSync(process.execPath, [path.join(body.plugin.root, body.plugin_script), ...body.args], { encoding: 'utf8' }), stderr: '' } : String(body.tag || '').endsWith(':review') ? { structured: { pass: true, issues: [] }, text: '' } : (asked.push(body), { text: '읽었어요' });   // 독립 검토 요청은 따로
     const job = { id, status: 'done', result }; jobs.set(id, job); return send(201, { job });
   }
   const m = u.pathname.match(/^\/v1\/jobs\/(\w+)$/);

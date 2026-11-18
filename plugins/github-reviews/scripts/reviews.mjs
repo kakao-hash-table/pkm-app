@@ -8,7 +8,9 @@
 // 토큰은 환경 변수 GITHUB_TOKEN(pkm-ai-server가 승인한 플러그인에만 넣어 준다).
 import fs from 'node:fs';
 const [cmd, ...rest] = process.argv.slice(2);
-const opt = Object.fromEntries(rest.filter(a => a.startsWith('--')).map(a => { const i = a.indexOf('='); return i < 0 ? [a.slice(2), true] : [a.slice(2, i), a.slice(i + 1)]; }));
+// 1,800자가 넘는 인자는 실행기가 임시 파일에 쓰고 --키=@file:<경로>로 넘긴다 — 그 파일 내용을 값으로 읽는다
+const big = v => typeof v === 'string' && v.startsWith('@file:') ? (() => { try { return fs.readFileSync(v.slice(6), 'utf8'); } catch { return ''; } })() : v;
+const opt = Object.fromEntries(rest.filter(a => a.startsWith('--')).map(a => { const i = a.indexOf('='); return i < 0 ? [a.slice(2), true] : [a.slice(2, i), big(a.slice(i + 1))]; }));
 const API = String(opt.api || 'https://api.github.com').replace(/\/+$/, '');
 const REPOS = String(opt.repos || '').split(/[\n,]+/).map(s => s.trim()).filter(s => /^[\w.-]+\/[\w.-]+$/.test(s));
 const TOKEN = process.env.GITHUB_TOKEN;
@@ -228,13 +230,22 @@ if (cmd === 'decide'){
     };
   });
   const truncated = String(opt.truncated) === 'true', summary = short(opt.summary, 300);
-  const clean = !blind && (verdict !== 'block' || !findings.length);
-  const judged = blind
+  const rawN = Array.isArray(raw) ? raw.length : 0, dropped = rawN - findings.length;
+  // AI는 막아야 한다고 했는데 문제 목록을 읽지 못했다 — 판정이 뒤집히지 않게 승인을 권하지 않는다
+  const lost = verdict === 'block' && !rawN;
+  const clean = !blind && !lost && (verdict !== 'block' || !findings.length);
+  // AI가 본 범위 — 사람이 판정을 얼마나 믿을지 정할 수 있게
+  const rules = String(opt.rules || '').split('\n').map(x => x.trim()).filter(Boolean).length;
+  const seen = [short(opt.scope, 120), rules ? `팀 기준 ${rules}개 함께 봄` : '', dropped > 0 ? `AI가 짚은 ${dropped}개는 확신이 낮거나 바뀐 줄 밖이라 뺌` : ''].filter(Boolean).join(' · ');
+  const judged = lost
+    ? { summary: 'AI 판정을 다 읽지 못했어요', verdict: { tone: 'bad', title: 'AI가 문제가 있다고 했어요', text: `${summary} 짚은 곳 목록을 읽지 못해서 승인을 권하지 않아요. 직접 보고 남겨 주세요.` } }
+    : blind
     ? { summary: 'AI가 코드를 못 봤어요', verdict: { tone: 'bad', title: 'AI가 코드를 못 봤어요', text: '바뀐 코드를 가져온 결과가 비어서 AI 판정을 믿을 수 없어요. 직접 리뷰하고 남겨 주세요.' }, ...(findings.length ? { findings } : {}) }
     : clean
     ? { summary: truncated ? '본 부분에는 큰 문제가 없어요' : '큰 문제가 없어요',
         verdict: { tone: 'ok', title: truncated ? '본 부분에는 큰 문제 없음' : '큰 문제 없음', text: `${summary}${truncated ? ' PR이 커서 앞부분만 봤어요.' : ''}` } }
     : { summary: `문제 ${findings.length}개`, verdict: { tone: 'bad', title: `큰 문제 ${findings.length}개`, text: summary }, findings };
+  if (seen) judged.verdict.text = `${judged.verdict.text}\nAI가 본 범위: ${seen}`;
   if (answer === 'done') done({ ...judged, outcome: { title: '직접 리뷰함' } });
   if (answer === 'approve'){
     const pr = await gh(`/repos/${REPO}/pulls/${NUM}`);

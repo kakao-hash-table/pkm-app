@@ -56,10 +56,12 @@ export function detect(dir, want){
 }
 
 // .nvmrc·.node-version → ~/.nvm/versions/node 에서 맞는 가장 높은 버전. 딱 맞는 게 없으면 같은 주 버전(24.11.1 → 24.22.1)
+// 둘 다 없으면 package.json의 engines.node(">=24", "^24.11", "24.x")의 주 버전으로 — 맞지 않는 node로 띄워 바로 멈추지 않게
 export function nodeFor(dir){
   const f = ['.nvmrc', '.node-version'].map(n => path.join(dir, n)).find(f => fs.existsSync(f));
-  if (!f) return null;
-  const want = (fs.readFileSync(f, 'utf8').trim().split(/\s+/)[0] || '').replace(/^v/, '');
+  const eng = !f && String(((readJSON(path.join(dir, 'package.json')) || {}).engines || {}).node || '').match(/(\d+)(?:\.(\d+))?/);
+  if (!f && !eng) return null;
+  const want = f ? (fs.readFileSync(f, 'utf8').trim().split(/\s+/)[0] || '').replace(/^v/, '') : eng[1];
   const root = path.join(os.homedir(), '.nvm', 'versions', 'node');
   let vs = []; try { vs = fs.readdirSync(root).filter(v => /^v\d+\.\d+\.\d+$/.test(v)); } catch {}
   const num = v => v.slice(1).split('.').map(Number), parts = want.split('.').map(Number);
@@ -196,6 +198,15 @@ async function launch(dir, c, port, extra, onCrash){
   const argv = withPort(c, port), log = logPath(dir);
   fs.mkdirSync(stateDir(), { recursive: true });
   fs.writeFileSync(log, `$ ${argv.join(' ')} # ${dir} · node ${nodeV} · 포트 ${port ?? '-'}\n`);
+  // 패키지를 아직 안 받았으면 먼저 받는다(node_modules 없이 띄우면 바로 멈춘다)
+  const pkgj = !c.install && !c.gradle ? readJSON(path.join(dir, 'package.json')) : null;
+  const deps = pkgj && Object.keys({ ...pkgj.dependencies, ...pkgj.devDependencies }).length;
+  const pm = deps && !fs.existsSync(path.join(dir, 'node_modules')) ? detect(dir).pm : null;
+  if (pm){
+    fs.appendFileSync(log, `$ ${pm} install # node_modules가 없어 먼저 받아요\n`);
+    try { execFileSync(pm, ['install'], { cwd: dir, env, stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')], timeout: Number(process.env.DEV_TOOLS_INSTALL_MS) || 10 * 60000 }); }
+    catch (e) { const error = `${pm} install이 실패했어요${e.code === 'ENOENT' ? ` — ${pm} 명령을 찾지 못했어요` : ''}`; writeState(dir, { cwd: dir, pid: null, error }); failWith(`${error}.\n${tail(log)}`); }
+  }
   writeState(dir, { cwd: dir, pid: null, selected: c.command, command: argv.join(' '), port, startedAt: new Date().toISOString(), node: nodeV });
   const fd = fs.openSync(log, 'a');
   let spawnErr = null, exited = null;

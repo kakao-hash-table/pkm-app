@@ -48,18 +48,16 @@ test('ww 데일리와 같은 글 — 약속(시각)과 계획, 지라 링크, �
     '[#hash202610](https://kakao.agit.in/search?q=%23hash202610) [#hash20261005](https://kakao.agit.in/search?q=%23hash20261005)'
   ].join('\n'));
   assert.equal(r.findings[0].rich, true);   // 아지트에는 마크다운이 아니라 서식 있는 글로 붙여 넣는다
-  assert.deepEqual(r.ask.choices.map(c => c.value), ['done', 'doing']);
-  assert.equal(r.ask.inline, true);
+  assert.equal(r.ask, undefined, '붙여 넣었는지 묻지 않는다');
+  assert.equal(r.outcome.title, '글 준비됨');
+  assert.equal(r.change.value, 'doing', '진행 중 카드 더하기는 작업 화면 버튼');
 });
 
-test('진행 중 카드 더하기(오늘 계획에 없는 것만) → 다 썼어요로 끝', () => {
+test('진행 중 카드 더하기(오늘 계획에 없는 것만) — 다시 만들어도 묻지 않고, 빼기 버튼이 된다', () => {
   const r = run('draft', '--date=2026-10-29', '--answer=doing');
   assert.match(r.findings[0].copy, /- \[ \] 위키 정리\n- \[ \] \[MAP-77\]\(https:\/\/jira\.example\/browse\/MAP-77\) 로그 정리\n/);
-  assert.deepEqual(r.ask.choices.map(c => c.value), ['done+doing', 'plain']);
-  const end = run('draft', '--date=2026-10-29', '--answer=done+doing');
-  assert.equal(end.ask, undefined);
-  assert.equal(end.outcome.title, '다 썼어요');
-  assert.match(end.findings[0].copy, /MAP-77/);
+  assert.equal(r.ask, undefined);
+  assert.equal(r.change.value, 'plain');
 });
 
 test('설치된 자리(<프로필>/_플러그인/agit-daily/scripts)에서 프로필을 찾는다', () => {
