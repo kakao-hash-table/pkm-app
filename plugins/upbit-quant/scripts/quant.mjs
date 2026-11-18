@@ -9,7 +9,7 @@
 //   settle --pid                                        체결 확인. 정한 시간 안에 다 체결되지 않으면 취소하고 시장가로 마저(매수는 허용 슬리피지 안에서만, 매도는 늘)
 //   sell-now --mode --sid --market [--answer=sell]      들고 있는 것을 지금 시장가로 팔기(한 번 묻는다)
 //   toggle --sid                                        전략 켜고 끄기 · doctor  업비트 연결·권한 확인(실제 주문 없음)
-// 공통 설정: --live=true|false --markets=줄들 --strategies=id,id --budget=2000000(굴릴 금액 — 적으면 복리) --order-krw=10000 --max-positions=5 --slippage=0.3 --wait=20
+// 공통 설정: --live=true|false --markets=줄들 --strategies=id,id --budget=2000000(굴릴 금액 — 적으면 복리) --order-krw=10000 --max-positions=5 --slippage=0.5 --wait=20
 // 테스트용: --profile=폴더 --now=ISO --cache=폴더 --api=http://127.0.0.1:포트 --poll=ms
 // 저장: <프로필>/_플러그인/.data/upbit-quant/ledger.json(장부 — 포지션·거래·손익 곡선. 비밀값은 없다, 프로필과 함께 동기화) · 봉 캐시는 이 컴퓨터의 ~/.pkm-app/cache/upbit-quant/
 // 모의(paper)와 실제(live)는 장부에서 따로 센다. '실제 돈으로 사기'는 새로 사는 것만 정한다 — 이미 실제로 산 것은 꺼도 실제로 판다.
@@ -41,7 +41,7 @@ const ORDER_KRW = num(args['order-krw'], 10000, 0, 100000000), MAX_POS = Math.ro
 // 이번에 살 금액 — 굴릴 금액을 적었으면 복리((굴릴 금액 + 판 손익) ÷ 칸 수), 아니면 한 번에 살 금액
 const sizing = (db, mode) => E.sizeOf({ budget: BUDGET, orderKrw: ORDER_KRW, maxPos: MAX_POS, fee: FEE,
   realized: E.statsOf(db.trades.filter(t => t.mode === mode)).realized, deployed: Object.values(db.positions).filter(p => p.mode === mode).reduce((a, p) => a + p.cost, 0) });
-const SLIP = num(args.slippage, 0.3, 0, 5), WAIT = num(args.wait, 20, 1, 120), POLL = num(args.poll, 1500, 10, 5000);
+const SLIP = num(args.slippage, 0.5, 0, 5), WAIT = num(args.wait, 20, 1, 120), POLL = num(args.poll, 1500, 10, 5000);
 const FEE = 0.0005;   // 원화 마켓 수수료(모의 거래 계산용. 실제 거래는 업비트가 알려 준 수수료를 쓴다)
 const LATE = 0.25;    // 봉이 닫히고 봉 길이의 이만큼이 지나면 그 매수 신호는 늦은 것으로 본다(1시간봉 15분)
 
@@ -110,6 +110,11 @@ async function bestOf(market){
   if (!u || !(u.ask_price > 0) || !(u.bid_price > 0)) fail(`${E.coinOf(market)} 호가를 받지 못했어요`);
   return { ask: u.ask_price, bid: u.bid_price };
 }
+/* 호가 단위 — 못 받으면 0(허용 슬리피지만 쓴다) */
+async function tickOf(market){
+  try { const r = await up.instruments([market]), t = Number(r && r[0] && r[0].tick_size); return t > 0 ? t : 0; } catch { return 0; }
+}
+const slipText = (signal, tick) => tick > signal * SLIP / 100 ? `허용 ${SLIP}% 또는 호가 한 칸 ${tick >= 1 ? tick.toLocaleString('ko-KR') : String(tick)}원` : `허용 ${SLIP}%`;
 const lateSec = (d, interval) => NOW_SEC - (d.bar + STEP_SEC[interval]);   // 신호 봉이 닫힌 뒤 지난 시간
 
 /* 들고 있는 것을 지금 팔아야 하나 — 전략이 '보유 아님'이거나, 실제 매수가 기준 손절·익절·최대 보유에 닿았다 */
@@ -162,14 +167,14 @@ async function finish(p, { wait, chase }){
     }
     if (o) uuids.push(o.uuid);
     ({ fills, fee } = filled(o));
-    const got = E.fillOf(fills), best = await bestOf(p.market);
+    const got = E.fillOf(fills), best = await bestOf(p.market), tick = p.side === 'bid' ? await tickOf(p.market) : 0;
     let left = false;   // 덜 체결돼 남은 것이 있나
     const body = p.side === 'bid'
       ? (() => { const rest = Math.floor(p.krw - got.funds);
           if (rest < E.MIN_ORDER) return null;
           left = true;
           if (!chase){ notes.push('늦게 확인한 주문이라 나머지는 사지 않았어요'); return null; }
-          if (best.ask > p.signal_price * (1 + SLIP / 100)){ notes.push(`값이 신호가보다 ${E.pct((best.ask / p.signal_price - 1) * 100)} 올라(허용 ${SLIP}%) 나머지는 사지 않았어요`); return null; }
+          if (E.overCap(best.ask, p.signal_price, SLIP, tick)){ notes.push(`값이 신호가보다 ${E.pct((best.ask / p.signal_price - 1) * 100)} 올라(${slipText(p.signal_price, tick)}) 나머지는 사지 않았어요`); return null; }
           return { market: p.market, side: 'bid', ord_type: 'price', price: String(rest), identifier: `${p.pid}m` }; })()
       : (() => { const rest = E.floor8(p.volume - got.volume);
           if (rest <= 0) return null;
@@ -422,8 +427,8 @@ async function order(){
     const d = E.desired(await barsOf(market, entry.interval), entry);
     if (!(d.hold && d.fresh && d.bar === bar)) return pass('사지 않았어요', '신호가 지나갔어요 — 다음 봉이 닫혔거나 조건이 풀렸어요');
     if (lateSec(d, entry.interval) > STEP_SEC[entry.interval] * LATE) return pass('사지 않았어요', `신호가 난 지 ${Math.round(lateSec(d, entry.interval) / 60)}분이 지나 사지 않았어요`, true);
-    const { ask } = await bestOf(market);
-    if (ask > d.price * (1 + SLIP / 100)) return pass('사지 않았어요', `값이 신호가(${E.priceText(d.price)}원)보다 ${E.pct((ask / d.price - 1) * 100)} 올라 사지 않았어요(허용 ${SLIP}%)`, true);
+    const { ask } = await bestOf(market), tick = await tickOf(market);
+    if (E.overCap(ask, d.price, SLIP, tick)) return pass('사지 않았어요', `값이 신호가(${E.priceText(d.price)}원)보다 ${E.pct((ask / d.price - 1) * 100)} 올라 사지 않았어요(${slipText(d.price, tick)})`, true);
     if (mode === 'live'){
       const have = Number(((await up.accounts()).find(a => a.currency === 'KRW') || {}).balance || 0), can = Math.floor(have / (1 + FEE));
       // 복리로 굴릴 때는 계좌 원화가 조금 모자라면 있는 만큼만 산다(절반도 안 되면 사지 않는다). 금액을 정해 둔 때는 그 금액이 안 되면 사지 않는다

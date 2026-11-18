@@ -22,6 +22,7 @@ const upbit = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x'), send = b => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(b)); };
   if (u.pathname === '/v1/market/all') return send([{ market: 'KRW-BTC', korean_name: '비트코인' }]);
   if (u.pathname === '/v1/ticker') return send(u.searchParams.get('markets').split(',').map(m => ({ market: m, trade_price: 90 })));
+  if (u.pathname === '/v1/orderbook/instruments') return send([{ market: u.searchParams.get('markets'), quote_currency: 'KRW', tick_size: '0.1' }]);
   if (u.pathname === '/v1/orderbook') return send([{ orderbook_units: [{ ask_price: M.ask, bid_price: M.bid }] }]);
   if (u.pathname === '/v1/candles/minutes/60'){
     const to = u.searchParams.get('to') ? Date.parse(u.searchParams.get('to')) / 1000 : Infinity;

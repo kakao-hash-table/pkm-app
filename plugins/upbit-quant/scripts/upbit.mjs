@@ -64,6 +64,7 @@ export function client({ access = '', secret = '', base = API, fetchFn = globalT
     /* ---------- 시세 ---------- */
     ticker: markets => call('GET', '/v1/ticker', { markets: markets.join(',') }),
     orderbook: markets => call('GET', '/v1/orderbook', { markets: markets.join(',') }),
+    instruments: markets => call('GET', '/v1/orderbook/instruments', { markets: markets.join(',') }),   // 호가 단위(tick_size)
     markets: () => call('GET', '/v1/market/all', { isDetails: 'false' }),
     /* 닫힌 봉만, 오래된 것부터. since(초)보다 뒤의 봉을 want개까지 — 200개씩 과거로 거슬러 받는다. 거래가 없던 봉은 업비트가 내려주지 않는다 */
     async candles(market, interval, { want = 200, since = 0, now = Date.now() } = {}){

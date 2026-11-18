@@ -162,6 +162,9 @@ export function checkEntry(entry){
 // 주문 가격은 호가창의 값을 그대로 쓴다(호가 단위에 이미 맞는다) — 가격을 직접 계산해 넣지 않는다
 export const floor8 = v => Math.floor(v * 1e8 + 1e-6) / 1e8;
 export const MIN_ORDER = 5000;   // 원화 마켓 최소 주문 금액
+/* 살 수 있는 가장 높은 값 — 신호가 + 허용 슬리피지와 신호가 + 호가 한 칸 중 큰 것(값이 싼 코인은 한 칸이 허용치보다 커서 한 칸만 올라도 못 사게 된다) */
+export const buyCap = (signal, slipPct, tick = 0) => Math.max(signal * (1 + slipPct / 100), signal + (tick > 0 ? tick : 0));
+export const overCap = (ask, signal, slipPct, tick = 0) => { const cap = buyCap(signal, slipPct, tick); return ask - cap > cap * 1e-9; };
 
 /* 이번에 살 금액(수수료 빼고 코인에 들어가는 돈).
    굴릴 금액(budget)이 있으면 복리: 지금 굴리는 돈 = 굴릴 금액 + 지금까지 판 손익. 그 돈을 칸 수(maxPos)로 나눈 만큼씩 사되, 이미 들어가 있는 돈(deployed)을 뺀 남은 돈을 넘지 않는다.

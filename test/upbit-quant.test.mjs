@@ -50,6 +50,7 @@ const server = http.createServer((req, res) => {
     const p = u.pathname;
     if (p === '/v1/market/all') return send(200, [{ market: 'KRW-BTC', korean_name: '비트코인' }, { market: 'KRW-ETH', korean_name: '이더리움' }]);
     if (p === '/v1/ticker') return send(200, u.searchParams.get('markets').split(',').map(m => ({ market: m, trade_price: (M.ask + M.bid) / 2 })));
+    if (p === '/v1/orderbook/instruments') return M.tick ? send(200, [{ market: u.searchParams.get('markets'), quote_currency: 'KRW', tick_size: String(M.tick) }]) : err(404, '404');
     if (p === '/v1/orderbook') return send(200, [{ market: u.searchParams.get('markets'), orderbook_units: [{ ask_price: M.ask, bid_price: M.bid, ask_size: 1, bid_size: 1 }] }]);
     if (p === '/v1/candles/minutes/60'){
       const to = u.searchParams.get('to') ? Date.parse(u.searchParams.get('to')) / 1000 : Infinity;
@@ -92,7 +93,7 @@ let n = 0;
 function world({ keys = true } = {}){
   const dir = path.join(tmp, `w${++n}`), profile = path.join(dir, '개인');
   fs.mkdirSync(profile, { recursive: true }); fs.writeFileSync(path.join(profile, '_설정.md'), '---\ntype: settings\nformat: 1\n---\n');
-  Object.assign(M, { bars: dip(), ask: 90.1, bid: 89.9, krw: 1000000, coins: {}, orders: new Map(), posts: [], fill: 'full', auth: true });
+  Object.assign(M, { bars: dip(), ask: 90.1, bid: 89.9, tick: 0, krw: 1000000, coins: {}, orders: new Map(), posts: [], fill: 'full', auth: true });
   const base = { profile, cache: path.join(dir, 'cache'), api, poll: 20, wait: 1, markets: 'KRW-BTC', strategies: 'disparity', 'order-krw': 10000, 'max-positions': 5, slippage: 0.3 };
   const run = (cmd, a = {}) => new Promise(resolve => execFile(process.execPath, [path.join(PLUGIN, 'scripts/quant.mjs'), cmd, ...Object.entries({ ...base, now: nowAt(M.bars), ...a }).map(([k, v]) => `--${k}=${v}`)],
     { encoding: 'utf8', env: { ...process.env, UPBIT_ACCESS_KEY: keys ? KEY : '', UPBIT_SECRET_KEY: keys ? SECRET : '' } }, (e, stdout) => resolve(JSON.parse(stdout.trim().split('\n').pop()))));
@@ -250,6 +251,24 @@ test('슬리피지 — 값이 신호가보다 허용치 넘게 올랐으면 사�
   const s = await w.run('settle', { pid: o.pid, live: true });
   assert.equal(s.verdict.title, '사지 않았어요'); assert.match(s.verdict.text, /나머지는 사지 않았어요/);
   assert.equal(M.posts.length, 1); assert.equal(M.orders.get('u1').state, 'cancel'); assert.deepEqual(w.ledger().positions, {}); assert.deepEqual(w.ledger().pending, {});
+});
+
+test('슬리피지 — 호가 한 칸까지는 허용치를 넘어도 산다(값이 싼 코인은 한 칸이 허용치보다 크다). 두 칸이면 사지 않는다', async () => {
+  assert.equal(E.overCap(91, 90, 0.3, 1), false); assert.equal(E.overCap(92, 90, 0.3, 1), true);
+  assert.equal(E.overCap(90.27, 90, 0.3, 0), false); assert.equal(E.overCap(90.28, 90, 0.3, 0), true);
+  assert.equal(E.overCap(1.235, 1.234, 0, 0.001), false, '소수 호가 단위도 한 칸은 넘지 않은 것으로 본다');
+  assert.equal(E.overCap(100500, 100000, 0.5, 50), false); assert.equal(E.overCap(100600, 100000, 0.5, 50), true, '한 칸이 허용치보다 작으면 허용치를 쓴다');
+
+  let w = world(); M.tick = 1; M.ask = 91;   // 신호가 90원, 허용 0.3%(90.27원)보다 한 칸(91원)이 크다
+  let sig = await w.run('signals', { live: true });
+  let o = await w.run('order', { ...vars(sig.items[0]), live: true });
+  assert.ok(o.pid); assert.equal(M.posts[0].price, '91');
+
+  w = world(); M.tick = 1; M.ask = 92;
+  sig = await w.run('signals', { live: true });
+  o = await w.run('order', { ...vars(sig.items[0]), live: true });
+  assert.equal(o.pid, ''); assert.match(o.verdict.text, /\+2\.22% 올라 사지 않았어요\(허용 0\.3% 또는 호가 한 칸 1원\)/);
+  assert.equal(M.posts.length, 0);
 });
 
 test('사지 않는 경우 — 늦은 신호, 원화 부족, 포지션 한도, 꺼진 전략', async () => {

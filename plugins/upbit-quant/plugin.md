@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: upbit-quant
 name: 업비트 퀀트
-version: 0.1.5
+version: 0.1.6
 author: pkm
 permissions:
   bundled: [scripts/quant.mjs, scripts/engine.mjs, scripts/upbit.mjs, scripts/indicators.mjs, scripts/strategies.mjs]
@@ -16,7 +16,7 @@ settings:
   - { key: max_positions, label: 동시에 가질 수 있는 수, default: "5", hint: "이만큼 들고 있으면 더 사지 않아요. 굴릴 금액을 적었으면 그 돈을 이 수로 나눠서 사요. 비웠으면 한 번에 살 금액 × 이 수가 운용 한도예요(수익률의 기준)" }
   - { key: markets, label: 볼 코인, type: lines, default: "KRW-BTC\nKRW-ETH\nKRW-XRP\nKRW-ADA\nKRW-XLM", hint: "업비트 원화 마켓 코드를 한 줄에 하나, 20개까지. 기본값은 백테스트에서 전략을 고를 때 쓴 5종목이에요" }
   - { key: strategies, label: 켜 둔 전략, default: "or:keltner-breakout_period20_mult2.5+disparity", hint: "'전략' 탭의 [켜고 끄기]로 바뀌어요. 등록된 전략의 id를 쉼표로 적어요" }
-  - { key: slippage, label: 매수 허용 슬리피지(%), default: "0.3", hint: "지금 값이 신호가 난 봉의 종가보다 이만큼 넘게 올랐으면 사지 않아요. 파는 것은 값과 상관없이 팔아요" }
+  - { key: slippage, label: 매수 허용 슬리피지(%), default: "0.5", hint: "지금 값이 신호가 난 봉의 종가보다 이만큼 넘게 올랐으면 사지 않아요. 다만 호가 한 칸까지는 늘 사요(값이 싼 코인은 한 칸이 이보다 커요). 파는 것은 값과 상관없이 팔아요" }
   - { key: wait_sec, label: 지정가를 기다리는 시간(초), default: "20", hint: "지정가 주문이 이 시간 안에 다 체결되지 않으면 취소하고 시장가로 마저 해요(매수는 허용 슬리피지 안에서만)" }
 ---
 
