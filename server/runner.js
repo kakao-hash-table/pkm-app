@@ -76,6 +76,8 @@ const TAB_RE = /^[\w:.|\-/]{1,160}$/;
 const tabSeg = v => /^[\w.-]{1,48}$/.test(String(v)) ? String(v) : 'h' + crypto.createHash('sha1').update(String(v)).digest('hex').slice(0, 16);
 export const tabKey = (p, id, name) => `${tabSeg(p)}|${id}|${tabSeg(name)}`;
 const LOST = 'AI 서버에서 이 작업을 찾지 못했어요. 이 단계를 다시 해 주세요';
+// 브라우저 단계(접수·제출)가 중간에 끊겼다 — 실패가 아니라 '확인 못 함'. 이미 냈을 수 있으니 다시 하기 전에 사이트에서 먼저 본다(피클07 상태, A4·A6)
+const UNSURE = '브라우저 작업이 중간에 끊겨 어디까지 했는지 확인하지 못했어요. 이미 냈을 수 있으니 사이트에서 먼저 확인한 뒤 다시 해 주세요';
 // 멈춰 둔 넘겨받기에 답했을 때 에이전트에게 하는 말(같은 대화를 이어 간다)
 const RESUME = { done: '사용자가 부탁한 일을 끝냈다고 해요. snapshot으로 화면을 확인하고, 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.', fail: '사용자가 하지 못했다고 해요. 더 진행하지 말고 지금 상태로 결과를 돌려주세요.' };
 const AGAIN_MAX = 5;
@@ -495,7 +497,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
           continue;
         }
         if (j.status === 'error' && safeAgain(d) && ['timeout', 'provider', 'restart'].includes(j.reason) && retryLater(run, step, conf, jobError(j))) return;
-        if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : scrub(jobError(j), my), text: scrub(clip(j.result && (j.result.stdout || j.result.text), 4000), my), finished: now(), ...(web ? { session: undefined } : {}) }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
+        if (j.status !== 'done'){ Object.assign(step, { status: 'failed', error: j.status === 'canceled' ? '취소됐어요' : web && ['timeout', 'restart'].includes(j.reason) ? `${UNSURE} (${scrub(jobError(j), my)})` : scrub(jobError(j), my), unsure: web && ['timeout', 'restart'].includes(j.reason) ? true : undefined, text: scrub(clip(j.result && (j.result.stdout || j.result.text), 4000), my), finished: now(), ...(web ? { session: undefined } : {}) }); Object.assign(run, { status: 'stopped', updated: now() }); return; }
         if (web && j.parked){   // 넘긴 일을 보기 전에 에이전트가 이미 쉬러 갔다 — 알림은 지금 보낸다
           const told = step.told === step.job || !!(step.ask && ASKS.includes(step.ask.type));   // 이 작업에서 넘긴 일을 이미 알렸으면 다시 알리지 않는다(서버가 넘긴 일을 거둔 뒤 쉬러 가는 사이에 봤어도)
           park(run, step, j, my);

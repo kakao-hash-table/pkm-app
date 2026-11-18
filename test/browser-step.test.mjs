@@ -435,6 +435,19 @@ test('멈춰 둔 값 묻기 — 같은 입력창으로 남고, 답하면 알려 
   await until(rid2, r => r.status === 'done', '끝난다');
 });
 
+test('브라우저 단계가 시간 초과로 끊기면 실패가 아니라 \'확인 못 함\'으로 — 다시 하기 전에 사이트에서 먼저 보라고', async () => {
+  reset(); fake.hold = true;
+  try {
+    const rid = await start('cm-2026');
+    let r = await until(rid, r => stepOf(r, '브라우저').status === 'running', '브라우저 단계가 돈다');
+    Object.assign(jobs.get(stepOf(r, '브라우저').job), { status: 'error', reason: 'timeout', error: '30분 안에 끝나지 않았어요', pending: [] });
+    r = await until(rid, r => r.status === 'stopped', '멈춘다');
+    const s = stepOf(r, '브라우저');
+    assert.equal(s.unsure, true); assert.match(s.error, /확인하지 못했어요[\s\S]*30분 안에 끝나지 않았어요/);
+    assert.equal(s.retries, undefined, '쓰는 단계는 알아서 다시 하지 않는다');
+  } finally { fake.hold = false; }
+});
+
 test('사람이 보는 브라우저 — 이 플러그인의 탭만 중계한다', async () => {
   reset();
   const st = await runner.browser(P, ID, 'info', '');

@@ -4643,6 +4643,7 @@ function plRunLine(x, r){
   if (r.status === 'waiting') return s.reason === 'limit' ? `AI 한도 · ${s.until ? plTime(new Date(s.until).toISOString()) + '에 이어서' : '풀리면 이어서'}` : s.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중';
   if (r.gone && plMine(r)) return '목록에서 빠졌어요 · 할당이 풀렸거나 끝났을 수 있어요';
   if (r.status === 'input') return s.ask && s.ask.type === 'gate' ? `${s.name} 하기 전에 확인해 주세요` : s.ask && s.ask.type === 'confirm' ? '확인할 결과가 있어요' : (s.ask && s.ask.question) || '답이 필요해요';
+  if (r.status === 'stopped' && s.unsure) return `${i}단계 · 됐는지 확인하지 못했어요 — 사이트에서 먼저 확인`;
   if (r.status === 'stopped') return `${i}단계에서 멈춤 · ${String(s.error || '').split('\n')[0]}`;
   if (r.status === 'done') return `${plTime(r.finished || r.updated)}에 끝남`;
   return r.note || plTime(r.updated);
@@ -4971,7 +4972,7 @@ function plInlineFeed(id, x, f){
     else if (r.status === 'input' && s.ask && s.ask.type === 'gate'){ tone = 'wait'; head = `${esc(s.name)} 하기 전에 확인해 주세요`; body = '<span>자동 시작에서 이 단계는 내 확인을 받게 해 뒀어요</span>';
       acts = `<button class="btn btn-primary btn-sm" type="button" data-pl="confirm" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}" data-msg="이어서 해요">이 단계 하기</button>`; }
     else if (r.status === 'input'){ tone = 'wait'; head = esc((s.ask && s.ask.question) || '답이 필요해요'); acts = `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/run/${r.id}">답하러 가기</a>`; }
-    else if (r.status === 'stopped'){ tone = 'bad'; head = `${esc(s.name)}에서 멈췄어요`; body = `<span>${esc(String(s.error || '').split('\n')[0])}</span>`;
+    else if (r.status === 'stopped'){ tone = 'bad'; head = s.unsure ? `${esc(s.name)} — 됐는지 확인하지 못했어요` : `${esc(s.name)}에서 멈췄어요`; body = `<span>${esc(String(s.error || '').split('\n')[0])}</span>`;
       acts = plIsRunner() || plRunner() ? `<button class="btn btn-primary btn-sm" type="button" data-pl="restart" data-id="${id}" data-run="${r.id}" data-step="${esc(r.steps[0].key)}">처음부터 다시</button>${plUnfilled(s) ? `<button class="btn btn-ghost btn-sm" type="button" data-pl="lenient" data-id="${id}" data-run="${r.id}" data-step="${esc(s.key)}">빈 값은 두고 이어 하기</button>` : ''}` : ''; acts += multi; }
     else if (r.status === 'done'){ tone = 'done'; head = `끝 · ${plTime(r.finished || r.updated)}`; acts = multi; }
     const more = r && !stale ? `<a class="btn btn-text btn-sm" href="#/plugins/${id}/run/${r.id}">자세히</a>` : '';
@@ -5291,7 +5292,7 @@ function vPluginRun(id, rid){
   }
   else if (r.status === 'stopped'){
     const token = /토큰/.test(s.error || ''), ap = /준비와 설정에서 다시 승인/.test(s.error || '');
-    card = ['bad', token ? '토큰을 다시 넣어 주세요' : `${i}단계 ${esc(s.name)}에서 멈췄어요`, esc(String(s.error || '').split('\n')[0]),
+    card = ['bad', token ? '토큰을 다시 넣어 주세요' : s.unsure ? `${i}단계 ${esc(s.name)} — 됐는지 확인하지 못했어요` : `${i}단계 ${esc(s.name)}에서 멈췄어요`, esc(String(s.error || '').split('\n')[0]),
       // 앞 단계 결과가 빈 것(채우지 못한 값) — 이 단계만 다시 하면 또 멈춘다. 처음부터 다시가 먼저, 빈 값은 두고 이어 가는 길도 준다
       plUnfilled(s) ? `${restart('btn-primary')}${btn('lenient', '빈 값은 두고 이어 하기')}${btn('skip', '건너뛰기')}${cancel}`
       : `${token ? (here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">토큰 넣기</a>` : `<span class="faint">${esc(plRunner() || '돌리는 컴퓨터')}에서 넣어 주세요</span>`) : ap && here ? `<a class="btn btn-primary btn-sm" href="#/plugins/${id}/setup">준비와 설정 열기</a>${btn('retry', '이 단계 다시 하기')}` : btn('retry', '이 단계 다시 하기', 'btn-primary')}
