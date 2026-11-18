@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: github-reviews
 name: 코드 리뷰
-version: 0.2.1
+version: 0.3.0
 author: pkm
 permissions:
   ai: [chat]

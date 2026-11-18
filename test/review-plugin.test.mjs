@@ -109,6 +109,17 @@ test('decide: 범주 밖·확신 낮은·diff에 없는 파일은 버리고, 남
   assert.ok(bad.ask.choices.find(c => c.value === 'approve').confirm);
 });
 
+test('decide: 큰 문제 목록이 파일(@file:)로 와도 읽고, block인데 목록이 없으면 승인을 권하지 않고, AI가 본 범위를 보인다', async () => {
+  const lines = JSON.stringify({ 'src/A.tsx': [[11, 12]] }), f = path.join(T, 'findings.json');
+  fs.writeFileSync(f, JSON.stringify([{ path: 'src/A.tsx', start_line: 11, end_line: 11, category: 'logic', title: '조건이 뒤집힘', scenario: '로그인한 사람이 막혀요', comment: '조건을 뒤집어 주세요.', confidence: 0.9 }]));
+  const viaFile = await runScript(['decide', '--repo=o/web', '--number=7', `--head=${GH.head}`, '--verdict=block', '--summary=요약', `--findings=@file:${f}`, `--lines=${lines}`, '--truncated=false', '--scope=파일 3개를 봐요 · 1개 뺌', '--rules=API는 services에서만\n이름은 영어로']);
+  assert.equal(viaFile.verdict.tone, 'bad'); assert.equal(viaFile.findings.length, 1, '파일로 온 목록을 읽었다');
+  assert.match(viaFile.verdict.text, /AI가 본 범위: 파일 3개를 봐요 · 1개 뺌 · 팀 기준 2개 함께 봄/);
+  const lost = await runScript(['decide', '--repo=o/web', '--number=7', `--head=${GH.head}`, '--verdict=block', '--summary=요약', '--findings=', `--lines=${lines}`, '--truncated=false']);
+  assert.equal(lost.verdict.tone, 'bad'); assert.equal(lost.ask.choices.find(c => c.value === 'approve').recommended, undefined, '승인을 권하지 않는다');
+  assert.ok(lost.ask.choices.find(c => c.value === 'approve').confirm);
+});
+
 test('목록 → AI 검토 → 큰 문제 없음 → 승인은 검토한 커밋에, 끝나면 diff는 상태에서 지운다', async () => {
   await runner.act(P, ID, { type: 'refresh', feed: FEED });
   const items = (await state()).feeds[FEED].items;

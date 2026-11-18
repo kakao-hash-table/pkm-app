@@ -1156,7 +1156,7 @@ body.has-chat-fab main{padding-bottom:120px}
 .pl-hide-row{display:flex;align-items:stretch}.pl-hide-row>.row{flex:1;min-width:0}
 .pl-x{flex:none;width:48px;border:0;background:none;color:var(--text-2);font-size:1.375rem;line-height:1;cursor:pointer;border-radius:var(--r-md)}.pl-x:hover{color:var(--text);background:var(--s-wait-bg)}
 .pl-every{display:flex;flex-direction:column;gap:12px}.pl-every-all{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;padding-bottom:12px;border-bottom:1px solid var(--line)}.pl-every-all .field{margin:0}.pl-every select{max-width:260px}
-.pl-gates{display:flex;flex-direction:column;gap:12px;margin-top:12px}.pl-feats{display:flex;flex-direction:column;gap:12px}.pl-feat{align-items:flex-start}.pl-feat span{display:flex;flex-direction:column;gap:2px}.pl-gate-list{list-style:none;margin:0;padding:0;background:var(--surface);border-radius:var(--r-lg)}
+.pl-gates{display:flex;flex-direction:column;gap:12px;margin-top:12px}.pl-feats{display:flex;flex-direction:column;gap:12px}.pl-bulk{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;margin:0 0 12px;background:var(--surface);border-radius:var(--r-lg)}.pl-feat{align-items:flex-start}.pl-feat span{display:flex;flex-direction:column;gap:2px}.pl-feat small{font-weight:400;line-height:1.5}.pl-gate-list{list-style:none;margin:0;padding:0;background:var(--surface);border-radius:var(--r-lg)}
 .pl-gate-list li{display:flex;flex-wrap:wrap;gap:4px 16px;justify-content:space-between;align-items:center;min-height:48px;padding:8px 20px;border-bottom:1px solid var(--line)}.pl-gate-list li:last-child{border-bottom:0}.pl-gate-name{font-weight:600}
 .pl-upd{margin:0 0 12px}.pl-changes{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.pl-changes li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pl-changes code{overflow-wrap:anywhere;font-size:.8125rem}
 .pl-start-row{align-items:center;flex-wrap:wrap}.pl-start-row .title{color:inherit;text-decoration:none}.pl-start-row .title:hover{text-decoration:underline}
@@ -4984,7 +4984,28 @@ function plInlineFeed(id, x, f){
     </li>`;
   };
   const list = rows.length ? `<ul class="list pl-ilist">${rows.map(row).join('')}</ul>` : fs_.at || fs_.ok ? `<p class="faint">${esc(f.empty || '비어 있어요')}</p>` : '';
-  return section(`${esc(f.name)}${rows.length ? ` <span class="count">${rows.filter(z => !z.gone).length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${err}${f.search && rows.length ? plFindBox(id, f, rows.map(z => plFindText(z.it))) : ''}${list}`);
+  const bulk = plBulk(id, f, runs, rows);
+  return section(`${esc(f.name)}${rows.length ? ` <span class="count">${rows.filter(z => !z.gone).length}</span>` : ''}`, `${f.description ? `<p class="faint" style="margin:-4px 0 12px">${esc(f.description)}</p>` : ''}${err}${bulk}${f.search && rows.length ? plFindBox(id, f, rows.map(z => plFindText(z.it))) : ''}${list}`);
+}
+
+// 주소 끝 두세 마디(저장소/번호 등) — 제목이 같은 항목을 가르는 데 쓴다
+const plShortUrl = u => { try { const p = new URL(u).pathname.split('/').filter(Boolean); return p.length > 3 ? `${p[p.length - 3]}#${p[p.length - 1]}` : p.join('/'); } catch { return ''; } };
+// 추천대로 한 번에 — 같은 단계가 같은 추천 답(예: 큰 문제 없음 → 승인하기)을 기다리는 작업이 둘 이상이면 목록 위에 버튼 하나로 모은다.
+// 바깥에 남는 일일 수 있어 누르면 무엇을 몇 개 하는지 한 번 묻는다
+function plBulk(id, f, runs, rows){
+  if (!(plIsRunner() || plRunner())) return '';
+  const live = new Set(rows.filter(z => !z.gone).map(z => z.it.id)), groups = new Map(), seen = new Set();
+  for (const r of runs){   // 새것이 앞 — 항목마다 목록 줄이 보이는 최근 실행 하나만
+    if (r.status === 'canceled' || seen.has(r.item.id)) continue;
+    seen.add(r.item.id);
+    if (r.status !== 'input' || PL.picked[r.id] || PL.sent[r.id] || !live.has(r.item.id)) continue;
+    const s = plStepNow(r), c = s && s.status === 'input' && s.ask && s.ask.inline && (s.ask.choices || []).find(z => z.recommended);
+    if (!c) continue;
+    const k = `${s.key}\u0000${c.value}`;
+    if (!groups.has(k)) groups.set(k, { step: s.key, value: c.value, label: c.label, runs: [] });
+    groups.get(k).runs.push(r);
+  }
+  return [...groups.values()].filter(g => g.runs.length > 1).map(g => `<div class="pl-bulk"><span>추천대로 할 것 <b class="num">${g.runs.length}개</b> · ${esc(g.label)}</span><button class="btn btn-primary btn-sm" type="button" data-pl="bulk" data-id="${id}" data-step="${esc(g.step)}" data-value="${esc(g.value)}" data-label="${esc(g.label)}" data-runs="${esc(g.runs.map(r => r.id).join(','))}" data-titles="${esc(g.runs.map(r => g.runs.filter(z => z.item.title === r.item.title).length > 1 ? `${r.item.title} · ${plShortUrl(r.item.url)}` : r.item.title).join('\n'))}">${g.runs.length}개 한 번에 ${esc(g.label)}</button></div>`).join('');
 }
 
 /* 플러그인 화면 — 피드 섹션, 작업을 돌리는 플러그인은 내 차례·진행 중·시작 전·끝난 작업 */
@@ -5385,13 +5406,13 @@ function vPluginSetup(id){
       <p class="faint">자동으로 시작한 작업에서 체크한 단계는 <b>하기 전에 내 차례로 멈춰요</b>. 나머지는 자동으로 해요. [시작하기]로 직접 시작한 작업은 멈추지 않아요.</p>
       <ol class="pl-gate-list">${autoWf.steps.map((s, k) => s.kind === 'manual'
         ? `<li><span class="pl-gate-name">${k + 1} ${esc(s.name)}</span><span class="faint">항상 내가 해요</span></li>`
-        : `<li><span class="pl-gate-name">${k + 1} ${esc(s.name)} <span class="faint">${KIND[s.kind] || ''}</span></span><label class="check"><input type="checkbox" name="g" value="${esc(`${autoWf.name}|${s.key}`)}" ${(x.local.gates || {})[`${autoWf.name}|${s.key}`] ? 'checked' : ''}><span>하기 전에 내 확인</span></label></li>`).join('')}</ol>
+        : `<li><span class="pl-gate-name">${k + 1} ${esc(s.name)} <span class="faint">${KIND[s.kind] || ''}</span></span><label class="check opt"><input type="checkbox" name="g" value="${esc(`${autoWf.name}|${s.key}`)}" ${(x.local.gates || {})[`${autoWf.name}|${s.key}`] ? 'checked' : ''}><span>하기 전에 내 확인</span></label></li>`).join('')}</ol>
       <div><button class="btn btn-ghost" type="submit">단계 저장하기</button></div></form>`;
   // 자동화 기능 — 실행기가 알아서 해 주는 것(server/features.js). 기능마다 끄고 켠다. 돌리는 컴퓨터에서만
   const feats = (PL.st && PL.st.features) || [], fon = (x && x.local && x.local.features) || {};
   const featBody = !feats.length || !x || !x.workflows.length || elsewhere ? '' : `<form data-pl-form="features" data-id="${id}" novalidate class="pl-feats">
       <p class="faint">켜 둔 기능은 이 플러그인의 작업에서 알아서 해요. 끄면 그 부분은 예전처럼 사람이 해요.</p>
-      ${feats.map(f => `<label class="check pl-feat"><input type="checkbox" name="f" value="${esc(f.key)}" ${fon[f.key] !== false ? 'checked' : ''}><span><b>${esc(f.label)}</b>${f.hint ? `<small class="faint">${esc(f.hint)}</small>` : ''}</span></label>`).join('')}
+      ${feats.map(f => `<label class="check opt pl-feat"><input type="checkbox" name="f" value="${esc(f.key)}" ${fon[f.key] !== false ? 'checked' : ''}><span><b>${esc(f.label)}</b>${f.hint ? `<small class="faint">${esc(f.hint)}</small>` : ''}</span></label>`).join('')}
       <div><button class="btn btn-ghost" type="submit">기능 저장하기</button></div></form>`;
   // AI 챗봇: 같은 컴퓨터의 pkm-ai-server인지, full 모드·동시 실행 수
   const cst = plChat(id) && CH.st && CH.st.plugin ? CH.st : null;
@@ -5670,6 +5691,17 @@ document.addEventListener('click', async e => {
     case 'choose': {   // 목록 줄의 선택지 버튼 — 고른 자리에 '하는 중'을 두고 보낸다. 선택지에 confirm 말이 있으면 한 번 더 묻는다
       const send = () => { if (b.dataset.find) (PL.fq[run] ||= {})[b.dataset.value] = Date.now(); else PL.picked[run] = b.dataset.label; render(); plAct(id, { type:'answer', run, step, value:b.dataset.value }); };
       if (b.dataset.confirm) plAsk({ title:`${b.dataset.label} — 진행할까요?`, body:`<p>${esc(b.dataset.confirm)}</p>`, ok:b.dataset.label, danger:true }, send); else send();
+      break;
+    }
+    case 'bulk': {   // 추천대로 한 번에 — 무엇을 몇 개 하는지 보이고 한 번 묻는다
+      const ids = b.dataset.runs.split(',').filter(Boolean), titles = b.dataset.titles.split('\n'), label = b.dataset.label;
+      plAsk({ title:`${ids.length}개 모두 ${label} — 진행할까요?`, body:`<p>AI가 추천한 답이에요. 하나씩 차례로 보내요.</p><ul class="pl-ol">${titles.slice(0, 20).map(t => `<li>${esc(t)}</li>`).join('')}${titles.length > 20 ? `<li>그 밖 ${titles.length - 20}개</li>` : ''}</ul>`, ok:`${ids.length}개 ${label}`, danger:true }, async () => {
+        for (const r of ids) PL.picked[r] = label;
+        render();
+        let ok = 0;
+        for (const r of ids){ try { const res = await papi(`/plugins/${id}/act`, { type:'answer', run:r, step:b.dataset.step, value:b.dataset.value }); if (!res.applied) PL.sent[r] = Date.now(); ok++; } catch (er) { delete PL.picked[r]; } }
+        await plLoad(true); render(); toast(ok === ids.length ? `${ok}개를 보냈어요 · ${label}` : `${ok}개 보냈고 ${ids.length - ok}개는 못 보냈어요`);
+      });
       break;
     }
     case 'confirm': plAct(id, { type:'confirm', run, step }, b.dataset.msg || '끝난 것으로 옮겼어요'); break;
