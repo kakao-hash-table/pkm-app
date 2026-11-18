@@ -19,6 +19,9 @@ export const FEATURES = [
   { key: 'auto_update', label: 'pkm에 들어 있는 플러그인은 알아서 업데이트하기',
     hint: '새 버전이 오면 이 컴퓨터가 30분 안에 업데이트하고, 전에 승인했으면 다시 승인해요. 설치본을 손으로 고쳤거나 권한(AI·브라우저·토큰)이 늘면 지금처럼 직접 살펴보고 업데이트해요',
     default: true },
+  { key: 'daily_cap', label: '하루 AI 사용 상한 지키기',
+    hint: '이 플러그인이 하루에 AI 작업을 150번 넘게 보내면 다음 날까지 멈추고 알려요. 되풀이가 고장 나 사용량이 새는 것을 막아요',
+    default: true },
 ];
 const BY = new Map(FEATURES.map(f => [f.key, f]));
 

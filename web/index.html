@@ -4638,6 +4638,7 @@ function plRunLine(x, r){
   const s = plStepNow(r), i = r.steps.indexOf(s) + 1, n = r.steps.length;
   if (r.status === 'queued'){ const ahead = (x.state.runs || []).filter(z => z !== r && (['running', 'waiting'].includes(z.status) || (z.status === 'queued' && z.created < r.created))).length; /* 내 답을 기다리는 작업은 다음 차례를 막지 않는다 */ return ahead ? `앞에 ${ahead}개` : '곧 시작해요'; }
   if (r.status === 'running') return `${i}/${n} ${s.name} · ${plMin(s.started || r.updated)}분째`;
+  if (r.status === 'waiting' && s.reason === 'cap') return '오늘 AI 상한 · 내일 이어서';
   if (r.status === 'waiting' && s.reason === 'retry') return `잠깐 실패 · ${s.until ? plTime(new Date(s.until).toISOString()) + '에 ' : ''}다시 해요 (${s.retries || 1}/3)`;
   if (r.status === 'waiting') return s.reason === 'limit' ? `AI 한도 · ${s.until ? plTime(new Date(s.until).toISOString()) + '에 이어서' : '풀리면 이어서'}` : s.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중';
   if (r.gone && plMine(r)) return '목록에서 빠졌어요 · 할당이 풀렸거나 끝났을 수 있어요';
@@ -5268,6 +5269,7 @@ function vPluginRun(id, rid){
   else if (r.status === 'queued') card = ['wait', '차례를 기다려요', esc(plRunLine(x, r)), cancel];
   else if (r.status === 'running' && s.phase === 'review') card = ['wait', `${i}/${n} ${esc(s.name)} — 답을 한 번 더 검토하는 중이에요`, '작업 과정을 모르는 AI가 요청과 결과만 보고 채점해요. 짚은 점이 있으면 한 번 다시 만들어요', cancel];
   else if (r.status === 'running') card = ['wait', `${i}/${n} ${esc(s.name)} 하는 중이에요`, `${plMin(s.started || r.updated)}분째 · ${s.kind === 'browser' ? '이 창' : '브라우저'}을 닫아도 ${esc(plWho())}에서 계속해요`, cancel];
+  else if (r.status === 'waiting' && s.reason === 'cap') card = ['wait', '오늘 AI 사용 상한에 걸려 쉬어요', '이 플러그인이 오늘 AI를 정해 둔 만큼 써서 내일 0시가 지나면 이어서 해요. 상한은 [준비와 설정 › 자동화 기능]에서 끌 수 있어요.', cancel];
   else if (r.status === 'waiting' && s.reason === 'retry') card = ['wait', `${esc(s.name)} — 잠깐 실패해서 다시 할게요`, `${s.until ? plTime(new Date(s.until).toISOString()) + '에 ' : '곧 '}알아서 다시 해요 (${s.retries || 1}/3번째)${s.retry_why ? ` · ${esc(s.retry_why)}` : ''}. 손댈 것은 없어요.`, cancel];
   else if (r.status === 'waiting') card = ['wait', s.reason === 'limit' ? 'AI 사용 한도로 기다려요' : s.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중이에요', s.until ? `${plTime(new Date(s.until).toISOString())}에 이어서 해요` : '풀리면 이어서 해요', cancel];
   else if (r.status === 'input' && s.ask && s.ask.type === 'gate') card = ['wait', `${i}/${n} ${esc(s.name)} 차례예요`, '자동 시작에서 이 단계는 하기 전에 내 확인을 받게 해 뒀어요. 확인하면 이 단계부터 이어서 해요.',

@@ -205,3 +205,23 @@ test('pkm에 들어 있는 플러그인은 새 버전이 오면 알아서 업데
   await runner.tick();
   assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, '0.0.1');
 });
+
+test('하루 AI 상한 — 넘으면 AI 단계를 내일까지 기다리고 한 번 알린다(끄면 그대로 한다)', async () => {
+  const sf = path.join(DATA, P, '_플러그인/.state', `${ID}.json`), d = new Date(), day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const st0 = JSON.parse(fs.readFileSync(sf, 'utf8')); for (const r of st0.runs) if (!['done', 'canceled'].includes(r.status)) r.status = 'canceled';
+  st0.ai_day = { d: day, n: 150 }; fs.writeFileSync(sf, JSON.stringify(st0));
+  notified.length = 0; process.env.LIST_ITEMS = 'A-1';
+  try {
+    await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
+    const rid = (await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', workflow: '처리' })).state.runs[0].id;
+    for (let i = 0; i < 3; i++) await runner.tick();
+    const r = (await runner.status(P)).plugins[ID].state.runs.find(z => z.id === rid);
+    assert.equal(r.status, 'waiting'); assert.equal(r.steps[0].reason, 'cap'); assert.ok(r.steps[0].until > Date.now());
+    await new Promise(z => setTimeout(z, 20));
+    assert.equal(notified.filter(n => /상한|150번/.test(n.title)).length, 1);
+    await runner.setLocal(P, ID, { features: { daily_cap: false } });
+    const st1 = JSON.parse(fs.readFileSync(sf, 'utf8')); st1.runs.find(z => z.id === rid).steps[0].until = Date.now() - 1; fs.writeFileSync(sf, JSON.stringify(st1));
+    for (let i = 0; i < 4; i++){ await runner.tick(); await new Promise(z => setTimeout(z, 10)); }
+    assert.notEqual((await runner.status(P)).plugins[ID].state.runs.find(z => z.id === rid).steps[0].reason, 'cap', '끄면 그대로 한다');
+  } finally { await runner.setLocal(P, ID, { features: { daily_cap: true } }); delete process.env.LIST_ITEMS; }
+});

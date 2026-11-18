@@ -404,6 +404,10 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       const d = def.steps.find(s => s.key === step.key) || {};
       if (step.status === 'input') return;   // 사람 답을 기다린다
       if (step.status === 'failed'){ run.status = 'stopped'; return; }
+      if (step.status === 'waiting' && step.reason === 'cap'){   // 하루 AI 상한에 걸려 기다리는 중 — 날이 바뀌면
+        if (step.until > Date.now()){ run.status = 'waiting'; return; }
+        Object.assign(step, { status: 'pending', reason: null, until: null });
+      }
       if (step.status === 'waiting' && step.reason === 'retry'){   // 잠깐 실패해 기다리는 중 — 때가 되면 이 단계를 처음부터
         if (step.until > Date.now()){ run.status = 'waiting'; return; }
         Object.assign(step, { status: 'pending', reason: null, until: null });
@@ -421,7 +425,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         if (run.by === 'auto' && !step.gate_ok && conf.gates && conf.gates[gateKey(run.workflow, step.key)]){
           Object.assign(step, { status: 'input', ask: { type: 'gate', question: `${step.name} — 지금 할까요?` }, started: now() }); Object.assign(run, { status: 'input', updated: now() }); return;
         }
-        try { step.job = await startStep(conn, x, run, step, d, settings, p); Object.assign(step, { status: 'running', started: now(), error: null }); }
+        if (d.kind !== 'script' && overCap(p, x, st, conf, run, step)) return;   // 하루 AI 상한 — 다음 날까지 기다린다
+        try { step.job = await startStep(conn, x, run, step, d, settings, p); Object.assign(step, { status: 'running', started: now(), error: null }); if (d.kind !== 'script') countAI(st); }
         catch (e) {
           if (e.status !== 400 && (!e.status || e.status >= 500 || e.status === 429 || transient(e.message)) && retryLater(run, step, conf, e.message)) return;   // 시작도 못 했다 — 다시 해도 안전하다
           Object.assign(step, { status: 'failed', error: clip(e.message, 500), finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); return;
@@ -550,7 +555,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         }
         if (out && Array.isArray(out.forget)) forgetAnswers(run, step, out.forget);
         if (d.kind === 'ai' && !step.reviewed && !(out && out.error) && featureOn(conf, 'ai_review')){   // 독립 검토를 맡기고 결과는 그때까지 붙잡아 둔다
-          const rj = await reviewJob(conn, x, step.job, out, text).catch(() => null);
+          const rj = overCap(p, x, st, conf, run, step) ? null : await reviewJob(conn, x, step.job, out, text).catch(() => null);
+          if (rj) countAI(st);
+          else if (step.status === 'waiting') { Object.assign(step, { status: 'done', output: out, text, finished: now(), session: j.result.session || undefined, until: null, reason: null }); Object.assign(run, { status: 'running', updated: now() }); continue; }   // 상한이면 검토 없이 끝
           if (rj){ Object.assign(step, { job: rj, phase: 'review', draft: { out, text, session: j.result.session || undefined } }); run.updated = now(); return; }
         }
         if (step.revised && step.reviewed && step.reviewed.after === undefined) step.reviewed = { ...step.reviewed, after: true };   // 짚은 점을 붙여 다시 만든 답
@@ -698,6 +705,17 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
      AI 단계가 답을 내면, 작업 과정을 보지 않는 다른 AI가 [요청]과 [결과]만 보고 예/아니오로 채점한다(생성과 검증을 나눈다).
      짚은 점이 있으면 그 점을 붙여 한 번만 다시 만든다. 검토가 안 되면(서버 재시작으로 요청을 잊음·검토 실패) 막지 않고 그대로 쓴다 */
   let loginToldAt = 0;   // AI 로그인 풀림을 마지막으로 알린 때(같은 일로 여러 번 깨우지 않게)
+  /* 하루 AI 상한(자동화 기능 daily_cap) — 플러그인마다 하루에 AI 작업(단계·검토)을 몇 번까지 보낼지. 되풀이가 고장 나도 사용량이 새지 않게(교과서 편의11 상한) */
+  const CAP = Number(process.env.PKM_DAILY_AI_CAP || 150), today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const countAI = st => { const d = today(); if (!st.ai_day || st.ai_day.d !== d) st.ai_day = { d, n: 0 }; st.ai_day.n++; };
+  function overCap(p, x, st, pc, run, step){
+    if (!featureOn(pc, 'daily_cap') || !st.ai_day || st.ai_day.d !== today() || st.ai_day.n < CAP) return false;
+    const next = new Date(); next.setHours(24, 5, 0, 0);
+    Object.assign(step, { status: 'waiting', reason: 'cap', until: next.getTime() }); Object.assign(run, { status: 'waiting', updated: now() });
+    if (!st.ai_day.told){ st.ai_day.told = true;
+      Promise.resolve().then(() => onNotify(p, { plugin: x.id, name: x.manifest.name, title: `오늘 AI를 ${CAP}번 써서 멈췄어요`, text: '내일 0시가 지나면 이어서 해요. 너무 자주 돈다면 플러그인을 살펴봐 주세요', run: run.id })).catch(() => {}); }
+    return true;
+  }
   const asked = new Map();   // AI 작업 id → 보낸 요청(메모리에만 — 서버를 다시 켜면 그 단계는 검토 없이 끝난다)
   const REVIEW_SCHEMA = { type: 'object', properties: { pass: { type: 'boolean' }, issues: { type: 'array', items: { type: 'string' } } }, required: ['pass', 'issues'] };
   const squeeze = (t, n) => { t = String(t || ''); return t.length > n ? `${t.slice(0, n * 0.7)}\n…(가운데 ${t.length - n}자 줄임)…\n${t.slice(-n * 0.3)}` : t; };
