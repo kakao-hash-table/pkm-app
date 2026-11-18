@@ -49,10 +49,12 @@ export function detect(dir, want){
 }
 
 // .nvmrc·.node-version → ~/.nvm/versions/node 에서 맞는 가장 높은 버전. 딱 맞는 게 없으면 같은 주 버전(24.11.1 → 24.22.1)
+// 둘 다 없으면 package.json의 engines.node(">=24", "^24.11", "24.x")의 주 버전으로 — 맞지 않는 node로 띄워 바로 멈추지 않게
 export function nodeFor(dir){
   const f = ['.nvmrc', '.node-version'].map(n => path.join(dir, n)).find(f => fs.existsSync(f));
-  if (!f) return null;
-  const want = (fs.readFileSync(f, 'utf8').trim().split(/\s+/)[0] || '').replace(/^v/, '');
+  const eng = !f && String(((readJSON(path.join(dir, 'package.json')) || {}).engines || {}).node || '').match(/(\d+)(?:\.(\d+))?/);
+  if (!f && !eng) return null;
+  const want = f ? (fs.readFileSync(f, 'utf8').trim().split(/\s+/)[0] || '').replace(/^v/, '') : eng[1];
   const root = path.join(os.homedir(), '.nvm', 'versions', 'node');
   let vs = []; try { vs = fs.readdirSync(root).filter(v => /^v\d+\.\d+\.\d+$/.test(v)); } catch {}
   const num = v => v.slice(1).split('.').map(Number), parts = want.split('.').map(Number);

@@ -87,6 +87,13 @@ test('node 버전: .nvmrc·.node-version을 ~/.nvm 버전에 맞춘다', () => {
   assert.deepEqual(nv('.nvmrc', '22'), { want: '22', version: null, bin: null });
   assert.equal(nv('.nvmrc', 'lts/*').version, null);
   assert.equal(dev.nodeFor(project('nv-none', { 'package.json': {} })), null);
+  assert.equal(dev.nodeFor(project('nv-eng', { 'package.json': { engines: { node: '>=20.9' } } })).version, '20.11.1', '.nvmrc가 없으면 engines.node의 주 버전으로');
+  assert.equal(dev.nodeFor(project('nv-eng2', { 'package.json': { engines: { node: '^18' } }, '.nvmrc': '20' })).version, '20.11.1', '.nvmrc가 먼저');
+});
+
+test('devserver.mjs는 개발 도구와 FE 프로젝트가 똑같은 사본을 갖는다(한쪽만 고치지 않게)', () => {
+  const read = id => fs.readFileSync(new URL(`../plugins/${id}/scripts/devserver.mjs`, import.meta.url), 'utf8');
+  assert.equal(read('fe-projects'), read('dev-tools'));
 });
 
 test('projects.mjs와 devserver.mjs의 공통 코드가 같다', () => {
@@ -284,6 +291,22 @@ test('띄우기 한 번에(up): 묻지 않고 넘겨받은 명령·빈 포트로
   assert.equal(again.port, want);
   await run('devserver.mjs', 'stop', `--path=${d}`);
   pid = null;
+});
+
+test('띄우기(up): 패키지를 아직 안 받은 프로젝트는 먼저 받고 띄운다', { timeout: 120000 }, async () => {
+  const d = project('need-install', {
+    'package.json': { name: 'need-install', scripts: { dev: 'node server.js' }, dependencies: { local: 'file:./local' } },
+    'local/package.json': { name: 'local', version: '1.0.0' },
+    'server.js': "require('local/package.json'); require('http').createServer((q, s) => s.end('ok')).listen(Number(process.env.PORT));"
+  });
+  let pid = null;
+  after(() => { if (pid) try { process.kill(-pid, 'SIGKILL'); } catch {} });
+  const up = await run('devserver.mjs', 'up', `--path=${d}`, '--command=npm run dev');
+  pid = up.pid;
+  assert.ok(up.url, JSON.stringify(up));
+  assert.ok(fs.existsSync(path.join(d, 'node_modules', 'local')), '먼저 받았다');
+  assert.match(fs.readFileSync(up.log, 'utf8'), /node_modules가 없어 먼저 받아요/);
+  await run('devserver.mjs', 'stop', `--path=${d}`); pid = null;
 });
 
 test('개발 서버: 바로 죽으면 기록 끝을 보여 준다', { timeout: 60000 }, async () => {

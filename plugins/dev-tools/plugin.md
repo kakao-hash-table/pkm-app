@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: dev-tools
 name: 개발 도구
-version: 0.5.0
+version: 0.6.0
 author: pkm
 permissions:
   ai: [agent]
