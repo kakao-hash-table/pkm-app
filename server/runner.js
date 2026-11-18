@@ -859,10 +859,43 @@ ${squeeze(result, 12000)}`;
   }
 
   /* ---------- 한 차례 ---------- */
+  /* ---------- pkm에 들어 있는 플러그인은 알아서 업데이트(자동화 기능 auto_update) ----------
+     출처가 이 앱의 plugins/ 폴더(서버 코드와 같은 저장소)이고, 설치본을 손으로 고치지 않았고, 권한(AI·모드·브라우저·비밀값·등록 스크립트)이 늘지 않았고,
+     도는 작업이 없을 때만. 전에 승인했으면 다시 승인한다(파일 지문이 바뀌므로). 권한이 늘면 지금처럼 사람이 [살펴보고 업데이트]로 본다 */
+  const updAt = new Map(), UPD_EVERY = Number(process.env.PKM_AUTO_UPDATE_MS || 30 * 60000);
+  const permsOf = mf => { const pr = (mf && mf.permissions) || {};
+    return { ai: new Set(pr.ai || []), mode: ['read', 'auto', 'full'].indexOf(pr.agent_mode || 'read'), browser: !!pr.browser, secrets: new Set((pr.secrets || []).map(z => typeof z === 'string' ? z : z && z.name)), scripts: new Set(pr.scripts || []) }; };
+  const widened = (a, b) => { const o = permsOf(a), n = permsOf(b);
+    return [...n.ai].some(z => !o.ai.has(z)) || n.mode > o.mode || (n.browser && !o.browser) || [...n.secrets].some(z => !o.secrets.has(z)) || [...n.scripts].some(z => !o.scripts.has(z)); };
+  async function autoUpdate(p, conf){
+    if (Date.now() - (updAt.get(p) || 0) < UPD_EVERY) return;
+    updAt.set(p, Date.now());
+    const dir = path.join(DATA, p), ups = await plugins.updates(dir).catch(() => ({})), mine_ = await plugins.list(dir).catch(() => []);
+    let approved = null;
+    for (const [id, u] of Object.entries(ups)){
+      if (u.kind !== 'bundled') continue;
+      const li = mine_.find(z => z.id === id), pc = plugConf(readConf(), p, id), st = readState(p, id);
+      if (!li || !li.ok || (li.changed && li.changed.length) || !featureOn(pc, 'auto_update')) continue;
+      if (st.runs.some(r => ['queued', 'running', 'waiting'].includes(r.status))) continue;   // 도는 중에 파일을 바꾸지 않는다 — 다음 차례에
+      let r; try { r = await plugins.inspectUpdate(dir, id); } catch { continue; }
+      if (!r.ok || !r.manifest){ continue; }
+      if (widened(li.manifest, r.manifest)) continue;   // 권한이 늘었다 — 사람이 본다
+      try {
+        const done = await plugins.install(dir, r.stage);
+        if (approved == null) approved = conf.ai ? new Set(((await ai(conf.ai, '/v1/plugins').catch(() => ({ plugins: [] }))).plugins || []).map(z => z.id)) : new Set();
+        if (approved.has(id)) await approve(p, id).catch(() => {});
+        const st2 = readState(p, id);
+        addNote(st2, { kind: 'done', feed: '', item: '', run: '', title: `${done.manifest.name} ${done.previous || ''} → ${done.version}`, text: 'pkm에 들어 있는 플러그인이라 알아서 업데이트했어요', url: '' });
+        writeState(p, id, st2);
+      } catch (e) { console.error(`플러그인 자동 업데이트(${id}): ${e.message}`); }
+    }
+  }
+
   async function tick(only){
     const conf = readConf();
     for (const { name: p } of await listProfiles()){
       if (!profConf(conf, p).on || runnerHost(p) !== HOST || (only && only !== p)) continue;
+      await autoUpdate(p, conf).catch(e => console.error(`플러그인 자동 업데이트: ${e.message}`));
       for (const x0 of await installed(p).catch(() => [])){
         const key = `${p}|${x0.id}`;
         if (busy.has(key)) continue;

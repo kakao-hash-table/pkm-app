@@ -8,7 +8,7 @@ import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-retry-'));
-Object.assign(process.env, { PKM_HOME: path.join(T, 'home'), PKM_HOST_NAME: '시험맥', PKM_RUNNER_TICK: '999999', PKM_RETRY_UNIT_MS: '20', PKM_GONE_CLOSE_MS: '40', SAVE_COUNT: path.join(T, 'save-count') });
+Object.assign(process.env, { PKM_HOME: path.join(T, 'home'), PKM_HOST_NAME: '시험맥', PKM_RUNNER_TICK: '999999', PKM_RETRY_UNIT_MS: '20', PKM_GONE_CLOSE_MS: '40', PKM_AUTO_UPDATE_MS: '0', SAVE_COUNT: path.join(T, 'save-count') });
 const DATA = path.join(T, 'data'), P = '개인', ID = 'retry-demo';
 fs.mkdirSync(path.join(DATA, P), { recursive: true });
 
@@ -178,4 +178,30 @@ test('AI 로그인이 풀려 작업이 기다리면 휴대폰으로 한 번 알�
     await new Promise(z => setTimeout(z, 30));
     assert.equal(notified.length, 1); assert.match(notified[0].title, /로그인이 풀려/);
   } finally { waitLogin = false; delete process.env.LIST_ITEMS; }
+});
+
+test('pkm에 들어 있는 플러그인은 새 버전이 오면 알아서 업데이트하고 알림을 남긴다(손으로 고친 설치본·끈 기능은 두고)', async () => {
+  const plugins = await import('../server/plugins.js'), crypto = await import('node:crypto');
+  const ins = await plugins.inspect({ local: new URL('../plugins/quicklinks/', import.meta.url).pathname });
+  assert.equal(ins.ok, true, ins.errors.join()); await plugins.install(path.join(DATA, P), ins.stage);
+  const dir = path.join(DATA, P, '_플러그인', 'quicklinks'), recF = path.join(dir, '.pkm-install.json');
+  const real = JSON.parse(fs.readFileSync(recF, 'utf8')).version;
+  const older = () => {   // 설치본을 옛 버전처럼 — 파일과 기록을 같이 바꿔서 '손으로 고친 것'은 아니게
+    const md = path.join(dir, 'plugin.md'), t = fs.readFileSync(md, 'utf8').replace(/version: .+/, 'version: 0.0.1');
+    fs.writeFileSync(md, t);
+    const rec = JSON.parse(fs.readFileSync(recF, 'utf8')); rec.version = '0.0.1'; rec.files['plugin.md'] = crypto.createHash('sha256').update(t).digest('hex'); fs.writeFileSync(recF, JSON.stringify(rec));
+  };
+  older();
+  assert.ok((await plugins.updates(path.join(DATA, P))).quicklinks, '새 버전이 있다고 보인다');
+  await runner.setLocal(P, 'quicklinks', { features: { auto_update: false } });
+  await runner.tick();
+  assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, '0.0.1', '끄면 그대로');
+  await runner.setLocal(P, 'quicklinks', { features: { auto_update: true } });
+  await runner.tick();
+  assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, real, '알아서 업데이트했다');
+  const note = (await runner.status(P)).plugins.quicklinks.state.notes[0];
+  assert.match(note.title, new RegExp(`0\\.0\\.1 → ${real.replace(/\./g, '\\.')}`)); assert.match(note.text, /알아서 업데이트/);
+  older(); fs.appendFileSync(path.join(dir, 'plugin.md'), '\n손으로 고침');   // 설치본을 손으로 고쳤으면 두고 사람이 본다
+  await runner.tick();
+  assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, '0.0.1');
 });

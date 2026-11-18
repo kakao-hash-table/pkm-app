@@ -16,6 +16,9 @@ export const FEATURES = [
   { key: 'ai_review', label: 'AI가 낸 답을 다른 AI가 한 번 더 검토하기',
     hint: 'AI 단계의 답을 작업 과정을 모르는 AI가 요청과 결과만 보고 채점해요(형식·지어낸 내용·빠진 항목·모순). 짚은 점이 있으면 한 번 다시 만들어요. AI 사용량이 늘어요',
     default: true },
+  { key: 'auto_update', label: 'pkm에 들어 있는 플러그인은 알아서 업데이트하기',
+    hint: '새 버전이 오면 이 컴퓨터가 30분 안에 업데이트하고, 전에 승인했으면 다시 승인해요. 설치본을 손으로 고쳤거나 권한(AI·브라우저·토큰)이 늘면 지금처럼 직접 살펴보고 업데이트해요',
+    default: true },
 ];
 const BY = new Map(FEATURES.map(f => [f.key, f]));
 
