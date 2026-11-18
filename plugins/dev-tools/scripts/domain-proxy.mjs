@@ -162,7 +162,9 @@ export function status(script){
 async function start(script){
   const st = status(script);
   if (st.running || st.starting) return { ...st, summary: `이미 :${st.port}에서 실행 중이에요` };
-  if (st.other) throw fail(st.other.proxy ? `터미널에서 띄운 domain-proxy(PID ${st.other.pid})가 :${st.port}에서 돌고 있어요. [프록시 멈추기]로 멈춘 뒤 다시 띄워 주세요` : `:${st.port}을 다른 프로그램(PID ${st.other.pid} ${st.other.command.split(/\s+/)[0]})이 쓰고 있어요`);
+  // 터미널에서 띄운 같은 domain-proxy가 이미 듣고 있으면 띄울 것이 없다 — 실패로 멈추지 않고 실행 중으로 본다
+  if (st.other && st.other.proxy) return { ...st, running: true, summary: `이미 :${st.port}에서 실행 중이에요(터미널에서 띄운 것 · PID ${st.other.pid})` };
+  if (st.other) throw fail(`:${st.port}을 다른 프로그램(PID ${st.other.pid} ${st.other.command.split(/\s+/)[0]})이 쓰고 있어요`);
   fs.mkdirSync(stateDir(), { recursive: true });
   const fd = fs.openSync(logFile(), 'w', 0o600);
   let child;
