@@ -20,7 +20,7 @@
 // GET  /api/profile/:p/notifications      알림(notify: yes 목록의 새 항목·내 차례·멈춤·끝남)   POST …/notifications/read {ids?}  읽음(없으면 모두)
 // POST /api/profile/:p/runner {on, ai}     이 컴퓨터에서 돌리기 켜기·끄기, AI 연결 넣기
 // GET  /api/profile/:p/plugins/:id/machine 이 컴퓨터의 승인·비밀값 상태     POST …/approve  승인     POST …/secret {name, value|null}
-// POST /api/profile/:p/plugins/:id/local {settings, auto}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
+// POST /api/profile/:p/plugins/:id/local {settings, auto, every, gates, features}   이 컴퓨터의 설정값     POST …/act {type, …}  새로 가져오기·시작·답하기·다시 하기·건너뛰기·그만두기
 // GET  /api/profile/:p/plugins/:id/scripts  가져오는 스크립트 내용(승인 전에 보여 준다)
 // GET  /api/profile/:p/plugins/:id/file?name=  플러그인이 만든 파일(<프로필>/_플러그인/.data/<id>/files/ — 프로필 데이터와 함께 동기화. 없으면 예전 자리 ~/.pkm-app/plugin-files/<프로필>/<id>/) · &download=1이면 내려받기
 // POST /api/profile/:p/plugins/:id/search {name, q}   플러그인 검색 한 번(이 컴퓨터의 pkm-ai-server, 60초까지) → { items, note }

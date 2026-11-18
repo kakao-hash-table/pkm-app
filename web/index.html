@@ -1156,7 +1156,7 @@ body.has-chat-fab main{padding-bottom:120px}
 .pl-hide-row{display:flex;align-items:stretch}.pl-hide-row>.row{flex:1;min-width:0}
 .pl-x{flex:none;width:48px;border:0;background:none;color:var(--text-2);font-size:1.375rem;line-height:1;cursor:pointer;border-radius:var(--r-md)}.pl-x:hover{color:var(--text);background:var(--s-wait-bg)}
 .pl-every{display:flex;flex-direction:column;gap:12px}.pl-every-all{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;padding-bottom:12px;border-bottom:1px solid var(--line)}.pl-every-all .field{margin:0}.pl-every select{max-width:260px}
-.pl-gates{display:flex;flex-direction:column;gap:12px;margin-top:12px}.pl-gate-list{list-style:none;margin:0;padding:0;background:var(--surface);border-radius:var(--r-lg)}
+.pl-gates{display:flex;flex-direction:column;gap:12px;margin-top:12px}.pl-feats{display:flex;flex-direction:column;gap:12px}.pl-feat{align-items:flex-start}.pl-feat span{display:flex;flex-direction:column;gap:2px}.pl-gate-list{list-style:none;margin:0;padding:0;background:var(--surface);border-radius:var(--r-lg)}
 .pl-gate-list li{display:flex;flex-wrap:wrap;gap:4px 16px;justify-content:space-between;align-items:center;min-height:48px;padding:8px 20px;border-bottom:1px solid var(--line)}.pl-gate-list li:last-child{border-bottom:0}.pl-gate-name{font-weight:600}
 .pl-upd{margin:0 0 12px}.pl-changes{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}.pl-changes li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pl-changes code{overflow-wrap:anywhere;font-size:.8125rem}
 .pl-start-row{align-items:center;flex-wrap:wrap}.pl-start-row .title{color:inherit;text-decoration:none}.pl-start-row .title:hover{text-decoration:underline}
@@ -4638,6 +4638,7 @@ function plRunLine(x, r){
   const s = plStepNow(r), i = r.steps.indexOf(s) + 1, n = r.steps.length;
   if (r.status === 'queued'){ const ahead = (x.state.runs || []).filter(z => z !== r && (['running', 'waiting'].includes(z.status) || (z.status === 'queued' && z.created < r.created))).length; /* 내 답을 기다리는 작업은 다음 차례를 막지 않는다 */ return ahead ? `앞에 ${ahead}개` : '곧 시작해요'; }
   if (r.status === 'running') return `${i}/${n} ${s.name} · ${plMin(s.started || r.updated)}분째`;
+  if (r.status === 'waiting' && s.reason === 'retry') return `잠깐 실패 · ${s.until ? plTime(new Date(s.until).toISOString()) + '에 ' : ''}다시 해요 (${s.retries || 1}/3)`;
   if (r.status === 'waiting') return s.reason === 'limit' ? `AI 한도 · ${s.until ? plTime(new Date(s.until).toISOString()) + '에 이어서' : '풀리면 이어서'}` : s.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중';
   if (r.gone && plMine(r)) return '목록에서 빠졌어요 · 할당이 풀렸거나 끝났을 수 있어요';
   if (r.status === 'input') return s.ask && s.ask.type === 'gate' ? `${s.name} 하기 전에 확인해 주세요` : s.ask && s.ask.type === 'confirm' ? '확인할 결과가 있어요' : (s.ask && s.ask.question) || '답이 필요해요';
@@ -5242,6 +5243,7 @@ function vPluginRun(id, rid){
   else if (sent) card = ['wait', '답을 보냈어요', `${esc(plRunner() || '돌리는 컴퓨터')}가 받으면 이어서 해요. 동기화에 몇 분 걸릴 수 있어요.`, ''];
   else if (r.status === 'queued') card = ['wait', '차례를 기다려요', esc(plRunLine(x, r)), cancel];
   else if (r.status === 'running') card = ['wait', `${i}/${n} ${esc(s.name)} 하는 중이에요`, `${plMin(s.started || r.updated)}분째 · ${s.kind === 'browser' ? '이 창' : '브라우저'}을 닫아도 ${esc(plWho())}에서 계속해요`, cancel];
+  else if (r.status === 'waiting' && s.reason === 'retry') card = ['wait', `${esc(s.name)} — 잠깐 실패해서 다시 할게요`, `${s.until ? plTime(new Date(s.until).toISOString()) + '에 ' : '곧 '}알아서 다시 해요 (${s.retries || 1}/3번째)${s.retry_why ? ` · ${esc(s.retry_why)}` : ''}. 손댈 것은 없어요.`, cancel];
   else if (r.status === 'waiting') card = ['wait', s.reason === 'limit' ? 'AI 사용 한도로 기다려요' : s.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중이에요', s.until ? `${plTime(new Date(s.until).toISOString())}에 이어서 해요` : '풀리면 이어서 해요', cancel];
   else if (r.status === 'input' && s.ask && s.ask.type === 'gate') card = ['wait', `${i}/${n} ${esc(s.name)} 차례예요`, '자동 시작에서 이 단계는 하기 전에 내 확인을 받게 해 뒀어요. 확인하면 이 단계부터 이어서 해요.',
     `${btn('confirm', '이 단계 하기', 'btn-primary', 'data-msg="이어서 해요"')}${btn('skip', '건너뛰고 이어 하기')}${cancel}`];
@@ -5385,6 +5387,12 @@ function vPluginSetup(id){
         ? `<li><span class="pl-gate-name">${k + 1} ${esc(s.name)}</span><span class="faint">항상 내가 해요</span></li>`
         : `<li><span class="pl-gate-name">${k + 1} ${esc(s.name)} <span class="faint">${KIND[s.kind] || ''}</span></span><label class="check"><input type="checkbox" name="g" value="${esc(`${autoWf.name}|${s.key}`)}" ${(x.local.gates || {})[`${autoWf.name}|${s.key}`] ? 'checked' : ''}><span>하기 전에 내 확인</span></label></li>`).join('')}</ol>
       <div><button class="btn btn-ghost" type="submit">단계 저장하기</button></div></form>`;
+  // 자동화 기능 — 실행기가 알아서 해 주는 것(server/features.js). 기능마다 끄고 켠다. 돌리는 컴퓨터에서만
+  const feats = (PL.st && PL.st.features) || [], fon = (x && x.local && x.local.features) || {};
+  const featBody = !feats.length || !x || !x.workflows.length || elsewhere ? '' : `<form data-pl-form="features" data-id="${id}" novalidate class="pl-feats">
+      <p class="faint">켜 둔 기능은 이 플러그인의 작업에서 알아서 해요. 끄면 그 부분은 예전처럼 사람이 해요.</p>
+      ${feats.map(f => `<label class="check pl-feat"><input type="checkbox" name="f" value="${esc(f.key)}" ${fon[f.key] !== false ? 'checked' : ''}><span><b>${esc(f.label)}</b>${f.hint ? `<small class="faint">${esc(f.hint)}</small>` : ''}</span></label>`).join('')}
+      <div><button class="btn btn-ghost" type="submit">기능 저장하기</button></div></form>`;
   // AI 챗봇: 같은 컴퓨터의 pkm-ai-server인지, full 모드·동시 실행 수
   const cst = plChat(id) && CH.st && CH.st.plugin ? CH.st : null;
   const chatRows = !plChat(id) || !here.ai ? '' : !cst ? kv('이 컴퓨터의 pkm-ai-server', '확인하는 중…')
@@ -5407,6 +5415,7 @@ function vPluginSetup(id){
     ${plLoginBox(id, true)}
     ${settings && !elsewhere ? `<section class="section"><h2>설정 · 이 컴퓨터</h2><form data-pl-form="settings" data-id="${id}" novalidate class="pl-settings">${settings}<div><button class="btn btn-ghost" type="submit">설정 저장하기</button></div></form></section>` : ''}
     ${autoFeed && !elsewhere ? section('자동 시작', `<p class="pl-auto">${esc(autoFeed.name)}에 새로 들어오면 자동 시작 · <b>${x.local.auto ? '켜짐' : '꺼짐'}</b> <button class="btn btn-text btn-sm" type="button" data-pl="auto" data-id="${id}" data-on="${x.local.auto ? '' : '1'}" ${plIsRunner() ? '' : 'disabled'}>${x.local.auto ? '끄기' : '켜기'}</button></p>${plIsRunner() ? '' : '<p class="faint">이 컴퓨터에서 돌리기를 켠 뒤에 켤 수 있어요</p>'}${gatesBody}`) : ''}
+    ${featBody ? section('자동화 기능', featBody) : ''}
     ${everyBody ? section('가져오는 주기', everyBody) : ''}
     ${section('정보', `<p class="faint">${esc(mf.version)}${li.installed_at ? ` · ${plTime(li.installed_at)} 설치` : ''}${li.source ? ` · ${li.source.type === 'bundled' ? 'pkm에 들어 있는 플러그인' : esc(li.source.url || li.source.path || '')}` : ''}</p>
       ${plUpd(id) ? `<p>새 버전 ${esc(plUpd(id).to || '')}이 있어요 · 바뀐 파일 ${plUpd(id).files.length}개 ${plUpdBtn(id, '살펴보고 업데이트')}</p>` : PL.updates && PL.updates[id] && PL.updates[id].check ? `<p>${plUpdBtn(id, 'git에서 새 버전 확인', 'btn-ghost')}</p>` : ''}${li.changed && li.changed.length ? `<p class="faint">설치 뒤 바뀐 파일: ${esc(li.changed.join(', '))}</p>` : ''}<button class="btn btn-text btn-sm pl-danger" type="button" data-pl="remove" data-id="${id}">이 플러그인 지우기</button>`)}
@@ -5791,6 +5800,9 @@ document.addEventListener('submit', async e => {
   } else if (kind === 'every'){
     const every = Object.fromEntries([...f.querySelectorAll('select[data-feed]')].map(s => [s.dataset.feed, Number(s.value) === Number(s.dataset.default) ? null : Number(s.value)]));
     try { await papi(`/plugins/${id}/local`, { every }); await plLoad(true); render(); toast('가져오는 주기를 저장했어요'); } catch (er) { toast(er.message); }
+  } else if (kind === 'features'){
+    const features = Object.fromEntries([...f.querySelectorAll('input[name="f"]')].map(i => [i.value, i.checked]));
+    try { await papi(`/plugins/${id}/local`, { features }); await plLoad(true); render(); const off = Object.values(features).filter(v => !v).length; toast(off ? `${off}개 기능을 껐어요` : '자동화 기능을 모두 켰어요'); } catch (er) { toast(er.message); }
   } else if (kind === 'gates'){
     const gates = Object.fromEntries([...f.querySelectorAll('input[name="g"]')].map(i => [i.value, i.checked]));
     try { await papi(`/plugins/${id}/local`, { gates }); await plLoad(true); render(); const n = Object.values(gates).filter(Boolean).length; toast(n ? `${n}단계는 하기 전에 내 확인을 받아요` : '모든 단계를 자동으로 해요'); } catch (er) { toast(er.message); }

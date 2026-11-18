@@ -407,7 +407,7 @@
     const steps = r.steps || [], cur = steps.find(s => !['done', 'skipped'].includes(s.status)) || steps[steps.length - 1] || {};
     const line = v => String(v || '').trim().split('\n')[0].slice(0, 160);
     if (['queued', 'running', 'waiting'].includes(r.status)){
-      if (r.status === 'waiting') return { phase: 'ai', text: cur.reason === 'limit' ? 'AI 한도라 기다리는 중 · 풀리면 이어서 해요' : cur.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중 · 이어서 해요' };
+      if (r.status === 'waiting') return { phase: 'ai', text: cur.reason === 'retry' ? `잠깐 실패해서 곧 다시 해요 (${cur.retries || 1}/3)` : cur.reason === 'limit' ? 'AI 한도라 기다리는 중 · 풀리면 이어서 해요' : cur.reason === 'login' ? 'AI 로그인을 기다려요' : '기다리는 중 · 이어서 해요' };
       if (!['ai', 'agent', 'browser'].includes(cur.kind)) return { phase: 'busy', text: '처리하는 중…' };
       const min = cur.started ? Math.floor((now - Date.parse(cur.started)) / 60000) : 0;
       return { phase: 'ai', text: `AI가 하는 중 · ${min >= 1 ? `${min}분째` : '몇 분 걸려요'}` };
