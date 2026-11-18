@@ -101,7 +101,11 @@ test('구글 폼 — 글자 제한을 넘으면 막고, 작품 칸만 채운 주
   run('info', { cid: 'wevity:2', me: ME, answer: 'fconsent:yes' });
   const d = db(); d.form_test.google = { at: NOW, ok: true, sent: true }; put(d);
   let r = run('submit', { cid: 'wevity:2', me: ME, answer: 'pick:0' });
-  assert.match(text(r, '폼 제출')[0].text, /글자 수 초과: 501자\(500자까지\)/);
+  assert.equal(r.again.step, '폼계획', '글자 수만 넘으면 묻지 않고 폼 답 계획(AI)으로 되돌려 줄여 쓰게 한다');
+  assert.match(r.again.value, /501자\(500자까지\)/);
+  assert.ok(run('submit', { cid: 'wevity:2', me: ME }).again, '두 번까지');
+  r = run('submit', { cid: 'wevity:2', me: ME });
+  assert.match(text(r, '폼 제출')[0].text, /글자 수 초과: 501자\(500자까지\)/, '두 번 해도 넘으면 그때 보인다');
   const pre = new URL(text(r, '작품 칸을 채워서 열기')[0].url);
   assert.equal(pre.searchParams.get('usp'), 'pp_url');
   assert.equal([...pre.searchParams.values()].includes('세계를 잇는 길'), true);

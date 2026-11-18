@@ -329,7 +329,7 @@ test('again — 스크립트가 앞 스크립트 단계로 되돌리면 사람�
 
   rid = await start('no-web', '되돌리기');
   r = await until(rid, r => r.status === 'stopped', '앞 스크립트 단계가 아니면 멈춘다');
-  assert.match(stepOf(r, '확인').error, /again은 앞에 있는 스크립트 단계만 가리킬 수 있어요: 확인/);
+  assert.match(stepOf(r, '확인').error, /again은 앞에 있는 스크립트·AI 단계만 가리킬 수 있어요: 확인/);
 });
 
 test('값 묻기 — 입력창으로 멈추고, 적은 값은 서버에 보내고 끝나면 _given으로 뒤 단계에 넘긴다(상태 파일에는 남지 않는다)', async () => {

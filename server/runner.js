@@ -79,6 +79,7 @@ const LOST = 'AI 서버에서 이 작업을 찾지 못했어요. 이 단계를 �
 // 멈춰 둔 넘겨받기에 답했을 때 에이전트에게 하는 말(같은 대화를 이어 간다)
 const RESUME = { done: '사용자가 부탁한 일을 끝냈다고 해요. snapshot으로 화면을 확인하고, 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.', fail: '사용자가 하지 못했다고 해요. 더 진행하지 말고 지금 상태로 결과를 돌려주세요.' };
 const AGAIN_MAX = 5;
+const AGAIN_AI_MAX = 2;   // AI 단계로 되돌려 다시 만들게 하는 횟수(단계마다)
 const GONE_CLOSE_MS = Number(process.env.PKM_GONE_CLOSE_MS || 24 * 3600000);
 // 멈춰 둔 값 묻기에 답했을 때 — 값은 vars에 합쳐 보내고 에이전트는 자리표시로 넣는다
 const RESUME_VALUE = (name, given) => given ? `사용자가 ${name}을(를) 알려 줬어요. {{${name}}} 자리표시로 넣고 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.` : `사용자가 ${name}을(를) 건너뛰었어요. 그 칸은 비워 두고 할 수 있는 데까지 하던 일을 이어서 끝낸 뒤 결과를 돌려주세요.`;
@@ -520,11 +521,17 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         }
         if (d.kind === 'script' && out && out.again && typeof out.again === 'object'){   // 앞 스크립트 단계로 되돌리기 — 사람이 그 단계에 그 답을 한 것처럼 거기부터 다시 돈다
           const i = run.steps.indexOf(step), k = run.steps.findIndex(z => z.key === String(out.again.step)), stop = error => { Object.assign(step, { status: 'failed', error, output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); };
-          if (k < 0 || k >= i || (def.steps.find(z => z.key === run.steps[k].key) || {}).kind !== 'script') return stop(`again은 앞에 있는 스크립트 단계만 가리킬 수 있어요: ${clip(out.again.step, 60)}`);
+          const tk = k < 0 ? null : (def.steps.find(z => z.key === run.steps[k].key) || {}).kind;
+          if (k < 0 || k >= i || !['script', 'ai'].includes(tk)) return stop(`again은 앞에 있는 스크립트·AI 단계만 가리킬 수 있어요: ${clip(out.again.step, 60)}`);
+          // AI 단계로 되돌리기(예: 글자 수를 넘었으니 줄여서 다시 써) — 그 AI가 value를 고칠 점으로 받아 다시 만든다. 단계마다 두 번까지(몇 번 해 볼지는 스크립트가 세고, 이건 넘지 않게 막는 선)
+          const aiBack = tk === 'ai', tried = aiBack ? ((run.again_ai ||= {})[out.again.step] || 0) : 0;
+          if (aiBack && tried >= AGAIN_AI_MAX) return stop('AI 단계로 너무 여러 번 되돌렸어요');
+          if (aiBack) run.again_ai[out.again.step] = tried + 1;
           if ((run.again || 0) >= AGAIN_MAX) return stop('같은 단계를 너무 여러 번 되돌렸어요');
           run.again = (run.again || 0) + 1;
-          for (const z of run.steps.slice(k)) Object.assign(z, { status: 'pending', job: null, error: null, ask: null, answered: undefined, given: undefined, output: z === run.steps[k] ? z.output : null, finished: null, when_skipped: undefined, lenient: undefined, answer: null, answer_label: null });
-          run.steps[k].answer = String(out.again.value ?? '').slice(0, 2000);
+          for (const z of run.steps.slice(k)) Object.assign(z, { status: 'pending', job: null, error: null, ask: null, answered: undefined, given: undefined, output: z === run.steps[k] ? z.output : null, finished: null, when_skipped: undefined, lenient: undefined, answer: null, answer_label: null, reviewed: undefined, revised: undefined, phase: undefined, draft: undefined });
+          if (aiBack) run.steps[k].feedback = [String(out.again.value ?? '').slice(0, 2000)];   // AI는 고칠 점으로 받는다(독립 검토와 같은 자리)
+          else run.steps[k].answer = String(out.again.value ?? '').slice(0, 2000);
           run.updated = now();
           return;   // 다음 차례에 그 단계부터
         }
@@ -787,7 +794,7 @@ ${squeeze(result, 12000)}`;
         for (const s of run.steps.slice(i)) await cancelJob(s);
         // lenient: 못 채운 값은 빈 값으로 두고 이 단계를 한다(앞 단계 결과가 비었을 때 처음부터 다시 말고 이어 가는 길)
         for (const s of run.steps.slice(i)) Object.assign(s, { status: 'pending', job: null, error: null, ask: null, answered: undefined, given: undefined, retries: undefined, retry_why: undefined, reason: null, until: null, phase: undefined, draft: undefined, reviewed: undefined, revised: undefined, feedback: undefined, output: s === step ? s.output : null, finished: null, when_skipped: undefined, lenient: s === step && a.lenient === true ? true : undefined, ...(s === step && a.value ? { answer: String(a.value).slice(0, 2000) } : {}) });
-        Object.assign(run, { status: 'queued', note: null, finished: null, again: undefined, updated: now() }); return;
+        Object.assign(run, { status: 'queued', note: null, finished: null, again: undefined, again_ai: undefined, updated: now() }); return;
       }
       case 'skip': {
         if (!step || !['failed', 'input'].includes(step.status)) throw fail(409, '건너뛸 수 있는 단계가 아니에요');

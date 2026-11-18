@@ -149,3 +149,18 @@ test('독립 검토 — 다른 AI가 요청과 결과만 보고 짚으면 그 �
     assert.equal(reviews.length, 0, '끄면 검토하지 않는다');
   } finally { await runner.setLocal(P, ID, { features: { ai_review: true } }); verdict = { pass: true, issues: [] }; delete process.env.LIST_ITEMS; }
 });
+
+test('again으로 AI 단계에 되돌리면 고칠 점을 붙여 다시 만든다(단계마다 두 번까지)', async () => {
+  aiCalls = 1; prompts.length = 0; fs.rmSync(process.env.SAVE_COUNT, { force: true }); process.env.SAVE_AGAIN = '1'; process.env.LIST_ITEMS = 'A-1';
+  await runner.setLocal(P, ID, { features: { ai_review: false } });
+  try {
+    await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
+    const rid = (await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', workflow: '처리' })).state.runs[0].id;
+    const run = async () => (await runner.status(P)).plugins[ID].state.runs.find(r => r.id === rid);
+    for (let i = 0; i < 60 && (await run()).status !== 'done'; i++){ await runner.tick(); await new Promise(z => setTimeout(z, 15)); }
+    const r = await run();
+    assert.equal(r.status, 'done');
+    assert.equal(prompts.length, 2); assert.match(prompts[1], /검토에서 짚은 점[\s\S]*20자 이내로 줄여 주세요/);
+    assert.deepEqual(r.again_ai, { 요약: 1 });
+  } finally { delete process.env.SAVE_AGAIN; delete process.env.LIST_ITEMS; await runner.setLocal(P, ID, { features: { ai_review: true } }); }
+});

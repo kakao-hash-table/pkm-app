@@ -869,6 +869,11 @@ async function submit(again = ''){
     const s = f.submit, findings = [...(again ? [{ where: '다시 확인', tag: '바뀜', title: '보내지 않았어요', text: `${again}. 아래 내용을 확인하고 다시 눌러 주세요` }] : []), ...aiRule], split = ['form', 'nform', 'oform', 'site'].includes(s.method), mine = new Set(top(c));
     // 메일로 보낼 수 있으면 고른 안을 '보낼 안'으로, 아니면 AI 추천을 '추천'으로 표시한다
     const sheet = fmode ? formSheet(c, me, readJSON(ANSWERS(c), {})) : null, gate = fmode ? formGate(db, c, sheet) : ['폼 아님'], fcan = !gate.length && !c.formed;   // 이미 보낸 폼은 다시 보내는 선택지를 두지 않는다
+    // 글자 수만 넘었으면 묻지 않고 폼 답 계획(AI)으로 되돌려 줄여 쓰게 한다(A1 — 스스로 한 번 더). 두 번 해도 넘으면 그때 보인다
+    const over = fmode && gate.length && gate.every(t => /글자 수 초과/.test(t));
+    if (over && (c.shorten || 0) < 2){ c.shorten = (c.shorten || 0) + 1; save(db);
+      return { summary: '글자 수에 맞춰 다시 써요', again: { step: '폼계획', value: `폼 문항이 글자 수 제한을 넘었어요 — ${gate.join(' / ')}. 그 문항의 답을 제한 안으로 줄여 쓰세요. 응모작 자리표시({{작품}} 등)를 넣어서 넘는다면 자리표시 대신 줄인 글을 직접 쓰세요.` } }; }
+    if (!over && c.shorten){ delete c.shorten; save(db); }
     if (fmode || bro) mine.clear(), mine.add(top(c)[0]);
     const canBrowse = !!bro && !fcan && !c.formed, unsureForm = !!(c.formed && !c.formed.sure);
     items.forEach((x, i) => findings.push({ ...cand(x, i, sendable ? (mine.has(x) ? `보낼 안 ${i + 1}` : `안 ${i + 1}`) : i < k ? `추천 ${i + 1}` : `안 ${i + 1}`), ...(fmode ? {} : { copy: split ? x.why || x.text : `${x.text}\n${x.why}`.trim() }) }));   // 폼 답을 보일 때는 아래 '폼 n'에 들어 있다
