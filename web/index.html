@@ -5699,12 +5699,14 @@ document.addEventListener('click', async e => {
   const id = b.dataset.id, run = b.dataset.run, step = b.dataset.step;
   switch (b.dataset.pl){
     case 'refresh': {
-      const x = PL.st.plugins[id], feeds = b.dataset.feed ? [b.dataset.feed] : x.feeds.map(f => f.name), before = feeds.reduce((n, f) => n + (((x.state.feeds[f] || {}).items) || []).length, 0);
+      const x = PL.st.plugins[id], feeds = b.dataset.feed ? [b.dataset.feed] : x.feeds.map(f => f.name);
+      const ids = s => new Set(feeds.flatMap(f => (((s.state.feeds[f] || {}).items) || []).map(it => `${f}|${it.id}`))), before = ids(x);
       PL.busy = `refresh:${id}`; render();
       for (const f of feeds) try { await papi(`/plugins/${id}/act`, { type:'refresh', feed:f }); } catch (er) { toast(er.message); }
       PL.busy = ''; await plLoad(true); render();
-      const y = PL.st.plugins[id], after = feeds.reduce((n, f) => n + (((y.state.feeds[f] || {}).items) || []).length, 0), bad = feeds.some(f => (y.state.feeds[f] || {}).ok === false);
-      toast(bad ? '일부 목록을 가져오지 못했어요' : after > before ? `새로 ${after - before}개를 가져왔어요` : '바뀐 게 없어요');
+      const y = PL.st.plugins[id], after = ids(y), bad = feeds.some(f => (y.state.feeds[f] || {}).ok === false);
+      const added = [...after].filter(k => !before.has(k)).length, gone = [...before].filter(k => !after.has(k)).length;   // 개수가 같아도 바뀌었을 수 있다
+      toast(bad ? '일부 목록을 가져오지 못했어요' : [added && `새로 ${added}개를 가져왔어요`, gone && `끝난 ${gone}개가 목록에서 빠졌어요`].filter(Boolean).join(' · ') || '바뀐 게 없어요');
       break;
     }
     case 'project-free': {
