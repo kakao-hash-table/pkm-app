@@ -446,3 +446,24 @@ test('설계의 볼 파일(see) — 사람 몫 할 일에만 3개까지 남고, 
   assert.deepEqual(p.subprojects[0].todos.map(t => t.see), [['content/a.md', 'b.md', 'c.md'], undefined, undefined]);
   assert.match(E.planMarkdown({ goal: 'g', plan: p }), /🙋 예시 문구를 보고 정한다 \(1분\) — 볼 파일: content\/a\.md, b\.md, c\.md/);
 });
+
+test('같은 일을 다르게 적은 🙋 할 일은 하나로 — 점검이 더 자세히 적어 오면 옛 줄을 바꾸고, 이미 둘이면 짧은 쪽을 이유와 함께 내린다', () => {
+  const A = '고객센터에 스레드·X·카톡 오픈채팅방 표기 기준, 내 방 게시 허용 여부, 오아시스 간접기여 여부를 문의한다';
+  const B = '고객센터에 스레드·X·카톡 오픈채팅방 표기 기준, 내 방 게시 허용 여부, 오아시스 간접기여 여부, 쉐어링크 API를 스크립트로 읽는 것이 허용되는지 문의한다';
+  assert.equal(E.sameTask(A, B), true);
+  assert.equal(E.sameTask('스레드 계정을 만들고 프로필을 설정한다', 'X 계정을 만들고 스레드와 같은 프로필 문구를 넣는다'), false);
+  const card = Object.entries(files()).find(([f, t]) => /스레드 채널 열기/.test(t) && f.includes('단기보드'))[0], cf = path.join(profile, card);
+  fs.writeFileSync(cf, fs.readFileSync(cf, 'utf8').replace('# 할 일\n', `# 할 일\n- [ ] 🙋 ${A} (3분)\n`));
+  const prep = run('loop-prep', { pid, loop: 'review', period: 'now', now: '2026-11-10T10:00:00' });
+  write(path.join(prep.work, prep.out), JSON.stringify({ summary: 's', items: [], changes: [{ type: 'todo_add', sub: 'acquire', text: B, who: 'me', minutes: 4 }] }));
+  run('loop-done', { pid, loop: 'review', period: prep.period, answer: 'apply' });
+  let t = fs.readFileSync(cf, 'utf8');
+  assert.equal(t.includes(A), false);
+  assert.equal(t.split(B).length - 1, 1);
+  fs.writeFileSync(cf, t.replace('# 할 일\n', `# 할 일\n- [ ] 🙋 ${A} (3분)\n`));   // 예전에 이미 둘이 된 카드
+  const mine = run('me-list').items.filter(i => i.title === A || i.title === B);
+  assert.deepEqual(mine.map(i => i.title), [B]);
+  t = fs.readFileSync(cf, 'utf8');
+  assert.match(t, /- \[x\] 🙋 고객센터에 .*여부를 문의한다 \(3분\) \(같은 일을 더 자세히 적은 할 일로 합쳤어요/);
+  assert.equal(run('me-list').items.filter(i => i.title === A || i.title === B).length, 1);
+});

@@ -398,7 +398,7 @@ async function api(req, res, url){
   }
   if (parts[0] === 'app' && !parts[1]){
     if (req.method === 'POST'){ const b = await body(req); if (typeof b.update === 'boolean'){ setAppUpdate(b.update); if (b.update) selfUpdate.check().catch(() => {}); } }
-    if (['GET', 'POST'].includes(req.method)) return send(res, 200, { commit:APP_COMMIT, update:{ enabled:appUpdateOn(), supervised:!!process.env.PKM_CHILD, ...selfUpdate.state() } });
+    if (['GET', 'POST'].includes(req.method)) return send(res, 200, { commit:APP_COMMIT, update:{ enabled:appUpdateOn(), supervised:!!process.env.PKM_CHILD, ...selfUpdate.state(), last_write:lastWrite ? { at:new Date(lastWrite).toISOString(), what:lastWritePath } : null } });
   }
   if (parts[0] === 'ai' && parts[1] === 'local' && !parts[2]){
     if (req.method === 'GET') return send(res, 200, await localAI());
@@ -557,12 +557,12 @@ async function statics(req, res, url){
   send(res, 200, data, TYPES[path.extname(abs)] || 'application/octet-stream');
 }
 
-let APP_COMMIT = null, lastWrite = 0;   // 화면이 새 버전을 알아채 새로고침하게 · 방금 저장했으면 업데이트를 미룬다
+let APP_COMMIT = null, lastWrite = 0, lastWritePath = '';   // 화면이 새 버전을 알아채 새로고침하게 · 방금 저장했으면 업데이트를 미룬다
 run('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD']).then(r => { APP_COMMIT = String(r.stdout).trim() || null; }).catch(() => {});
 const selfUpdate = createSelfUpdate({ root:ROOT, enabled:appUpdateOn, idleSince:() => lastWrite });
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (req.method !== 'GET' && url.pathname !== '/api/app') lastWrite = Date.now();
+  if (req.method !== 'GET' && url.pathname !== '/api/app'){ lastWrite = Date.now(); lastWritePath = `${req.method} ${url.pathname}`.slice(0, 120); }
   try {
     if (url.pathname.startsWith('/api/')) await api(req, res, url);
     else if (req.method === 'GET') await statics(req, res, url);

@@ -124,6 +124,15 @@ export const waveName = w => ['셋업', '1차', '2차', '3차'][w] || `${w}차`;
 const whoText = t => t.who === 'me' ? `나 · ${t.text}${t.minutes ? ` (${t.minutes}분)` : ''}` : `AI · ${t.text}`;   // 화면(짚은 곳)용 — 이모지만으로 나누지 않는다
 const whoMark = t => t.who === 'me' ? `🙋 ${t.text}${t.minutes ? ` (${t.minutes}분)` : ''}` : `🤖 ${t.text}`;
 export const todoLine = (t, done = false) => `- [${done ? 'x' : ' '}] ${whoMark(t)}`;
+// 같은 일을 다르게 적은 할 일인가 — 띄어쓰기·기호를 뺀 글자 두 개씩 겹치는 정도(Dice). 실제 카드에서 중복은 0.76, 다른 일은 0.5 아래
+const bigrams = s => { const m = new Map(); for (let i = 0; i < s.length - 1; i++){ const b = s.slice(i, i + 2); m.set(b, (m.get(b) || 0) + 1); } return m; };
+export function sameTask(a, b){
+  const x = String(a || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, ''), y = String(b || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');
+  if (x.length < 8 || y.length < 8) return x === y;
+  const A = bigrams(x), B = bigrams(y); let n = 0;
+  for (const [k, v] of A) n += Math.min(v, B.get(k) || 0);
+  return 2 * n / (x.length + y.length - 2) >= 0.7;
+}
 
 export function planMarkdown(pr){
   const p = pr.plan, out = [];

@@ -122,6 +122,15 @@ const meKey = text => sha(E.str(text, 200).replace(/^🙋\s*/u, '').replace(/\s*
 const SEE_MISS = { missing: '파일이 아직 없어요', outside: '작업 폴더 밖이라 읽지 않았어요', 'not-text': '글 파일이 아니라 여기서 보이지 않아요', linked: '다른 곳과 이어진 파일이라 여기서 보이지 않아요' };
 const seeName = f => f.length > 110 ? `…${f.slice(-109)}` : f;   // 피드는 who를 120자로 자른다 — 확장자가 남게 앞을 줄인다
 const seeDetail = (work, files) => files.map(f => { const r = S.readWorkFile(work, f); return r.status === 'ok' ? { kind: 'file', who: seeName(f), text: r.text } : { kind: r.status, who: seeName(f), text: SEE_MISS[r.status] }; });
+// 이 프로젝트의 열린 🙋 중 같은 일 — { key, card, text }
+function sameOpen(pr, text){
+  for (const s of pr.plan.subprojects){
+    const c = pr.cards[s.key]; if (!c) continue;
+    const t = S.openMine(profile, F, c).find(t => E.sameTask(t.text, text));
+    if (t) return { key: s.key, card: c, text: t.text };
+  }
+  return null;
+}
 // 아직 열린 내 몫 — ask(AI 요청)·decision(정할 것)·todo(카드 🙋). files는 이어 둔 파일
 function openMe(pr){
   const out = [], see = pr.see || {};
@@ -130,13 +139,21 @@ function openMe(pr){
     const ref = sha(d); if ((pr.accepted || []).includes(ref) || (pr.rejected_decisions || []).includes(ref)) continue;
     out.push({ kind: 'decision', ref, text: d, files: see[ref] || [] });
   }
+  const mine = [];   // 같은 일이 두 줄이면 더 자세한 쪽만 남기고 짧은 쪽은 이유를 붙여 내린다
   for (const s of pr.plan.subprojects){
     const c = pr.cards[s.key]; if (!c) continue;
     const card = S.readCard(profile, F, c); if (!card || card.status === 'done') continue;
     for (const t of S.openMine(profile, F, c)){
-      const h = sha(t.text), planned = s.todos.find(x => x.who === 'me' && x.text === t.text);
-      out.push({ kind: 'todo', ref: `${s.key}|${h}`, text: t.text, t, s, files: see[h] || (planned && planned.see) || [] });
+      const k = mine.findIndex(m => E.sameTask(m.t.text, t.text)), cur = { t, s, c };
+      if (k < 0){ mine.push(cur); continue; }
+      const [keep, drop] = t.text.length > mine[k].t.text.length ? [cur, mine[k]] : [mine[k], cur];
+      if (S.markTodo(profile, F, drop.c, drop.t.text, `같은 일을 더 자세히 적은 할 일로 합쳤어요: ${E.str(keep.t.text, 60)}`)) mine[k] = keep;
+      else mine.push(cur);
     }
+  }
+  for (const { t, s } of mine){
+    const h = sha(t.text), planned = s.todos.find(x => x.who === 'me' && x.text === t.text);
+    out.push({ kind: 'todo', ref: `${s.key}|${h}`, text: t.text, t, s, files: see[h] || (planned && planned.see) || [] });
   }
   return out;
 }
@@ -488,7 +505,14 @@ function applyChanges(pr, changes){
     if (c.type === 'todo_add' && pr.cards[c.sub] && E.str(c.text)){
       const t = { text: E.str(c.text, 200), who: c.who === 'me' ? 'me' : 'ai', minutes: Math.min(120, Math.max(0, Number(c.minutes) || 0)) }, see = t.who === 'me' ? E.seeList(c.see) : [];
       if (see.length) t.see = see;
-      if (S.addTodos(profile, F, pr.cards[c.sub], [E.todoLine(t)])){ pr.plan.subprojects.find(s => s.key === c.sub)?.todos.push(t); done.push(`할 일 더함: ${t.text}`); }
+      const twin = t.who === 'me' && sameOpen(pr, t.text);   // 같은 일을 더 자세히 적어 왔으면 옛 줄을 바꾼다 — 내 할 일이 둘로 늘지 않게
+      if (twin){
+        if (twin.text !== t.text && S.replaceTodo(profile, F, twin.card, twin.text, E.todoLine(t))){
+          const ps = pr.plan.subprojects.find(s => s.key === twin.key), pt = ps && ps.todos.find(x => x.who === 'me' && x.text === twin.text);
+          if (pt) Object.assign(pt, t); else ps?.todos.push(t);
+          done.push(`할 일 바꿈: ${t.text}`);
+        }
+      } else if (S.addTodos(profile, F, pr.cards[c.sub], [E.todoLine(t)])){ pr.plan.subprojects.find(s => s.key === c.sub)?.todos.push(t); done.push(`할 일 더함: ${t.text}`); }
     } else if (c.type === 'sub_add' && c.sub){
       const p = E.normalizePlan({ ...pr.plan, subprojects: [c.sub], loops: [] }).subprojects[0];
       if (p && !pr.cards[p.key]){

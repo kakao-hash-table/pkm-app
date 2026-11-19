@@ -178,6 +178,16 @@ export function markTodo(profile, F, card, text, note){
   }
   return false;
 }
+// 열린 🙋 줄 하나를 새 줄로 바꾼다(같은 일을 더 자세히 적은 할 일이 왔을 때)
+export function replaceTodo(profile, F, card, text, line){
+  const f = findCard(profile, F, card); if (!f) return false;
+  const L = read(f).split('\n'), b = bounds(L, '할 일'); if (!b) return false;
+  for (let k = b[0] + 1; k < b[1]; k++){
+    const m = L[k].match(/^\s*-\s+\[ \]\s+🙋\s*(.*)$/u);
+    if (m && m[1].replace(/\s*\(\d+분\)$/, '').trim() === String(text).trim()){ L[k] = line; writeAtomic(f, L.join('\n')); return true; }
+  }
+  return false;
+}
 // 아직 안 한 🙋(내 몫) 할 일 — [{ text, minutes }]
 export function openMine(profile, F, card){
   const f = findCard(profile, F, card), t = f && read(f); if (!t) return [];
