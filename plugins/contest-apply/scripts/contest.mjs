@@ -806,6 +806,8 @@ function mailChanged(was, m){
 const autoOk = (db, c) => { const f = c.fit; return !c.mail_sending && all(db).some(x => x.mailed) &&(!f.ai || f.ai.rule === 'none') && f.eligibility.ok === 'yes' && !f.doubt && !f.unreadable && (c.filled || []).every(o => !o.error && !o.hand && !o.manual.length && !o.missing.length && !o.skipped) && !(c.deadline && c.deadline < TODAY)
   && top(c).every(x => !f.submit.desc_limit || x.why.length <= f.submit.desc_limit); };   // 뜻풀이가 글자 제한을 넘으면 실격될 수 있다
 // 자동 메일을 보내도 되는 시각 — 한국 시각 08:00~21:00(사람이 직접 누른 것은 시각과 상관없이 보낸다)
+// 다음 아침 8시(한국 시각) — 밤에 미룬 자동 메일을 실행기가 그때 다시 보내게(wait_until)
+const next8 = () => { const k = new Date(NOW.getTime() + 9 * 3600000), d = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate(), 8) - 9 * 3600000; return new Date(k.getUTCHours() >= 8 ? d + 86400000 : d).toISOString(); };
 const mailHour = () => { const h = new Date(NOW.getTime() + 9 * 3600000).getUTCHours(); return h >= 8 && h < 21; };
 // 보내기 전에 '보내는 중'을 먼저 적는다 — 보낸 뒤 꺼지거나 끊겨도 다음 실행이 다시 보내지 않게(A2)
 // 시험에서만 — PKM_CONTEST_SMTP=127.0.0.1:포트 이면 그 가짜 서버(평문)로 보낸다
@@ -864,7 +866,7 @@ async function submit(again = ''){
   const wake = async (what, go) => { try { return await go(); } catch (e) {
     throw Object.assign(e, { notify: { title: /알 수 없어요|확인하지 못했어요/.test(e.message) ? `${what} — 제출됐는지 확인이 필요해요` : `${what}이 멈췄어요`, text: `${titleOf(c.title)} · ${E.cut(e.message, 150)}` } }); } };
   if (!answer && (args.auto === 'true' || FULL) && ready && autoOk(db, c)){
-    if (!mailHour()){ c.mail_wait = AT; save(db); return { ...done('later'), summary: '아침 8시 이후에 보내요', auto: true, verdict: { tone: 'ok', title: '아침 8시 이후에 보내요', text: '자동 메일은 한국 시각 오전 8시~오후 9시에만 보내요. 그 전에 보내려면 [제출 준비]에서 [메일 보내기]를 눌러요' } }; }
+    if (!mailHour()){ c.mail_wait = AT; save(db); return { ...done('later'), summary: '아침 8시 이후에 보내요', auto: true, wait_until: next8(), wait_why: '자동 메일은 오전 8시~오후 9시에만 보내요', verdict: { tone: 'ok', title: '아침 8시 이후에 보내요', text: '자동 메일은 한국 시각 오전 8시~오후 9시에만 보내요. 그 전에 보내려면 [제출 준비]에서 [메일 보내기]를 눌러요' } }; }
     delete c.mail_wait;
     return done('mail', { auto: true, to: (await wake('자동 메일', () => mail(db, c, me))).to });
   }

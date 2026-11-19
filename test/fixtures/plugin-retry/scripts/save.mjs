@@ -3,5 +3,6 @@
 import fs from 'node:fs';
 const f = process.env.SAVE_COUNT, n = Number(fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : 0) + 1;
 fs.writeFileSync(f, String(n));
-if (process.env.SAVE_AGAIN) console.log(JSON.stringify(n < 2 ? { summary: '너무 길어요', again: { step: '요약', value: '20자 이내로 줄여 주세요' } } : { summary: `저장했어요(${n}번째)` }));
+if (process.env.SAVE_WAIT) console.log(JSON.stringify(n < 2 ? { summary: '나중에', wait_until: new Date(Date.now() + 300).toISOString(), wait_why: '밤에는 보내지 않아요' } : { summary: `저장했어요(${n}번째)` }));
+else if (process.env.SAVE_AGAIN) console.log(JSON.stringify(n < 2 ? { summary: '너무 길어요', again: { step: '요약', value: '20자 이내로 줄여 주세요' } } : { summary: `저장했어요(${n}번째)` }));
 else console.log(JSON.stringify(n < 2 ? { error: '네트워크가 끊겨 보내지 못했어요', retry: true } : { summary: `저장했어요(${n}번째)` }));

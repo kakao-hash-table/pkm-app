@@ -416,9 +416,9 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         if (step.until > Date.now()){ run.status = 'waiting'; return; }
         Object.assign(step, { status: 'pending', reason: null, until: null });
       }
-      if (step.status === 'waiting' && step.reason === 'retry'){   // 잠깐 실패해 기다리는 중 — 때가 되면 이 단계를 처음부터
+      if (step.status === 'waiting' && ['retry', 'later'].includes(step.reason)){   // 잠깐 실패했거나 스크립트가 정한 시각을 기다리는 중 — 때가 되면 이 단계를 처음부터
         if (step.until > Date.now()){ run.status = 'waiting'; return; }
-        Object.assign(step, { status: 'pending', reason: null, until: null });
+        Object.assign(step, { status: 'pending', reason: null, until: null, later_why: undefined, output: null, text: null });
       }
       if (step.status === 'pending'){
         if (d.kind === 'manual'){ Object.assign(step, { status: 'input', ask: { type: 'confirm' }, started: now() }); run.status = 'input'; run.updated = now(); return; }
@@ -544,6 +544,13 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
         if (out && out.settings_patch){   // 같은 차례에 이어 시작하는 다음 단계도 바뀐 설정을 보게. 목록도 바뀐 설정으로 다시 가져온다(설정을 인자로 받는 목록·다시 묻기)
           patchSettings(p, x, out.settings_patch); settings = settingsFor(x, plugConf(readConf(), p, x.id));
           for (const fs_ of Object.values(st.feeds)) if (fs_) fs_.at = null;
+        }
+        if (d.kind === 'script' && out && out.wait_until){   // 스크립트가 '이 시각에 다시'라고 했다(예: 밤에는 메일을 보내지 않는다) — 그때 이 단계를 처음부터. 36시간 안만
+          const t = Date.parse(out.wait_until);
+          if (t > Date.now() && t - Date.now() <= 36 * 3600000){
+            Object.assign(step, { status: 'waiting', reason: 'later', until: t, later_why: clip(out.wait_why || out.summary || '', 200), job: null, output: out, text });
+            Object.assign(run, { status: 'waiting', updated: now() }); return;
+          }
         }
         if (d.kind === 'script' && out && out.again && typeof out.again === 'object'){   // 앞 스크립트 단계로 되돌리기 — 사람이 그 단계에 그 답을 한 것처럼 거기부터 다시 돈다
           const i = run.steps.indexOf(step), k = run.steps.findIndex(z => z.key === String(out.again.step)), stop = error => { Object.assign(step, { status: 'failed', error, output: out, text, finished: now() }); Object.assign(run, { status: 'stopped', updated: now() }); };

@@ -62,6 +62,8 @@ test('자동 메일 — 한국 시각 밤에는 보내지 않고 아침 8시 이
   const env = { NAVER_ID: 'tester', NAVER_APP_PASSWORD: 'fake-not-real' }, night = '2026-11-10T13:30:00.000Z';   // 22:30 KST
   const r = run('submit', { cid: 'wevity:2', me: '이름\t김테스트', auto: 'true', full: 'true' }, { now: night, env });
   assert.deepEqual([r.summary, r.choice, r.auto], ['아침 8시 이후에 보내요', 'later', true]);
+  assert.equal(r.wait_until, '2026-11-10T23:00:00.000Z', '다음 날 아침 8시(KST)에 실행기가 이 단계를 다시 한다');
+  assert.equal(run('submit', { cid: 'wevity:2', me: '이름\t김테스트', auto: 'true', full: 'true' }, { now: '2026-11-10T17:30:00.000Z', env }).wait_until, '2026-11-10T23:00:00.000Z', '새벽 2시 반이면 같은 날 8시');
   const c = db().contests['wevity:2'];
   assert.deepEqual([c.mailed, c.mail_sending, c.submitted], [undefined, undefined, undefined]);
   const fin = run('finish', { cid: 'wevity:2', choice: 'later' }, { now: night });

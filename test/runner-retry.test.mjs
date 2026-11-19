@@ -238,3 +238,24 @@ test('하루 AI 상한 — 넘으면 AI 단계를 내일까지 기다리고 한 
     assert.notEqual((await runner.status(P)).plugins[ID].state.runs.find(z => z.id === rid).steps[0].reason, 'cap', '끄면 그대로 한다');
   } finally { await runner.setLocal(P, ID, { features: { daily_cap: true } }); delete process.env.LIST_ITEMS; }
 });
+
+test('스크립트가 wait_until을 내면 그 시각까지 기다렸다가 그 단계를 처음부터 다시 한다(밤에 미룬 메일 같은 것)', async () => {
+  const P_ = await import('../web/js/pkm-plugin.js'), PK = P_.default || P_;
+  aiCalls = 1; fs.rmSync(process.env.SAVE_COUNT, { force: true }); process.env.SAVE_WAIT = '1';
+  await runner.setLocal(P, ID, { features: { daily_cap: false } });   // 앞 시험이 채운 하루 상한과 상관없이
+  try {
+    process.env.LIST_ITEMS = 'A-1'; await runner.act(P, ID, { type: 'refresh', feed: '할 일' });
+    for (const r of (await runner.status(P)).plugins[ID].state.runs.filter(r => !['done', 'canceled'].includes(r.status))) await runner.act(P, ID, { type: 'cancel', run: r.id }).catch(() => {});
+    const rid = (await runner.act(P, ID, { type: 'start', feed: '할 일', item: 'A-1', workflow: '처리' })).state.runs[0].id;
+    const run = async () => (await runner.status(P)).plugins[ID].state.runs.find(r => r.id === rid);
+    let r;
+    for (let i = 0; i < 200; i++){ await runner.tick(); r = await run(); if (r.steps.find(z => z.key === '저장').status === 'waiting') break; await new Promise(z => setTimeout(z, 10)); }
+    const s = r.steps.find(z => z.key === '저장');
+    assert.deepEqual([r.status, s.status, s.reason, s.later_why], ['waiting', 'waiting', 'later', '밤에는 보내지 않아요']);
+    assert.match(PK.runFeedback(r).text, /^\d\d:\d\d에 이어서 해요 · 밤에는 보내지 않아요$/);
+    for (let i = 0; i < 80 && (await run()).status !== 'done'; i++){ await runner.tick(); await new Promise(z => setTimeout(z, 15)); }
+    r = await run();
+    assert.equal(r.status, 'done');
+    assert.equal(r.steps.find(z => z.key === '저장').text, '저장했어요(2번째)');
+  } finally { delete process.env.SAVE_WAIT; delete process.env.LIST_ITEMS; await runner.setLocal(P, ID, { features: { daily_cap: true } }); }
+});
