@@ -154,3 +154,16 @@ test('치운 직후 다른 작업이 보관함에 쌓아도 내 항목을 찾아
   assert.equal(g(a.app, 'stash', 'list').split('\n').length, 1);
   assert.match(g(a.app, 'stash', 'list'), /다른 작업/);
 });
+
+test('폴더에서 직접 커밋해 켜질 때와 코드가 달라졌으면(감독 아래) 조용할 때 다시 켠다', async () => {
+  const a = repos();
+  const old = process.env.PKM_CHILD; process.env.PKM_CHILD = '1';
+  try {
+    const { su, exits } = make(a.app);
+    assert.equal(await su.check(), 'latest');
+    fs.writeFileSync(path.join(a.app, 'z.txt'), '1'); g(a.app, 'add', '.'); g(a.app, 'commit', '-qm', 'local'); g(a.app, 'push', '-q', 'origin', 'HEAD:main');
+    assert.equal(await make(a.app, { busy: true }).su.check(), 'latest', '새로 만든 것은 켜질 때 코드가 이미 이것');
+    assert.equal(await su.check(), 'pulled');
+    assert.deepEqual(exits, [RESTART]);
+  } finally { if (old == null) delete process.env.PKM_CHILD; else process.env.PKM_CHILD = old; }
+});

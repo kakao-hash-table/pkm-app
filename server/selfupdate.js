@@ -61,6 +61,7 @@ const STASH_MSG = 'pkm 자동 업데이트';
 // root: 앱 폴더 · enabled(): 켜져 있는지 · ready(): 지금 다시 켜도 되는지(하던 일이 없는지) · log
 export function createSelfUpdate({ root, enabled, ready = () => true, log = console.log, exit = code => process.exit(code), git = (...a) => run('git', ['-C', root, ...a], { timeout: 60000, env: { ...process.env, GIT_AUTOPUSH: '0' } }) }){
   const S = { at: null, state: 'idle', error: null, pulled: 0, kept: 0, commit: null, stash: null };
+  let boot = ''; try { boot = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD']).toString().trim(); } catch {}   // 켜질 때의 코드 — 폴더에서 직접 받거나 커밋해 바뀌었으면 다시 켠다
   let critical = false; const after = [];   // 치워 두기~다시 얹기 사이에 끄려는 쪽은 whenIdle로 기다린다
   const out = async (...a) => String((await git(...a)).stdout).trim();
   const has = async name => fs.existsSync(path.resolve(root, await out('rev-parse', '--git-path', name)));
@@ -74,7 +75,14 @@ export function createSelfUpdate({ root, enabled, ready = () => true, log = cons
       await git('fetch', '--quiet');
       const [ahead, behind] = (await out('rev-list', '--left-right', '--count', 'HEAD...@{u}')).split(/\s+/).map(Number);
       S.at = new Date().toISOString(); S.error = null;
-      if (!behind) return (S.state = 'latest');
+      if (!behind){
+        const head = await out('rev-parse', 'HEAD');
+        if (!boot || head === boot || !process.env.PKM_CHILD) return (S.state = 'latest');
+        if (!ready()) return (S.state = 'busy');
+        log('폴더의 코드가 켜질 때와 달라져 다시 켭니다');
+        if (process.env.PKM_UPDATE_MARK) try { fs.writeFileSync(process.env.PKM_UPDATE_MARK, JSON.stringify({ from: boot, to: head })); } catch {}
+        S.state = 'pulled'; exit(RESTART); return S.state;
+      }
       if (ahead) return (S.state = 'ahead');
       const to = await out('rev-parse', '@{u}');
       if (to === process.env.PKM_BAD_COMMIT || to === badCommit(root)) return (S.state = 'bad');   // 켜지다 죽어 되돌린 버전 — 다음 커밋을 기다린다
