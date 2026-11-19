@@ -257,6 +257,7 @@ test('전에 가져온 기록도 하나로 — 손으로 뺀 중복만 알던 �
   try {
     assert.deepEqual(run('open-list').items.map(i => i.tags[1]), ['메일로 바로 보내기', '구글 폼']);
     assert.match(run('mail-list').items[0].meta[1], /^메일로 바로 보낼 수 있는 낼 공모전 1개/);
+    const all = JSON.parse(fs.readFileSync(DB, 'utf8')); all.contests['wevity:12'].form = { src: 'x', at: '2026-01-01', v: 2, error: '읽지 못함' }; fs.writeFileSync(DB, JSON.stringify(all));   // 폼을 읽다 실패한 공모전 — 사람에게 묻는다
     const ask = run('submit', { cid: 'wevity:12', draft: '', me: '', auto: 'false' }).ask;
     assert.match(ask.hint, /\[메일 보내기\]는 이메일로 받는 공모전에만 나와요 · 이 공모전은 구글 폼 접수예요$/);
     assert.ok(!ask.choices.some(c => c.value.split(':')[0] === 'mail'));

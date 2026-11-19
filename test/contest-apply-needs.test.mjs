@@ -93,6 +93,15 @@ test('브라우저 — 고른 답은 AI가 보기를 고르게 보이고, 내 �
   assert.deepEqual([b.summary, b.again], ['알려 준 정보로 다시 내기', { step: '제출', value: 'browse' }]);
 });
 
+test("폼 접수인데 폼을 아직 읽지 않았으면 '냈나요?'를 묻지 않고 폼 문항부터 다시 간다", () => {
+  const d = db(); d.contests['wevity:4'] = contest('wevity:4', { fit: FIT('nform', 'https://m.site.naver.com/2kPBc'), docs: [], plan: null, draft }); put(d);
+  const r = run('submit', { cid: 'wevity:4', me: ME });
+  assert.deepEqual(r.again, { step: '요강', value: '' });
+  assert.equal(r.ask, undefined);
+  const e = db(); e.contests['wevity:4'].form = { src: 'x', at: NOW, v: 2, error: '읽지 못함' }; put(e);
+  assert.equal(run('submit', { cid: 'wevity:4', me: ME }).again, undefined, '폼을 읽다 실패했으면 되돌아가지 않는다(되풀이 없음)');
+});
+
 test("AI 활용 여부는 AI 안이 있으면 묻지 않고 '활용함'으로, 안이 없으면 지금처럼 묻는다", () => {
   const d = db(); d.contests['wevity:8'] = contest('wevity:8', { fit: FIT('site', 'https://www.example.org/apply'), docs: [], plan: null, draft });
   d.contests['wevity:3'] = contest('wevity:3', { fit: FIT('site', 'https://www.example.org/apply'), docs: [], plan: null }); delete d.contests['wevity:3'].draft; put(d);

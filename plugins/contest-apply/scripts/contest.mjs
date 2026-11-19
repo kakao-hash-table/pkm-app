@@ -830,6 +830,8 @@ async function submit(again = ''){
   saveDraft(db, c);
   const items = c.draft ? c.draft.items : [], allow = f.submit.allow;
   let answer = again ? '' : blank(args.answer) ? '' : String(args.answer).trim(), pickErr = '', want;
+  // 폼 접수인데 폼을 아직 읽지 않았다(준비할 때는 주소를 몰랐다가 나중에 요강이 바뀐 경우) — 사람에게 '냈나요?'를 묻지 않고 폼 문항부터 다시 간다
+  if (['', 'later'].includes(answer) && !c.submitted && !c.formed && !c.form && formUrl(f)){ save(db); return { summary: '폼 주소를 알게 돼 폼 문항부터 다시 읽어요', again: { step: '요강', value: '' } }; }
   // 보내는 버튼은 'mail:지문'처럼 확인 화면에 보인 것의 지문을 담는다. 지문이 없으면(예전 화면) 맞춰 볼 수 없으니 다시 보인다
   const sm = answer.match(/^(mail|mailretry|form)(?::([0-9a-f]{12}))?$/);
   if (sm){ answer = sm[1]; want = sm[2] || ''; }
