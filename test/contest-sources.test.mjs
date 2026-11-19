@@ -197,6 +197,11 @@ test('홈페이지 공고(일반 꼴): 문서 주소·내려받기 링크만, �
   const many = Array.from({ length: 14 }, (_, i) => `<a href="/f/${i}.pdf">${i}</a>`).join('');
   assert.equal(S.parseHomeAttachments(many, 'https://example.org/').length, 10);
   assert.deepEqual(S.parseHomeAttachments('', 'https://example.org/'), []);
+  // 그누보드 — 링크 글자에 날짜와 내려받은 수가 <span>으로 붙어 있다
+  const gnu = `<a class="list-group-item view_file_download" href="http://www.kappd.or.kr/kappd/bbs/download.php?bo_table=bo_01&amp;wr_id=1587&amp;no=1&amp;nonce=ab|1|cd"><span class="pull-right hidden-xs text-muted"><i class="fa fa-clock-o"></i> 2026.11.13 14:13</span><i class="fa fa-download"></i> 공모전 신청서 및 동의서.hwp (2.7M) &nbsp;<span class="orangered">+ 657</span></a>`;
+  assert.deepEqual(S.parseHomeAttachments(gnu, 'http://www.kappd.or.kr/kappd/bbs/board.php?bo_table=bo_01&wr_id=1587'), [
+    { name: '공모전 신청서 및 동의서.hwp', url: 'http://www.kappd.or.kr/kappd/bbs/download.php?bo_table=bo_01&wr_id=1587&no=1&nonce=ab|1|cd' },
+  ]);
 });
 
 test('fetchHomeAttachments: 주소 꼬리의 #…는 떼고 받고, http(s)가 아니면 받지 않는다', async () => {

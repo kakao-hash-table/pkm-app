@@ -83,10 +83,26 @@ test('메일 — 확인 화면을 본 뒤 붙일 파일이 바뀌면 보내지 �
 
 test('메일 — 내 정보가 바뀌어도 다시 보이고, 바뀐 이유를 말한다', async () => {
   put({ contests: { 'wevity:2': contest('wevity:2') } });
-  const r = await run('submit', { cid: 'wevity:2', me: ME });
-  const again = await run('submit', { cid: 'wevity:2', me: `${ME}\n주소\t수원시`, answer: mailBtn(r).value });
+  const r = await run('submit', { cid: 'wevity:2', me: `${ME}\n주소\t수원시\n조합원 여부\t아니오` });
+  assert.doesNotMatch(where(r, '메일 본문')[0].copy, /주소|조합원/, '요강이 묻지 않은 내 정보는 메일에 넣지 않는다');
+  assert.match(where(r, '메일 본문')[0].copy, /이름: 김테스트\n연락처: 010-1234-5678/);
+  const again = await run('submit', { cid: 'wevity:2', me: ME.replace('5678', '0000'), answer: mailBtn(r).value });
   assert.match(where(again, '다시 확인')[0].text, /제목이나 본문이 바뀌었어요/);
   assert.equal(sent.length, 1, '앞 시험의 한 통뿐');
+});
+
+test('아이콘처럼 그림을 같이 내야 하는 공모전은 자동으로 보내지 않고 할 일로 보이다가, 보탤 파일을 넣으면 보낸다', async () => {
+  put({ contests: { 'wevity:30': contest('wevity:30', { fit: { ...FIT, kinds: ['네이밍', '아이콘'], submit: { ...FIT.submit, what: '명칭과 아이콘 + 참가신청서' } } }), 'wevity:9': contest('wevity:9', { mailed: { at: NOW, to: 'a@b.kr' }, submitted: NOW }) } });
+  const before = sent.length;
+  const r = await run('submit', { cid: 'wevity:30', me: ME, auto: 'true' });
+  assert.equal(sent.length, before, '자동으로 보내지 않는다');
+  assert.ok(where(r, '직접 할 일').some(f => /아이콘 작품 파일/.test(f.title)));
+  assert.ok(where(r, '직접 할 일').some(f => /신청서/.test(f.title)));
+  const extra = path.join(path.dirname(DB), 'files', 'wevity-30-보탤 파일');
+  fs.mkdirSync(extra, { recursive: true }); fs.writeFileSync(path.join(extra, '아이콘.png'), 'png');
+  const r2 = await run('submit', { cid: 'wevity:30', me: ME, auto: 'true' });
+  assert.equal(r2.summary, '메일 보냄');
+  assert.equal(sent.length, before + 1);
 });
 
 test('자동 메일이 보내졌는지 모르게 끊기면 다시 보내지 않고, 휴대폰 알림으로 사람을 깨운다', async () => {

@@ -608,7 +608,9 @@ function saveDraft(db, c){
 }
 // 양식 문서 — 모음 사이트의 첨부, 같이 올라온 다른 사이트의 첨부, 주최 홈페이지 공고의 첨부에서 .hwp·.hwpx를 받아 둔다(제출 준비 때 한 번). 읽지 못하는 파일은 뺀다
 async function docsOf(c, again){
-  if (c.docs && !again && c.docs.every(d => fs.existsSync(path.join(FILES, d.file)))) return c.docs;
+  // 못 찾았으면(빈 목록) 하루에 한 번 다시 찾는다 — 처음에 못 읽은 홈페이지를 영영 다시 안 보지 않게
+  if (c.docs && !again && (c.docs.length ? c.docs.every(d => fs.existsSync(path.join(FILES, d.file))) : c.docs_at === TODAY)) return c.docs;
+  c.docs_at = TODAY;
   const D = await docsLib(), site = a => a.key.split(':')[0], home = E.urlOf(String(c.homepage || '').split('#')[0]), names = new Set(), hashes = new Set(), list = [], blocked = [];
   const pools = [async () => c.attachments || [], ...(c.also || []).slice(0, 3).map(a => async () => (await S.fetchDetail({ site: site(a), url: a.url })).attachments || []),
     ...(home ? [async () => S.fetchHomeAttachments(home)] : [])];
@@ -780,9 +782,16 @@ async function fillDocs(db, c){
 const attachOf = c => [...(c.filled || []).filter(o => o.file && (!o.hand || o.stamped)).map(o => ({ path: path.join(FILES, o.file), filename: `${fileName(o.cand ? `${o.title}_${o.cand}` : o.title)}${path.extname(o.file)}` })),
   ...extraFiles(c).map(f => ({ path: f, filename: path.basename(f) }))];
 // 요강·양식이 계좌를 요구하는가 — 아니면 메일에 계좌·은행을 넣지 않는다(이름·연락처 같은 나머지는 그대로)
-const wantsBank = c => BANK.test([JSON.stringify((c.fit || {}).submit || {}), ...used(c).flatMap(d => [d.title, ...(d.fills || []).map(x => x.text)]), ...(c.fplan && c.form ? c.form.questions.map(q => q.title) : [])].join('\n'));
+const asked = c => [JSON.stringify((c.fit || {}).submit || {}), ...used(c).flatMap(d => [d.title, ...(d.fills || []).map(x => x.text)]), ...(c.fplan && c.form ? c.form.questions.map(q => q.title) : [])].join('\n');
+const wantsBank = c => BANK.test(asked(c));
+// 메일에 적을 내 정보 — 이름·연락처·이메일과 요강·양식이 묻는 것만. 다른 공모전에서 받아 둔 주소·조합원 여부 같은 것은 주최에 보내지 않는다
+const BASIC = new Set(['이름', '연락처', '이메일']);
+function mailMe(c, me){
+  const t = `${asked(c)}\n${briefOf(c, 20000)}`;
+  return me.filter(([a]) => { const k = kindOf(a); return BANK.test(a) ? wantsBank(c) : BASIC.has(k) || (k ? KIND.find(([n]) => n === k)[1].test(t) : t.includes(a)); });
+}
 function mailOf(c, me){
-  if (!wantsBank(c)) me = me.filter(([a]) => !BANK.test(a));
+  me = mailMe(c, me);
   const f = c.fit, picks = top(c), name = mine(me, '이름') || mine(me, '성명') || '';
   const fillT = t => t.replace(/<([^<>]+)>/g, (m, w) => (w === '작품명' ? picks[0] && picks[0].text : mine(me, w)) || m);
   return { to: E.firstEmail(f.submit.to), subject: f.submit.subject ? fillT(f.submit.subject) : `${titleOf(c.title)} 응모${name ? ` - ${name}` : ''}`,
@@ -803,8 +812,16 @@ function mailChanged(was, m){
     : now.length && was.sig !== mailSig(m) && was.body === sha(m.subject + m.text).slice(0, 12) ? '붙일 파일의 내용이 바뀌었어요' : '메일 제목이나 본문이 바뀌었어요(내 정보·고른 안)';
 }
 // 확인 없이 보내도 되는 경우 — 하나라도 걸리면 켜 두어도 묻는다(보낸 메일은 되돌릴 수 없다). 확인창으로 한 번 보내 본 뒤에만(계정 설정이 맞는지 본 뒤)
-const autoOk = (db, c) => { const f = c.fit; return !c.mail_sending && all(db).some(x => x.mailed) &&(!f.ai || f.ai.rule === 'none') && f.eligibility.ok === 'yes' && !f.doubt && !f.unreadable && (c.filled || []).every(o => !o.error && !o.hand && !o.manual.length && !o.missing.length && !o.skipped) && !(c.deadline && c.deadline < TODAY)
+const autoOk = (db, c) => { const f = c.fit; return !c.mail_sending && all(db).some(x => x.mailed) && !handWork(c).length &&(!f.ai || f.ai.rule === 'none') && f.eligibility.ok === 'yes' && !f.doubt && !f.unreadable && (c.filled || []).every(o => !o.error && !o.hand && !o.manual.length && !o.missing.length && !o.skipped) && !(c.deadline && c.deadline < TODAY)
   && top(c).every(x => !f.submit.desc_limit || x.why.length <= f.submit.desc_limit); };   // 뜻풀이가 글자 제한을 넘으면 실격될 수 있다
+// 사람이 만들어 붙여야 하는 것 — 그림 작품, 받지 못한 양식, 요강이 말한 신청서·동의서. 하나라도 남았으면 자동으로 보내지 않고 할 일로 보인다
+const VISUAL = /아이콘|로고|디자인|캐릭터|포스터|사진|영상|그림|일러스트|웹툰|만화|이모티콘|엠블럼|심볼/;
+const handWork = c => { const f = c.fit, s = f.submit, extra = extraFiles(c).length, out = [];
+  const art = (f.kinds || []).filter(k => VISUAL.test(k));
+  if (art.length && !extra) out.push(`${art.join('·')} 작품 파일을 만들어 보탤 파일 폴더에 넣어요(AI 안은 이름·글만 만들어요)`);
+  for (const a of c.blocked || []) if (!extra) out.push(`'${a.name}'을 직접 받아 채운 뒤 보탤 파일 폴더에 넣어요`);
+  if (!(c.blocked || []).length && /신청서|동의서|양식|서식/.test(`${s.what} ${s.how} ${s.note}`) && !attachOf(c).length) out.push('요강이 말한 신청서·동의서를 채워 보탤 파일 폴더에 넣어요(받아 둔 양식이 없어요)');
+  return out; };
 // 자동 메일을 보내도 되는 시각 — 한국 시각 08:00~21:00(사람이 직접 누른 것은 시각과 상관없이 보낸다)
 // 다음 아침 8시(한국 시각) — 밤에 미룬 자동 메일을 실행기가 그때 다시 보내게(wait_until)
 const next8 = () => { const k = new Date(NOW.getTime() + 9 * 3600000), d = Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate(), 8) - 9 * 3600000; return new Date(k.getUTCHours() >= 8 ? d + 86400000 : d).toISOString(); };
@@ -918,6 +935,7 @@ async function submit(again = ''){
     else if (!(bro && bro.kind === 'explore')) findings.push({ where: '접수 방법', title: '여기서 낼 수 없는 접수예요', text: s.how || '요강과 공고에서 접수 방법을 찾지 못했어요', url: c.url });
     if (ready){   // 메일에 붙일 파일과, 손으로 만든 파일을 더할 폴더(메일을 여기서 보낼 수 있을 때만)
       const at = attachOf(c); fs.mkdirSync(extraDir(c), { recursive: true, mode: 0o700 });
+      for (const t of handWork(c)) findings.push({ where: '직접 할 일', tag: '보내기 전에', title: t });
       findings.push({ where: '메일에 붙일 파일', title: at.length ? `${at.length}개` : '없음', text: [at.map(a => a.filename).join('\n'), '서명한 스캔·PDF처럼 직접 만든 파일은 아래 폴더에 넣으면 함께 붙여요'].filter(Boolean).join('\n'), copy: shown(extraDir(c)) });
     }
     if (fmode){   // 폼 문항마다 넣을 답 — 내 정보가 들어 있어 실행이 끝나면 지운다. 동의 문항은 고른 보기만 보인다

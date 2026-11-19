@@ -141,7 +141,11 @@ export const parseDetail = (site, body) => (DETAIL[site] || fail(site))(String(b
 const SIZE = /\s*[\[(]\s*[\d.,]+\s*(?:bytes?|[kmg]b?)\s*[\])]\s*$/i, FILE = /\.(hwpx?|pdf|docx?|xlsx?|pptx?|zip|txt|odt|jpe?g|png|gif|webp|bmp)$/i, DOWN = /download|filedown|atchfile|attach|file_dn/i;
 const noHash = u => String(u || '').replace(/#.*$/, '');
 const urlFile = u => { const f = new URL(u).pathname.split('/').pop(); try { return decodeURIComponent(f); } catch { return f; } };
-const anchors = html => [...String(html || '').matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].map(([, a, t]) => ({ a, href: pick(/\bhref\s*=\s*"([^"]*)"/i, a) || pick(/\bhref\s*=\s*'([^']*)'/i, a), text: one(t).replace(SIZE, '') }));
+// 링크 글자에 날짜·내려받은 수 같은 덧붙임이 <span>으로 붙은 게시판(그누보드 등)은 그것을 걷어낸 글자가 파일 이름이다
+const anchors = html => [...String(html || '').matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)].map(([, a, t]) => {
+  const text = one(t).replace(SIZE, ''), bare = one(t.replace(/<span\b[^>]*>[\s\S]*?<\/span>/gi, ' ')).replace(SIZE, '');
+  return { a, href: pick(/\bhref\s*=\s*"([^"]*)"/i, a) || pick(/\bhref\s*=\s*'([^']*)'/i, a), text: !FILE.test(text) && FILE.test(bare) ? bare : text };
+});
 export function parseHomeAttachments(html, pageUrl){
   const base = noHash(pageUrl), out = [];
   // KISA: 본문 첨부 영역(board_detail_attach)의 fnPostAttachDownload(menuSeq, postSeq, attachSeq, lang) → /post/fileDownload. 영역 밖의 소개자료 링크는 뺀다
