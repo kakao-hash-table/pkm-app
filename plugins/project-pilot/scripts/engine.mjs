@@ -124,14 +124,18 @@ export const waveName = w => ['셋업', '1차', '2차', '3차'][w] || `${w}차`;
 const whoText = t => t.who === 'me' ? `나 · ${t.text}${t.minutes ? ` (${t.minutes}분)` : ''}` : `AI · ${t.text}`;   // 화면(짚은 곳)용 — 이모지만으로 나누지 않는다
 const whoMark = t => t.who === 'me' ? `🙋 ${t.text}${t.minutes ? ` (${t.minutes}분)` : ''}` : `🤖 ${t.text}`;
 export const todoLine = (t, done = false) => `- [${done ? 'x' : ' '}] ${whoMark(t)}`;
-// 같은 일을 다르게 적은 할 일인가 — 띄어쓰기·기호를 뺀 글자 두 개씩 겹치는 정도(Dice). 실제 카드에서 중복은 0.76, 다른 일은 0.5 아래
+// 같은 일을 다르게 적은 할 일인가 — 글자 두 개씩 겹치는 정도(Dice ≥ 0.7)이면서 짧은 쪽 낱말(조사 뗀)이 긴 쪽에 모두 들어 있을 때만.
+// 실제 중복(같은 문의에 항목을 더한 것)은 둘 다 맞고, '1차/2차 원고 검토'·'A사/B사 지원서'처럼 낱말 하나가 다른 일은 낱말 조건에서 빠진다
 const bigrams = s => { const m = new Map(); for (let i = 0; i < s.length - 1; i++){ const b = s.slice(i, i + 2); m.set(b, (m.get(b) || 0) + 1); } return m; };
+const words = s => String(s || '').toLowerCase().split(/[\s\p{P}\p{S}]+/u).filter(Boolean).map(w => w.replace(/(에서|으로|을|를|이|가|은|는|에|로|와|과|의|도)$/u, '')).filter(Boolean);
 export function sameTask(a, b){
   const x = String(a || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, ''), y = String(b || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');
   if (x.length < 8 || y.length < 8) return x === y;
   const A = bigrams(x), B = bigrams(y); let n = 0;
   for (const [k, v] of A) n += Math.min(v, B.get(k) || 0);
-  return 2 * n / (x.length + y.length - 2) >= 0.7;
+  if (2 * n / (x.length + y.length - 2) < 0.7) return false;
+  const [s1, l1] = words(a).length <= words(b).length ? [words(a), words(b)] : [words(b), words(a)], L = new Set(l1);
+  return s1.every(w => L.has(w));
 }
 
 export function planMarkdown(pr){

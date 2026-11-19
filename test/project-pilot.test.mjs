@@ -452,6 +452,8 @@ test('같은 일을 다르게 적은 🙋 할 일은 하나로 — 점검이 더
   const B = '고객센터에 스레드·X·카톡 오픈채팅방 표기 기준, 내 방 게시 허용 여부, 오아시스 간접기여 여부, 쉐어링크 API를 스크립트로 읽는 것이 허용되는지 문의한다';
   assert.equal(E.sameTask(A, B), true);
   assert.equal(E.sameTask('스레드 계정을 만들고 프로필을 설정한다', 'X 계정을 만들고 스레드와 같은 프로필 문구를 넣는다'), false);
+  for (const [x, y] of [['1차 원고 검토하기', '2차 원고 검토하기'], ['A사 지원서 보내기', 'B사 지원서 보내기'], ['백엔드 테스트 코드 검토하기', '프론트엔드 테스트 코드 검토하기'], ['로그인 화면 디자인 확인하기', '로그인 화면 디자인 수정하기'], ['월요일 회의 자료 준비하기', '화요일 회의 자료 준비하기'], ['iOS 빌드 테스트플라이트에 올리기', 'Android 빌드 테스트플라이트에 올리기']])
+    assert.equal(E.sameTask(x, y), false, `${x} / ${y}는 다른 일`);
   const card = Object.entries(files()).find(([f, t]) => /스레드 채널 열기/.test(t) && f.includes('단기보드'))[0], cf = path.join(profile, card);
   fs.writeFileSync(cf, fs.readFileSync(cf, 'utf8').replace('# 할 일\n', `# 할 일\n- [ ] 🙋 ${A} (3분)\n`));
   const prep = run('loop-prep', { pid, loop: 'review', period: 'now', now: '2026-11-10T10:00:00' });
@@ -466,4 +468,18 @@ test('같은 일을 다르게 적은 🙋 할 일은 하나로 — 점검이 더
   t = fs.readFileSync(cf, 'utf8');
   assert.match(t, /- \[x\] 🙋 고객센터에 .*여부를 문의한다 \(3분\) \(같은 일을 더 자세히 적은 할 일로 합쳤어요/);
   assert.equal(run('me-list').items.filter(i => i.title === A || i.title === B).length, 1);
+});
+
+test('루프가 이미 풀린 AI 요청을 근거와 함께 내리고, 같은 부탁이 다시 오면 다시 연다', () => {
+  const T = '쉐어링크 계정에 직접 로그인해 확인한다';
+  const loop = (period, out) => { const prep = run('loop-prep', { pid, loop: 'review', period: 'now', now: period }); write(path.join(prep.work, prep.out), JSON.stringify({ summary: 's', items: [], changes: [], ...out })); run('loop-done', { pid, loop: 'review', period: prep.period, answer: 'apply' }); return prep; };
+  loop('2026-11-20T10:00:00', { me_asks: [{ text: T, why: '401' }] });
+  const id = rec(pid).requests.find(x => x.text === T).id;
+  assert.match(run('loop-prep', { pid, loop: 'review', period: 'now', now: '2026-11-21T10:00:00' }).task, new RegExp(`열린 AI 요청[\\s\\S]*\\[${id}\\] \\d{4}-\\d{2}-\\d{2} ${T}`));
+  loop('2026-11-21T10:00:00', { solved_asks: [{ id, why: '11-10 조회가 성공함 — content/api-조회-2026-11-10.json' }, { id: '없는-id', why: '무시' }] });
+  const r = rec(pid).requests.find(x => x.id === id);
+  assert.deepEqual([!!r.done, r.solved], [true, '11-10 조회가 성공함 — content/api-조회-2026-11-10.json']);
+  assert.equal(run('me-list').items.some(i => i.title === T), false);
+  loop('2026-11-22T10:00:00', { me_asks: [{ text: T, why: '또 401' }] });
+  assert.equal(run('me-list').items.some(i => i.title === T), true, '같은 문제가 또 생기면 다시 연다');
 });

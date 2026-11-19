@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: project-pilot
 name: 프로젝트 파일럿
-version: 0.4.1
+version: 0.4.2
 author: pkm
 permissions:
   ai: [chat, agent]

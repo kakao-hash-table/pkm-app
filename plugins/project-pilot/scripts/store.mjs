@@ -174,7 +174,7 @@ export function markTodo(profile, F, card, text, note){
   const L = read(f).split('\n'), b = bounds(L, '할 일'); if (!b) return false;
   for (let k = b[0] + 1; k < b[1]; k++){
     const m = L[k].match(/^(\s*-\s+)\[ \](\s+)🙋\s*(.*)$/u);
-    if (m && m[3].replace(/\s*\(\d+분\)$/, '').trim() === String(text).trim()){ L[k] = `${m[1]}[x]${m[2]}🙋 ${m[3].trim()} (${String(note).replace(/[\r\n]+/g, ' ').slice(0, 200)})`; writeAtomic(f, L.join('\n')); return true; }
+    if (m && m[3].trim().replace(/\s*\(\d+분\)$/, '').trim() === String(text).trim()){ L[k] = `${m[1]}[x]${m[2]}🙋 ${m[3].trim()} (${String(note).replace(/[\r\n]+/g, ' ').slice(0, 200)})`; writeAtomic(f, L.join('\n')); return true; }
   }
   return false;
 }
@@ -184,7 +184,7 @@ export function replaceTodo(profile, F, card, text, line){
   const L = read(f).split('\n'), b = bounds(L, '할 일'); if (!b) return false;
   for (let k = b[0] + 1; k < b[1]; k++){
     const m = L[k].match(/^\s*-\s+\[ \]\s+🙋\s*(.*)$/u);
-    if (m && m[1].replace(/\s*\(\d+분\)$/, '').trim() === String(text).trim()){ L[k] = line; writeAtomic(f, L.join('\n')); return true; }
+    if (m && m[1].trim().replace(/\s*\(\d+분\)$/, '').trim() === String(text).trim()){ L[k] = line; writeAtomic(f, L.join('\n')); return true; }
   }
   return false;
 }
