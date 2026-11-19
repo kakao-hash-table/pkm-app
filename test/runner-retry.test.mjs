@@ -207,7 +207,7 @@ test('pkm에 들어 있는 플러그인은 새 버전이 오면 알아서 업데
   await runner.tick();
   assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, real, '알아서 업데이트했다');
   const note = (await runner.status(P)).plugins.quicklinks.state.notes[0];
-  assert.match(note.title, new RegExp(`0\\.0\\.1 → ${real.replace(/\./g, '\\.')}`)); assert.match(note.text, /알아서 업데이트/);
+  assert.match(note.title, new RegExp(`0\\.0\\.1 → ${real.replace(/\./g, '\\.')}`)); assert.match(note.text, /알아서 업데이트/); assert.equal(note.read, true, '할 일이 아닌 소식은 종 숫자를 올리지 않는다');
   older(); fs.appendFileSync(path.join(dir, 'plugin.md'), '\n손으로 고침');   // 설치본을 손으로 고쳤으면 두고 사람이 본다
   await runner.tick();
   assert.equal(JSON.parse(fs.readFileSync(recF, 'utf8')).version, '0.0.1');

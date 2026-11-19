@@ -938,7 +938,7 @@ ${squeeze(result, 12000)}`;
         if (approved == null) approved = conf.ai ? new Set(((await ai(conf.ai, '/v1/plugins').catch(() => ({ plugins: [] }))).plugins || []).map(z => z.id)) : new Set();
         if (approved.has(id)) await approve(p, id).catch(() => {});
         const st2 = readState(p, id);
-        addNote(st2, { kind: 'done', feed: '', item: '', run: '', title: `${done.manifest.name} ${done.previous || ''} → ${done.version}`, text: 'pkm에 들어 있는 플러그인이라 알아서 업데이트했어요', url: '' });
+        addNote(st2, { kind: 'done', feed: '', item: '', run: '', title: `${done.manifest.name} ${done.previous || ''} → ${done.version}`, text: 'pkm에 들어 있는 플러그인이라 알아서 업데이트했어요', url: '', read: true });   // 할 일이 아닌 소식 — 목록엔 남기고 종 숫자는 올리지 않는다(A3)
         writeState(p, id, st2);
       } catch (e) { console.error(`플러그인 자동 업데이트(${id}): ${e.message}`); }
       } finally { busy.delete(lock); }
