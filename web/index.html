@@ -1164,6 +1164,7 @@ body.has-chat-fab main{padding-bottom:120px}
 .ai-state>span{display:block;margin-top:2px;overflow-wrap:anywhere;white-space:pre-line}.ai-state ul{margin:6px 0 0;padding-left:20px}
 .pl-card{margin:16px 0}.pl-card-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.pl-card-acts .btn{margin-top:0}
 .pl-quiet{display:inline-flex;gap:4px;flex-wrap:wrap}
+.now-done{margin-top:8px}.now-done-list{list-style:none;margin:8px 0 0;padding:0}.now-done-list a{display:flex;flex-direction:column;gap:2px;padding:8px 0;min-height:44px;color:inherit;text-decoration:none;border-bottom:1px solid var(--line)}.now-done-list a:hover .now-done-t{text-decoration:underline}.now-done-m{font-size:.8125rem;overflow-wrap:anywhere}
 .pl-answer{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}.pl-ask-q{font-size:1rem;margin:8px 0 0}
 .pl-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
 .pl-track{flex:1 0 100%;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;color:var(--text-2);font-size:.875rem}
@@ -2462,6 +2463,7 @@ function vNow(){
         <ul class="now-list">${ended.map(a => nowCard('', `약속 · <span class="num">${hm(a.start)}–${hm(a.end)}</span>`, `<a href="#/action/appt/${a.id}">${esc(a.title)}</a>`, '', `<button class="btn btn-ghost btn-sm" type="button" data-act="rec-dismiss" data-id="${a.id}" aria-label="${esc(a.title)} 기록 안 남기기">안 남겨요</button><button class="btn btn-tonal btn-sm" type="button" data-act="rec-from-appt" data-id="${a.id}" data-kind="${kindFor(a).id}" aria-label="${esc(a.title)} ${esc(kindFor(a).name)} 쓰기">${esc(kindFor(a).name)} 쓰기</button>`)).join('')}</ul></section>` : ''; })()}
     ${carryN ? `<div class="fill-bar" style="margin-top:24px"><p><b>지나간 블록에 못 끝낸 할 일 ${carryN}개</b><span class="faint">남은 빈 시간으로 옮길 수 있어요</span></p><button class="btn btn-tonal btn-sm" type="button" data-act="fill-blocks">남은 빈 시간 채우기</button></div>` : ''}`}
     ${waits || plNowLinks() ? `<p class="now-links">${waits ? `<button class="btn btn-text btn-sm" type="button" data-act="go-waiting">기다리는 중 ${waits}개 ›</button>` : ''}${plNowLinks()}</p>` : ''}
+    ${plDoneToday()}
   </div>`;
 }
 /* 블록 종류 — 방법론의 네 영역(1층)이라 고정. 행동만 챙기고 지식·시간이 밀리지 않게, 그 입구를 하루 시간표에 둔다 */
@@ -4425,6 +4427,16 @@ function plNowLinks(){
   if (!plOK()) return '';
   plLoad();
   return plIds().map(id => { const n = plCount(id); return n ? `<a class="btn btn-text btn-sm" href="#/plugins/${id}">${esc(plName(id))} · ${plFlow(PL.st.plugins[id]) ? '내 차례' : '볼 것'} ${n}개 ›</a>` : ''; }).join('');
+}
+// 오늘 AI가 끝낸 일 — 지금 화면 맨 아래에 접어 둔다(내 할 일이 먼저). 펼치면 무엇을 했고 어떻게 끝났는지, 누르면 그 작업으로
+function plDoneToday(){
+  if (!plOK() || !PL.st) return '';
+  const done = plIds().flatMap(id => (PL.st.plugins[id].state.runs || []).filter(r => r.status === 'done' && r.updated && ymd(new Date(r.updated)) === TODAY).map(r => ({ id, r })))
+    .sort((a, b) => String(b.r.updated).localeCompare(String(a.r.updated)));
+  if (!done.length) return '';
+  const row = ({ id, r }) => { const fb = PKMPlugin.runFeedback(r) || {};
+    return `<li><a href="#/plugins/${encodeURIComponent(id)}/run/${encodeURIComponent(r.id)}"><span class="now-done-t">${esc(plName(id))} · ${esc(r.item.title || r.workflow)}</span><span class="faint now-done-m">${esc(plTime(r.updated))} · ${esc(fb.text || '끝났어요')}</span></a></li>`; };
+  return `<details class="more now-done"><summary>오늘 AI가 끝낸 일 <span class="count">${done.length}</span></summary><ul class="now-done-list">${done.slice(0, 20).map(row).join('')}</ul>${done.length > 20 ? `<p class="faint">${done.length - 20}개 더 — 플러그인 화면의 끝난 작업에서 볼 수 있어요</p>` : ''}</details>`;
 }
 function plCount(id){
   const x = PL.st && PL.st.plugins[id]; if (!x) return 0;
