@@ -57,7 +57,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
 import * as memory from './memory.js';
-import { createRunner, askTitle, readConf, localAI, connectLocalAI, aiChoice, setAIChoice } from './runner.js';
+import { createRunner, askTitle, readConf, localAI, connectLocalAI, aiChoice, setAIChoice, appUpdateOn, setAppUpdate } from './runner.js';
+import { supervise, watchParent, createSelfUpdate } from './selfupdate.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
 import { createPush } from './push.js';
@@ -70,6 +71,8 @@ const PORT = Number(process.env.PORT || 5270);
 const HOST = process.env.HOST || '127.0.0.1';
 const MD = createRequire(import.meta.url)('../web/js/pkm-md.js');
 const run = promisify(execFile);
+const MAIN = process.argv[1] === fileURLToPath(import.meta.url);
+if (MAIN && !process.env.PKM_CHILD && process.env.PKM_SUPERVISE !== '0') await supervise(fileURLToPath(import.meta.url));   // 감독은 서버를 켜고 기다리기만 한다
 const { createGcal } = await import('./gcal.js');
 
 /* ---------- 안전한 경로 ---------- */
@@ -393,6 +396,10 @@ async function api(req, res, url){
     if (req.method === 'GET') return send(res, 200, aiChoice());
     if (req.method === 'POST') return send(res, 200, setAIChoice(await body(req)));
   }
+  if (parts[0] === 'app' && !parts[1]){
+    if (req.method === 'POST'){ const b = await body(req); if (typeof b.update === 'boolean'){ setAppUpdate(b.update); if (b.update) selfUpdate.check().catch(() => {}); } }
+    if (['GET', 'POST'].includes(req.method)) return send(res, 200, { commit:APP_COMMIT, update:{ enabled:appUpdateOn(), supervised:!!process.env.PKM_CHILD, ...selfUpdate.state() } });
+  }
   if (parts[0] === 'ai' && parts[1] === 'local' && !parts[2]){
     if (req.method === 'GET') return send(res, 200, await localAI());
     if (req.method === 'POST') return send(res, 200, await connectLocalAI());
@@ -415,7 +422,7 @@ async function api(req, res, url){
   if (parts[0] === 'profile' && validProfile(parts[1]) && fss.existsSync(path.join(DATA, parts[1]))){
     const p = parts[1], sub = parts[2] || '';
     if (req.method === 'GET' && !sub) return send(res, 200, await readProfile(p));
-    if (req.method === 'GET' && sub === 'version') return send(res, 200, { version:await versionOf(p), sync:SYNC[p] ? { state:SYNC[p].state, at:SYNC[p].at, error:SYNC[p].error } : null });
+    if (req.method === 'GET' && sub === 'version') return send(res, 200, { version:await versionOf(p), app:APP_COMMIT, sync:SYNC[p] ? { state:SYNC[p].state, at:SYNC[p].at, error:SYNC[p].error } : null });
     if (req.method === 'POST' && sub === 'save') return send(res, 200, await save(p, await body(req)));
     if (req.method === 'GET' && sub === 'image') return image(res, p, url.searchParams.get('name'));
     if (req.method === 'GET' && sub === 'obsidian') return send(res, 200, await obsidianLink(p, url.searchParams.get('file')));
@@ -550,8 +557,12 @@ async function statics(req, res, url){
   send(res, 200, data, TYPES[path.extname(abs)] || 'application/octet-stream');
 }
 
+let APP_COMMIT = null, lastWrite = 0;   // 화면이 새 버전을 알아채 새로고침하게 · 방금 저장했으면 업데이트를 미룬다
+run('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD']).then(r => { APP_COMMIT = String(r.stdout).trim() || null; }).catch(() => {});
+const selfUpdate = createSelfUpdate({ root:ROOT, enabled:appUpdateOn, idleSince:() => lastWrite });
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+  if (req.method !== 'GET') lastWrite = Date.now();
   try {
     if (url.pathname.startsWith('/api/')) await api(req, res, url);
     else if (req.method === 'GET') await statics(req, res, url);
@@ -560,7 +571,8 @@ const server = http.createServer(async (req, res) => {
     send(res, e.status || 500, { error:e.message || '서버 오류' });
   }
 });
-if (process.argv[1] === fileURLToPath(import.meta.url)){
+if (MAIN){
+  watchParent(); selfUpdate.start();
   for (const pr of await listProfiles()){ const n = await syncTemplates(pr.name); if (n) console.log(`${pr.name}: 템플릿 ${n}개를 앱 템플릿에 맞췄어요`); }
   await syncTextbooks(); setInterval(() => syncTextbooks().catch(() => {}), 300000).unref();
   runner.start(); jobs.start(); chats.start((await listProfiles()).map(x => x.name));

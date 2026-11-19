@@ -1886,13 +1886,21 @@ function tick(){
   if (!busy && S.mode === 'data' && (prev !== TODAY || shape !== lastShape)) render();
 }
 /* 바깥(Obsidian·다른 기기)에서 바뀌었는지 — 로컬 서버일 때만 */
-let lastGhPoll = 0;
+let lastGhPoll = 0, APPV = null, APPV_TOLD = false;
 async function poll(){
   if (!STORE || document.visibilityState !== 'visible' || S.mode !== 'data' || saving || saveTimer) return;
   if (STORE.kind === 'github'){ if (Date.now() - lastGhPoll < 60000) return; lastGhPoll = Date.now(); }
   const n = S.profile;
   try {
     const v = await STORE.version(n);
+    if (v.app){   // 서버가 새 버전으로 다시 켜졌다 — 입력 중이 아니면 바로 새로고침, 입력 중이면 버튼으로
+      if (APPV && v.app !== APPV && !APPV_TOLD){
+        const busy = document.querySelector('dialog[open]') || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+        if (!busy) return location.reload();
+        APPV_TOLD = true; toast('pkm 앱이 새 버전으로 바뀌었어요', { label:'새로고침', fn:() => location.reload() });
+      }
+      APPV ||= v.app;
+    }
     if (v.sync){ SYNCST[n] = v.sync; document.querySelectorAll('.store-line').forEach(x => x.textContent = storeText(n)); }
     if (v.version !== VER[n] && !saving && !saveTimer && !document.querySelector('dialog[open]')){
       const before = new Map((PROFILES[n].textbooks || []).map(x => [x.id, x.body]));
@@ -5471,13 +5479,26 @@ function vPluginManage(){
   const mem = PL.mem || [];
   const memBody = !mem.length ? '' : section(`기억해 둔 내 정보 <span class="count">${mem.length}</span>`, `<p class="faint" style="margin:-4px 0 12px">브라우저에서 AI가 물어 알려 준 값이에요. 다음엔 묻지 않고 넣어요. 이 컴퓨터에만 있어요.</p>
     <ul class="list pl-mem">${mem.map(m => `<li class="row"><span class="body"><span class="title">${esc(m.name)} <span class="faint num">${esc(m.masked)}</span></span><span class="meta"><span>${plTime(m.at)} 받음</span>${m.from ? `<span>${esc(plName(m.from))}</span>` : ''}${m.used ? `<span>${m.used}번 넣음</span>` : ''}</span></span><button class="btn btn-text btn-sm" type="button" data-pl="mem-del" data-key="${esc(m.key)}" aria-label="${esc(m.name)} 잊기">잊기</button></li>`).join('')}</ul>`);
+  // pkm 앱 스스로 업데이트(server/selfupdate.js) — 이 컴퓨터마다
+  if (PL.app === undefined){ PL.app = null; STORE.json('/api/app').then(r => { PL.app = r; plRepaint(); }).catch(() => { PL.app = false; }); }
+  const au = PL.app && PL.app.update, AU = { latest:'최신이에요', pulled:'방금 새 버전을 받았어요', restart:'새 버전을 받았어요 — pkm을 다시 켜면 반영돼요', dirty:'앱 폴더에 고친 파일이 있어 받지 않았어요', ahead:'올리지 않은 커밋이 있어 받지 않았어요', busy:'방금 저장한 것이 있어 조금 뒤에 받아요', 'no-upstream':'받을 곳(GitHub)이 정해지지 않은 폴더예요', error:'확인하지 못했어요' };
+  const auLine = !au || !au.enabled ? '' : [AU[au.state], au.state === 'error' && au.error, au.at && `${plTime(au.at)} 확인`, PL.app.commit && `지금 ${PL.app.commit}`].filter(Boolean).map(esc).join(' · ');
+  const appBody = !au ? '' : section('이 컴퓨터', `<label class="check opt"><input type="checkbox" data-app-update ${au.enabled ? 'checked' : ''}><span>pkm 앱도 새 버전이 오면 알아서 받기<br><span class="faint" style="font-weight:400;font-size:.8125rem">30분마다 확인하고, 앱 폴더에 고친 파일이 없을 때만 받아 다시 켜요. 하던 작업은 이어서 해요</span>${auLine ? `<br><span class="faint" style="font-weight:400;font-size:.8125rem" role="status">${auLine}</span>` : ''}</span></label>`);
   return `<div class="page">
     ${plIds().length ? `<a class="back" href="#/plugins"><span aria-hidden="true">‹</span> 플러그인</a>` : ''}
     <header class="page-head"><div><h1 tabindex="-1">플러그인 관리</h1><p class="sub">${esc(S.profile)} 프로필에 설치한 플러그인이에요</p></div>${list.length ? '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>' : ''}</header>
     ${!PL.list || (list.length && wait) ? '<p class="muted" role="status">불러오는 중이에요</p>' : list.length ? `${used.length ? part('쓰는 중', used) : ''}${unused.length ? part('안 쓰는 중', unused, '토큰이나 준비가 빠져서 아직 돌지 않아요. 눌러서 마저 준비하거나, 필요 없으면 지워요.') : ''}` : empty('아직 설치한 플러그인이 없어요', '플러그인은 리뷰 모아 보기처럼 한 가지 일에 맞춘 목록과 작업을 pkm에 더해요.', '<a class="btn btn-primary" href="#/plugins/_add">플러그인 더하기</a>')}
     ${memBody}
+    ${appBody}
   </div>`;
 }
+document.addEventListener('change', e => { const t = e.target; if (!t.matches || !t.matches('input[data-app-update]')) return;
+  t.disabled = true;
+  STORE.json('/api/app', { method:'POST', headers:{ 'content-type':'application/json' }, body:JSON.stringify({ update:t.checked }) })
+    .then(r => { PL.app = r; toast(r.update.enabled ? 'pkm 앱 새 버전을 알아서 받아요' : 'pkm 앱 새 버전을 알아서 받지 않아요'); })
+    .catch(err => { t.checked = !t.checked; toast(`바꾸지 못했어요 — ${err.message}`); })
+    .finally(() => { t.disabled = false; plRepaint(); });
+});
 // 특성 한 줄 — 자기 화면이 있는지, 기존 화면 어디에 더해지는지, 무엇을 바꿀 수 있는지
 function plTraits(z){
   const x = PL.st && PL.st.plugins[z.id], mf = z.manifest; if (!x || !mf) return '';

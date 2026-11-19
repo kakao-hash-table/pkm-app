@@ -159,6 +159,9 @@ export async function connectLocalAI(){
 /* pkm 화면에서 고른 AI·모델·생각하는 정도 — 플러그인 AI 단계도 이것을 따른다. 연결을 새로 넣어도 남긴다 */
 const pickAI = a => Object.fromEntries(['provider', 'model', 'effort'].filter(k => a && a[k]).map(k => [k, a[k]]));
 export const aiChoice = () => pickAI(readConf().ai);
+// pkm 앱 스스로 업데이트(server/selfupdate.js) — 이 컴퓨터마다, 기본 켜짐
+export const appUpdateOn = () => readConf().app_update !== false;
+export function setAppUpdate(on){ const c = readConf(); c.app_update = !!on; writeConf(c); return !!on; }
 export function setAIChoice(b){
   const ok = (v, re) => v == null || v === '' || (typeof v === 'string' && re.test(v));
   if (!ok(b.provider, /^[\w-]{1,40}$/) || !ok(b.model, /^[\w.\-:@/]{1,80}$/) || !ok(b.effort, /^[\w-]{1,20}$/)) throw fail(400, 'AI 선택 값의 형식이 맞지 않아요');
