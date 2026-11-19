@@ -59,6 +59,7 @@ import * as textbook from './textbook.js';
 import * as memory from './memory.js';
 import { createRunner, askTitle, readConf, localAI, connectLocalAI, aiChoice, setAIChoice, appUpdateOn, setAppUpdate } from './runner.js';
 import { supervise, watchParent, createSelfUpdate } from './selfupdate.js';
+import { busy as working } from './inflight.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
 import { createPush } from './push.js';
@@ -72,7 +73,7 @@ const HOST = process.env.HOST || '127.0.0.1';
 const MD = createRequire(import.meta.url)('../web/js/pkm-md.js');
 const run = promisify(execFile);
 const MAIN = process.argv[1] === fileURLToPath(import.meta.url);
-if (MAIN && !process.env.PKM_CHILD && process.env.PKM_SUPERVISE !== '0') await supervise(fileURLToPath(import.meta.url));   // 감독은 서버를 켜고 기다리기만 한다
+if (MAIN && !process.env.PKM_CHILD && process.env.PKM_SUPERVISE !== '0') await supervise(fileURLToPath(import.meta.url), { root:ROOT });   // 감독은 서버를 켜고 기다리기만 한다
 const { createGcal } = await import('./gcal.js');
 
 /* ---------- 안전한 경로 ---------- */
@@ -232,7 +233,7 @@ async function syncOnce(p, s){
   } catch (e) {
     Object.assign(s, { state:'error', at:new Date().toISOString(), error:String(e.stderr || e.message).trim().split('\n').slice(-2).join(' ') });
   }
-  return s;
+  return { state:s.state, at:s.at, error:s.error };   // 이번 실행의 결과 — 공유 상태는 다음 실행이 바꿀 수 있다
 }
 setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다
   for (const pr of await listProfiles()) if (pr.storage === 'github' && !(SYNC[pr.name] || {}).running) syncNow(pr.name).catch(() => {});
@@ -554,7 +555,7 @@ async function statics(req, res, url){
   if (!abs.startsWith(WEB + path.sep) || !fss.existsSync(abs) || fss.statSync(abs).isDirectory()) return send(res, 404, 'not found', 'text/plain; charset=utf-8');
   let data = await fs.readFile(abs);
   if (abs.endsWith('index.html')){
-    let html = data.toString('utf8').replace('<html lang="ko"', '<html lang="ko" data-server="1"');
+    let html = data.toString('utf8').replace('<html lang="ko"', `<html lang="ko" data-server="1"${APP_COMMIT ? ` data-app="${APP_COMMIT}"` : ''}`);
     if (withHubLink) html = withHubLink(html, req, { inset:'16px' });
     data = html;
   }
@@ -563,7 +564,7 @@ async function statics(req, res, url){
 
 let APP_COMMIT = null, lastWrite = 0, lastWritePath = '';   // 화면이 새 버전을 알아채 새로고침하게 · 방금 저장했으면 업데이트를 미룬다
 run('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD']).then(r => { APP_COMMIT = String(r.stdout).trim() || null; }).catch(() => {});
-const selfUpdate = createSelfUpdate({ root:ROOT, enabled:appUpdateOn, idleSince:() => lastWrite });
+const selfUpdate = createSelfUpdate({ root:ROOT, enabled:appUpdateOn, ready:() => Date.now() - lastWrite > 3 * 60000 && !working() });   // 방금 저장했거나 실행기·채팅이 AI 서버에 보내는 중이면 미룬다
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method !== 'GET' && url.pathname !== '/api/app'){ lastWrite = Date.now(); lastWritePath = `${req.method} ${url.pathname}`.slice(0, 120); }

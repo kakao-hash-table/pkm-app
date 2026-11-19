@@ -6,6 +6,7 @@
 // 브라우저: 플러그인이 permissions.browser를 선언하고 이 컴퓨터에서 그렇게 승인했으면, 방마다 탭 하나를 에이전트에 붙인다.
 // 에이전트가 사람에게 넘긴 일(BrowserHandoff)과 사람이 직접 보는 화면은 이 서버가 pkm-ai-server의 같은 탭으로 중계한다.
 import fs from 'node:fs';
+import { track } from './inflight.js';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -48,7 +49,7 @@ export function createChats({ DATA, readConf, findCard, findProject = async () =
   /* ---------- pkm-ai-server ---------- */
   async function ai(conn, pathname, opt = {}){
     let r;
-    try { r = await fetch(conn.url + pathname, { ...opt, headers: { authorization: `Bearer ${conn.token}`, 'content-type': 'application/json' }, signal: opt.signal || AbortSignal.timeout(15000) }); }
+    try { r = await (opt.method && opt.method !== 'GET' ? track : x => x)(fetch(conn.url + pathname, { ...opt, headers: { authorization: `Bearer ${conn.token}`, 'content-type': 'application/json' }, signal: opt.signal || AbortSignal.timeout(15000) })); }
     catch (e) { if (e.name === 'AbortError' && opt.signal) throw e; throw fail(502, `AI 서버(${conn.url})에 닿지 않아요. 이 컴퓨터에서 pkm-ai-server가 켜져 있는지 확인해 주세요`); }
     if (opt.raw && r.ok) return r;
     const b = await r.json().catch(() => ({}));

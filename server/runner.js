@@ -11,6 +11,7 @@
 // 답이 오래 없으면 pkm-ai-server가 에이전트를 쉬게 한다(작업은 done + parked) — 내 확인은 그대로 남기고, 답하면 같은 대화(session)·같은 탭으로 새 작업을 만들어 이어 한다.
 // 사람이 보는 화면(작업 화면의 브라우저 보기·미리 로그인)은 이 서버가 pkm-ai-server의 같은 탭으로 중계한다(browser()).
 import fs from 'node:fs';
+import { track } from './inflight.js';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -61,7 +62,7 @@ export const EVERY_MIN = 5, EVERY_MAX = 1440;
 async function ai(conn, pathname, opt = {}){
   if (!conn || !conn.url || !conn.token) throw fail(409, '이 컴퓨터의 AI 연결이 없어요');
   let r;
-  try { r = await fetch(conn.url + pathname, { ...opt, headers: { authorization: `Bearer ${conn.token}`, 'content-type': 'application/json' }, signal: opt.signal || AbortSignal.timeout(15000) }); }
+  try { r = await (opt.method && opt.method !== 'GET' ? track : x => x)(fetch(conn.url + pathname, { ...opt, headers: { authorization: `Bearer ${conn.token}`, 'content-type': 'application/json' }, signal: opt.signal || AbortSignal.timeout(15000) })); }
   catch (e) { throw Object.assign(fail(502, `AI 서버(${conn.url})에 닿지 않아요. 이 컴퓨터에서 pkm-ai-server가 켜져 있는지 확인해 주세요`), { code: (e && e.cause && e.cause.code) || (e && e.name) || '' }); }   // code: ECONNREFUSED(보내지도 못함)·TimeoutError(보냈는데 답이 늦음) 등
   if (opt.raw && r.ok) return r;
   const body = await r.json().catch(() => ({}));
@@ -983,7 +984,7 @@ ${squeeze(result, 12000)}`;
     }
   }
   let timer = null;
-  function start(){ if (!timer){ timer = setInterval(() => tick().catch(e => console.error(`플러그인 실행기: ${e.message}`)), TICK); timer.unref(); } }
+  function start(){ if (!timer){ timer = setInterval(() => track(tick()).catch(e => console.error(`플러그인 실행기: ${e.message}`)), TICK); timer.unref(); } }
 
   /* ---------- API에서 부르는 것 ---------- */
   function here(p){

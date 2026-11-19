@@ -2,6 +2,7 @@
 // 돌리는 컴퓨터(플러그인과 같은 '이 컴퓨터에서 돌리기')만 돌린다. 마지막으로 돈 때·결과는 이 컴퓨터의 ~/.pkm-app/jobs.json에만 둔다.
 // 모드: chat = 도구 없는 AI 한 번 · read = 프로필 폴더를 읽기만 하는 에이전트 · auto = 프로필 폴더의 노트를 고칠 수 있는 에이전트
 import fs from 'node:fs';
+import { track } from './inflight.js';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -48,7 +49,7 @@ export function createJobs({ DATA, listProfiles, settingsOf, here, onWrite = () 
     const conn = readConf().ai;
     if (!conn || !conn.url || !conn.token) throw fail(409, '이 컴퓨터의 AI 연결이 없어요');
     let r;
-    try { r = await fetch(conn.url + pathname, { ...opt, headers:{ authorization:`Bearer ${conn.token}`, 'content-type':'application/json' }, signal:AbortSignal.timeout(15000) }); }
+    try { r = await (opt.method && opt.method !== 'GET' ? track : x => x)(fetch(conn.url + pathname, { ...opt, headers:{ authorization:`Bearer ${conn.token}`, 'content-type':'application/json' }, signal:AbortSignal.timeout(15000) })); }
     catch { throw fail(502, `AI 서버(${conn.url})에 닿지 않아요`); }
     const b = await r.json().catch(() => ({}));
     if (!r.ok) throw fail(r.status === 401 ? 409 : r.status, b.error || `AI 서버 오류 ${r.status}`);

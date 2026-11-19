@@ -1886,7 +1886,7 @@ function tick(){
   if (!busy && S.mode === 'data' && (prev !== TODAY || shape !== lastShape)) render();
 }
 /* 바깥(Obsidian·다른 기기)에서 바뀌었는지 — 로컬 서버일 때만 */
-let lastGhPoll = 0, APPV = null, APPV_TOLD = false;
+let lastGhPoll = 0, APPV = document.documentElement.dataset.app || null, APPV_TOLD = false;   // 처음 받은 페이지의 앱 버전 — 첫 확인 전에 서버가 바뀌어도 알아챈다
 async function poll(){
   if (!STORE || document.visibilityState !== 'visible' || S.mode !== 'data' || saving || saveTimer) return;
   if (STORE.kind === 'github'){ if (Date.now() - lastGhPoll < 60000) return; lastGhPoll = Date.now(); }
@@ -5481,7 +5481,7 @@ function vPluginManage(){
     <ul class="list pl-mem">${mem.map(m => `<li class="row"><span class="body"><span class="title">${esc(m.name)} <span class="faint num">${esc(m.masked)}</span></span><span class="meta"><span>${plTime(m.at)} 받음</span>${m.from ? `<span>${esc(plName(m.from))}</span>` : ''}${m.used ? `<span>${m.used}번 넣음</span>` : ''}</span></span><button class="btn btn-text btn-sm" type="button" data-pl="mem-del" data-key="${esc(m.key)}" aria-label="${esc(m.name)} 잊기">잊기</button></li>`).join('')}</ul>`);
   // pkm 앱 스스로 업데이트(server/selfupdate.js) — 이 컴퓨터마다
   if (PL.app === undefined){ PL.app = null; STORE.json('/api/app').then(r => { PL.app = r; plRepaint(); }).catch(() => { PL.app = false; }); }
-  const au = PL.app && PL.app.update, AU = { latest:'최신이에요', pulled:'방금 새 버전을 받았어요', restart:'새 버전을 받았어요 — pkm을 다시 켜면 반영돼요', dirty:'앱 폴더에서 고친 파일을 새 버전도 바꿔서 받지 않았어요', ahead:'올리지 않은 커밋이 있어 받지 않았어요', busy:'방금 저장한 것이 있어 조금 뒤에 받아요', 'no-upstream':'받을 곳(GitHub)이 정해지지 않은 폴더예요', error:'확인하지 못했어요' };
+  const au = PL.app && PL.app.update, AU = { latest:'최신이에요', pulled:'방금 새 버전을 받았어요', restart:'새 버전을 받았어요 — pkm을 다시 켜면 반영돼요', dirty:'앱 폴더에서 고친 파일을 새 버전도 바꿔서 받지 않았어요', ahead:'올리지 않은 커밋이 있어 받지 않았어요', busy:'하던 일이 있어 조금 뒤에 받아요', merging:'앱 폴더에서 합치기(merge)가 진행 중이라 받지 않았어요', bad:'지난 새 버전이 켜지다 끝나서 되돌렸어요 — 다음 버전을 기다려요', stashed:'고친 파일을 다시 얹지 못했어요 — git 보관함(git stash list)에 있어요', 'no-upstream':'받을 곳(GitHub)이 정해지지 않은 폴더예요', error:'확인하지 못했어요' };
   const auLine = !au || !au.enabled ? '' : [AU[au.state], au.state === 'error' && au.error, au.at && `${plTime(au.at)} 확인`, PL.app.commit && `지금 버전 ${PL.app.commit}`].filter(Boolean).map(esc).join(' · ');
   const appBody = !au ? '' : section('이 컴퓨터', `<label class="check opt"><input type="checkbox" data-app-update ${au.enabled ? 'checked' : ''}><span>pkm 앱도 새 버전이 오면 알아서 받기<br><span class="faint" style="font-weight:400;font-size:.8125rem">30분마다 확인해 받고 다시 켜요. 하던 작업은 이어서 해요. 앱 폴더에서 고친 파일은 그대로 두고, 새 버전이 같은 파일을 바꿨으면 받지 않아요</span>${auLine ? `<br><span class="faint" style="font-weight:400;font-size:.8125rem" role="status">${auLine}</span>` : ''}</span></label>`);
   return `<div class="page">

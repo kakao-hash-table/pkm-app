@@ -23,7 +23,7 @@ function repos(){
 }
 const make = (root, o = {}) => {
   const exits = [];
-  const su = createSelfUpdate({ root, enabled: () => o.enabled !== false, idleSince: () => o.idle || 0, log: () => {}, exit: c => exits.push(c),
+  const su = createSelfUpdate({ root, enabled: () => o.enabled !== false, ready: () => !o.busy, log: () => {}, exit: c => exits.push(c),
     git: (...a) => Promise.resolve({ stdout: execFileSync('git', ['-C', root, ...a], { env, stdio: 'pipe' }) }) });
   return { su, exits };
 };
@@ -55,7 +55,7 @@ test('최신·꺼짐·고친 파일·올리지 않은 커밋·방금 저장은 �
   assert.equal(await make(a.app).su.check(), 'latest');
   a.push();
   assert.equal(await make(a.app, { enabled: false }).su.check(), 'off');
-  assert.equal(await make(a.app, { idle: Date.now() }).su.check(), 'busy');
+  assert.equal(await make(a.app, { busy: true }).su.check(), 'busy');
   g(a.app, 'commit', '-q', '--allow-empty', '-m', 'local');
   assert.equal(await make(a.app).su.check(), 'ahead');
 });
@@ -93,4 +93,51 @@ else { const n = (fs.existsSync(${JSON.stringify(count)}) ? +fs.readFileSync(${J
   const r = spawnSync(process.execPath, [entry], { env: { ...process.env, PKM_CHILD: '' }, timeout: 20000 });
   assert.equal(fs.readFileSync(count, 'utf8'), '3');
   assert.equal(r.status, 7);
+});
+
+test('겹쳐 불러도 한 번만 돌고, 남이 만든 보관함(stash)은 건드리지 않는다', async () => {
+  const a = repos();
+  fs.writeFileSync(path.join(a.app, 'a.txt'), 'old-stash'); g(a.app, 'stash', 'push', '-q', '-m', '사람이 둔 것');
+  a.push('b.txt'); fs.writeFileSync(path.join(a.app, 'a.txt'), 'mine');
+  const { su } = make(a.app);
+  const [x, y] = await Promise.all([su.check(), su.check()]);
+  assert.deepEqual([x, y], ['restart', 'restart']);
+  assert.equal(fs.readFileSync(path.join(a.app, 'a.txt'), 'utf8'), 'mine');
+  assert.match(g(a.app, 'stash', 'list'), /사람이 둔 것/);
+  assert.equal(g(a.app, 'stash', 'list').split('\n').length, 1);
+});
+
+test('합치는 중이면 받지 않고, 켜지다 죽어 되돌린 버전은 다시 받지 않는다', async () => {
+  const a = repos(); a.push('b.txt');
+  const mh = path.join(a.app, '.git', 'MERGE_HEAD'); fs.writeFileSync(mh, g(a.app, 'rev-parse', 'HEAD'));
+  assert.equal(await make(a.app).su.check(), 'merging');
+  fs.rmSync(mh);
+  const old = process.env.PKM_BAD_COMMIT; process.env.PKM_BAD_COMMIT = g(a.app, 'rev-parse', '@{u}');
+  try { assert.equal(await make(a.app).su.check(), 'bad'); } finally { if (old == null) delete process.env.PKM_BAD_COMMIT; else process.env.PKM_BAD_COMMIT = old; }
+});
+
+test('새 버전이 켜지자마자 죽으면 감독이 전 버전으로 되돌리고 다시 켠다', () => {
+  const a = repos(); const from = g(a.app, 'rev-parse', 'HEAD'); a.push('b.txt');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pkm-rb-'));
+  const mod = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'server', 'selfupdate.js');
+  const entry = path.join(dir, 'entry.mjs'), log = path.join(dir, 'log');
+  fs.writeFileSync(entry, `import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { supervise, RESTART } from ${JSON.stringify(mod)};
+const root = ${JSON.stringify(a.app)};
+if (!process.env.PKM_CHILD) await supervise(${JSON.stringify(entry)}, { root, log: () => {} });
+else {
+  const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD']).toString().trim();
+  fs.appendFileSync(${JSON.stringify(log)}, head.slice(0, 7) + ' ' + (process.env.PKM_BAD_COMMIT || '-').slice(0, 7) + '\\n');
+  if (!fs.existsSync(root + '/b.txt') && !process.env.PKM_BAD_COMMIT){ const from = head; execFileSync('git', ['-C', root, 'fetch', '-q']); execFileSync('git', ['-C', root, 'merge', '--ff-only', '-q', '@{u}']); const to = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD']).toString().trim(); fs.writeFileSync(process.env.PKM_UPDATE_MARK, JSON.stringify({ from, to })); process.exit(RESTART); }
+  if (fs.existsSync(root + '/b.txt')) process.exit(3);   // 새 버전은 켜지다 죽는다
+  process.exit(0);
+}
+`);
+  const r = spawnSync(process.execPath, [entry], { env: { ...process.env, PKM_CHILD: '', GIT_AUTOPUSH: '0' }, timeout: 20000 });
+  const lines = fs.readFileSync(log, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 3);
+  assert.equal(g(a.app, 'rev-parse', 'HEAD'), from, '전 버전으로 돌아왔다');
+  assert.notEqual(lines[2].split(' ')[1], '-', '되돌린 버전을 다음 서버에 알린다');
+  assert.equal(r.status, 0);
 });
