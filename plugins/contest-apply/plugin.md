@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: contest-apply
 name: 공모전 신청
-version: 0.12.6
+version: 0.12.7
 author: pkm
 permissions:
   ai: [chat, agent]
