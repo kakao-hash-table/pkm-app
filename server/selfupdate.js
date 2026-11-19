@@ -129,13 +129,14 @@ export function createSelfUpdate({ root, enabled, ready = () => true, log = cons
     }
     return S.state;
   }
-  let busy = null;
-  const check = () => (busy ||= once().finally(() => { busy = null; }));   // 겹쳐 부르면 도는 것을 같이 기다린다
-  let timer = null;
+  let busy = null, timer = null, loop = null;
+  const arm = ms => { if (!loop) return; clearTimeout(timer); timer = setTimeout(loop, ms); timer.unref?.(); };
+  // 겹쳐 부르면 도는 것을 같이 기다린다. 어디서 불렀든 하던 일 때문에 미뤘으면 2분 뒤 다시 본다
+  const check = () => (busy ||= once().finally(() => { busy = null; if (S.state === 'busy') arm(2 * 60000); }));
   const start = () => {
-    if (timer) return;
-    const loop = async () => { await check(); timer = setTimeout(loop, S.state === 'busy' ? 2 * 60000 : MS); timer.unref?.(); };
-    timer = setTimeout(loop, 2 * 60000); timer.unref?.();
+    if (loop) return;
+    loop = async () => { await check(); if (S.state !== 'busy') arm(MS); };
+    arm(2 * 60000);
   };
   const whenIdle = f => { if (critical) after.push(f); else f(); };
   return { check, start, whenIdle, state: () => ({ ...S }) };
