@@ -562,7 +562,7 @@ run('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD']).then(r => { APP_COMMIT 
 const selfUpdate = createSelfUpdate({ root:ROOT, enabled:appUpdateOn, idleSince:() => lastWrite });
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (req.method !== 'GET') lastWrite = Date.now();
+  if (req.method !== 'GET' && url.pathname !== '/api/app') lastWrite = Date.now();
   try {
     if (url.pathname.startsWith('/api/')) await api(req, res, url);
     else if (req.method === 'GET') await statics(req, res, url);

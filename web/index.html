@@ -5482,7 +5482,7 @@ function vPluginManage(){
   // pkm 앱 스스로 업데이트(server/selfupdate.js) — 이 컴퓨터마다
   if (PL.app === undefined){ PL.app = null; STORE.json('/api/app').then(r => { PL.app = r; plRepaint(); }).catch(() => { PL.app = false; }); }
   const au = PL.app && PL.app.update, AU = { latest:'최신이에요', pulled:'방금 새 버전을 받았어요', restart:'새 버전을 받았어요 — pkm을 다시 켜면 반영돼요', dirty:'앱 폴더에 고친 파일이 있어 받지 않았어요', ahead:'올리지 않은 커밋이 있어 받지 않았어요', busy:'방금 저장한 것이 있어 조금 뒤에 받아요', 'no-upstream':'받을 곳(GitHub)이 정해지지 않은 폴더예요', error:'확인하지 못했어요' };
-  const auLine = !au || !au.enabled ? '' : [AU[au.state], au.state === 'error' && au.error, au.at && `${plTime(au.at)} 확인`, PL.app.commit && `지금 ${PL.app.commit}`].filter(Boolean).map(esc).join(' · ');
+  const auLine = !au || !au.enabled ? '' : [AU[au.state], au.state === 'error' && au.error, au.at && `${plTime(au.at)} 확인`, PL.app.commit && `지금 버전 ${PL.app.commit}`].filter(Boolean).map(esc).join(' · ');
   const appBody = !au ? '' : section('이 컴퓨터', `<label class="check opt"><input type="checkbox" data-app-update ${au.enabled ? 'checked' : ''}><span>pkm 앱도 새 버전이 오면 알아서 받기<br><span class="faint" style="font-weight:400;font-size:.8125rem">30분마다 확인하고, 앱 폴더에 고친 파일이 없을 때만 받아 다시 켜요. 하던 작업은 이어서 해요</span>${auLine ? `<br><span class="faint" style="font-weight:400;font-size:.8125rem" role="status">${auLine}</span>` : ''}</span></label>`);
   return `<div class="page">
     ${plIds().length ? `<a class="back" href="#/plugins"><span aria-hidden="true">‹</span> 플러그인</a>` : ''}
