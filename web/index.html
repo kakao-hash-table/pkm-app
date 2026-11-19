@@ -1164,7 +1164,7 @@ body.has-chat-fab main{padding-bottom:120px}
 .ai-state>span{display:block;margin-top:2px;overflow-wrap:anywhere;white-space:pre-line}.ai-state ul{margin:6px 0 0;padding-left:20px}
 .pl-card{margin:16px 0}.pl-card-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.pl-card-acts .btn{margin-top:0}
 .pl-quiet{display:inline-flex;gap:4px;flex-wrap:wrap}
-.now-done{margin-top:8px}.now-done-list{list-style:none;margin:8px 0 0;padding:0}.now-done-list a{display:flex;flex-direction:column;gap:2px;padding:8px 0;min-height:44px;color:inherit;text-decoration:none;border-bottom:1px solid var(--line)}.now-done-list a:hover .now-done-t{text-decoration:underline}.now-done-m{font-size:.8125rem;overflow-wrap:anywhere}
+.now-done{margin-top:8px}.now-done-list{list-style:none;margin:8px 0 0;padding:0}.now-done-list a{display:flex;flex-direction:column;gap:2px;padding:8px 0;min-height:44px;color:inherit;text-decoration:none;border-bottom:1px solid var(--line)}.now-done-list a:hover .now-done-t{text-decoration:underline}.now-done-m{font-size:.8125rem;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .pl-answer{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}.pl-ask-q{font-size:1rem;margin:8px 0 0}
 .pl-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
 .pl-track{flex:1 0 100%;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;color:var(--text-2);font-size:.875rem}
@@ -4436,7 +4436,7 @@ function plDoneToday(){
   if (!done.length) return '';
   const row = ({ id, r }) => { const fb = PKMPlugin.runFeedback(r) || {};
     return `<li><a href="#/plugins/${encodeURIComponent(id)}/run/${encodeURIComponent(r.id)}"><span class="now-done-t">${esc(plName(id))} · ${esc(r.item.title || r.workflow)}</span><span class="faint now-done-m">${esc(plTime(r.updated))} · ${esc(fb.text || '끝났어요')}</span></a></li>`; };
-  return `<details class="more now-done"><summary>오늘 AI가 끝낸 일 <span class="count">${done.length}</span></summary><ul class="now-done-list">${done.slice(0, 20).map(row).join('')}</ul>${done.length > 20 ? `<p class="faint">${done.length - 20}개 더 — 플러그인 화면의 끝난 작업에서 볼 수 있어요</p>` : ''}</details>`;
+  return `<details class="more now-done"><summary>오늘 AI가 끝낸 일&nbsp;<span class="count">${done.length}</span></summary><ul class="now-done-list">${done.slice(0, 20).map(row).join('')}</ul>${done.length > 20 ? `<p class="faint">${done.length - 20}개 더 — 플러그인 화면의 끝난 작업에서 볼 수 있어요</p>` : ''}</details>`;
 }
 function plCount(id){
   const x = PL.st && PL.st.plugins[id]; if (!x) return 0;
