@@ -5615,6 +5615,7 @@ function plMultiFeed(id, x, f){
   const err = fs_.ok === false ? plFeedError(id, fs_) : '';
   const live = (it, w) => runs.some(r => r.item.id === it.id && r.workflow === w && !['done', 'canceled'].includes(r.status));
   const { items:shown, chips } = plSorted(id, f, items.filter(it => !plTrackHidden(id, f, it)));
+  const seenFile = new Set();   // 같은 파일이 여러 항목에 붙었으면 처음 한 번만 펼쳐 보인다
   const row = it => {
     // 이 브라우저에서 누르지 않은 실행(자동 시작·다른 기기)도 아직 안 끝났으면 그 줄에 진행을 보인다 — 내 확인이 필요하면 그 자리에서 [확인하기]
     const open = runs.find(r => r.item.id === it.id && !['done', 'canceled'].includes(r.status));
@@ -5625,6 +5626,8 @@ function plMultiFeed(id, x, f){
     // 항목에 붙은 내용(예: 볼 파일)은 제목과 버튼 사이에 — 보고 나서 누르게
     const see = (it.detail || []).map((d, k) => { const key = `pl-see-${id}-${it.id}-${k}`;   // 목록을 다시 가져와도 펼친 칸은 그대로
       const mdText = d.kind === 'file' && /\.md$/i.test(d.who) && d.text.replace(/^#{1,6}\s+(.+)$/gm, '**$1**');   // 목록 항목 안이라 파일의 제목은 강조 글자로
+      const fk = d.kind === 'file' && `${d.who}\n${d.text}`, again = fk && seenFile.has(fk); if (fk) seenFile.add(fk);
+      if (again) return `<div class="pl-see"><details class="more" data-key="${esc(key)}"><summary>${esc(d.who)} <span class="faint">· 위 항목과 같은 파일</span></summary>${mdText ? `<div class="md pl-md">${md(mdText)}</div>` : `<p class="pl-text">${esc(d.text)}</p>`}</details></div>`;
       return `<div class="pl-see">${d.who ? `<p class="pl-see-path">${esc(d.who)}</p>` : ''}${mdText ? plMd(mdText, 300, key, it.title) : plText(d.text, 300, key, it.title)}</div>`; }).join('');
     return `<li data-pl-row="${esc(plTrackKey(id, f.name, it.id))}"><div class="row pl-multi-row"><span class="body">${ttl}${(it.tags || []).map(t => plBadge(t, 'ok')).join(' ')}<span class="meta">${(it.meta || []).slice(0, 4).map(mm => `<span>${esc(mm)}</span>`).join('')}</span></span>${see}${tk ? plTrackLine(id, f, it, tk) : ''}${leaving ? '' : `<span class="pl-btns">${btns}</span>`}</div></li>`;
   };

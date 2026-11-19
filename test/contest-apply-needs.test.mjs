@@ -93,6 +93,19 @@ test('브라우저 — 고른 답은 AI가 보기를 고르게 보이고, 내 �
   assert.deepEqual([b.summary, b.again], ['알려 준 정보로 다시 내기', { step: '제출', value: 'browse' }]);
 });
 
+test("AI 활용 여부는 AI 안이 있으면 묻지 않고 '활용함'으로, 안이 없으면 지금처럼 묻는다", () => {
+  const d = db(); d.contests['wevity:8'] = contest('wevity:8', { fit: FIT('site', 'https://www.example.org/apply'), docs: [], plan: null, draft });
+  d.contests['wevity:3'] = contest('wevity:3', { fit: FIT('site', 'https://www.example.org/apply'), docs: [], plan: null }); delete d.contests['wevity:3'].draft; put(d);
+  const need = [{ name: 'AI 활용 여부', question: '생성형 AI를 썼나요?', options: ['활용함', '활용하지 않음'] }];
+  const b = run('browsed', { cid: 'wevity:8', me: ME, result: { sent: 'no', reason: '칸', proof: '', did: [], need } });
+  assert.equal(b.again.step, '제출');
+  assert.match(b.summary, /'AI 활용 여부' 칸은 AI 안이라 '활용함'으로/);
+  const ans = JSON.parse(fs.readFileSync(fs.readdirSync(path.join(STORE, '답')).map(f => path.join(STORE, '답', f)).find(f => fs.readFileSync(f, 'utf8').includes('AI 활용')), 'utf8'));
+  assert.match(ans['AI 활용 여부'], /^활용함 — 생성형 AI\(Claude\)/);
+  const n = run('browsed', { cid: 'wevity:3', me: ME, result: { sent: 'no', reason: '칸', proof: '', did: [], need } });
+  assert.match(n.ask.question, /접수 양식에 넣을 내용 1개/);
+});
+
 test('접수 방법을 모르면 사람에게 원문을 보라고 하지 않고, AI가 공고를 열어 찾고 찾은 길로 다시 준비한다', () => {
   const d = db(); d.contests['wevity:6'] = contest('wevity:6', { fit: FIT('etc', ''), homepage: 'https://www.suwon.go.kr/notice/1', docs: [], plan: null }); put(d);
   let r = run('submit', { cid: 'wevity:6', me: ME });

@@ -439,6 +439,20 @@ function shown(f){
   return f;
 }
 const ANSWERS = c => path.join(STORE, '답', `${base(c)}.json`);   // 이 공모전에만 쓰는 답(예: AI를 썼나요)
+// 시스템이 아는 답 — 이 공모전의 안을 AI가 만들었으면(c.draft) 'AI 활용' 문항은 묻지 않고 사실대로 '활용함'. 안이 없으면 지금처럼 묻는다
+const AI_USE = /(생성형|\bAI\b|인공\s*지능|챗\s*GPT|chatgpt).{0,14}(활용|사용|썼|쓴|이용|여부)|(활용|사용|이용).{0,8}(생성형|\bAI\b|인공\s*지능)/i;
+function selfAnswer(c, name, options = []){
+  if (!c.draft || !AI_USE.test(String(name || ''))) return '';
+  const why = '생성형 AI(Claude)로 문구 초안 여러 개를 만들고 그중에서 골라 다듬었어요';
+  const yes = options.map(String).find(o => /활용|사용|^\s*(예|네|yes)\s*$|있음/i.test(o) && !/않|안\s*함|없|아니/.test(o)) || (/예\s*\/\s*아니/.test(name) ? '예' : '활용함');
+  return `${yes} — ${why}`;
+}
+function fillSelf(c, needs, ans){
+  const got = [];
+  for (const x of needs){ const name = typeof x === 'string' ? x : x.name, v = !ans[name] && selfAnswer(c, name, (x && x.options) || []); if (v){ ans[name] = v; got.push(name); } }
+  if (got.length) writeLocal(ANSWERS(c), ans);
+  return got;
+}
 const FULL = args.full === 'true';   // 완전 자동화 — 동의 문항·보낼 안·제출을 묻지 않는다(걸리는 것이 있을 때만 묻는다)
 /* 온라인 폼(구글 폼·네이버 폼) — 문항을 읽어 두고, AI가 문항마다 답을 계획하고, 내가 확인한 뒤에 제출한다 */
 const FORM = { google: '구글 폼', naver: '네이버 폼' };
@@ -726,6 +740,7 @@ async function info(){
     c.skipped = [...skipped]; delete c.filled; delete c.need; save(db);
     return { summary: `적은 내용 ${go.length}개${gm.length ? ` · 내 정보로 기억 ${gm.length}개` : ''}${c.skipped.length ? ` · 비워 둔 것 ${c.skipped.length}개` : ''}`, ...(gm.length ? refreshLists() : {}) };   // 값은 싣지 않는다(실행 기록은 동기화된다) — 목록만 다시 가져와 같은 정보를 기다리던 공모전이 이어 간다
   }
+  fillSelf(c, missingOf(c, me, ans), ans);
   const miss = missingOf(c, me, ans).filter(k => !(c.skipped || []).includes(k));
   if (!miss.length){ if (c.need){ delete c.need; save(db); } return { summary: '모자란 내용 없음' }; }
   // 고르는 문항에 들어갈 내용이면 보기를 알려 준다
@@ -1009,9 +1024,9 @@ function browsed(){
   }
   // 모자란 정보 — 이미 아는 것(다른 공모전에서 답했거나 '알려 줄 정보'에서 방금 답한 것)뿐이면 묻지 않고 다시 낸다. 모르는 것은 '알려 줄 정보'에 올린다
   if (r.sent === 'no' && r.need.length){
-    const ans = readJSON(ANSWERS(c), {}), me = meOf(), open = r.need.filter(n => !knownOf(me, n.name) && !ans[n.name] && !(c.skipped || []).includes(n.name));
+    const ans = readJSON(ANSWERS(c), {}), me = meOf(), self = fillSelf(c, r.need, ans), open = r.need.filter(n => !knownOf(me, n.name) && !ans[n.name] && !(c.skipped || []).includes(n.name));
     setNeed(c, r.need); c.sited = { at: AT, sent: 'no', reason: r.reason, proof: E.str(r.proof, 300), tries: (c.sited && c.sited.tries) || 0 }; save(db);
-    if (!open.length){ delete c.need; save(db); return { summary: '알려 준 정보로 다시 내기', sent: false, again }; }
+    if (!open.length){ delete c.need; save(db); return { summary: `${self.length ? `'${self.join("'·'")}' 칸은 AI 안이라 '활용함'으로 · ` : ''}알려 준 정보로 다시 내기`, sent: false, again }; }
     r.need = open;
   }
   const did =r.did.length ? [{ where: 'AI가 한 일', text: r.did.map((x, i) => `${i + 1}. ${x}`).join('\n') }] : [];
