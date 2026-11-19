@@ -56,11 +56,22 @@ test('최신·꺼짐·고친 파일·올리지 않은 커밋·방금 저장은 �
   a.push();
   assert.equal(await make(a.app, { enabled: false }).su.check(), 'off');
   assert.equal(await make(a.app, { idle: Date.now() }).su.check(), 'busy');
+  g(a.app, 'commit', '-q', '--allow-empty', '-m', 'local');
+  assert.equal(await make(a.app).su.check(), 'ahead');
+});
+
+test('고친 파일이 있어도 새 버전과 겹치지 않으면 치워 두고 받은 뒤 다시 얹고, 겹치면 받지 않는다', async () => {
+  const a = repos(); a.push('b.txt');
   fs.writeFileSync(path.join(a.app, 'a.txt'), 'mine');
+  const { su } = make(a.app);
+  assert.equal(await su.check(), 'restart');
+  assert.equal(su.state().kept, 1);
+  assert.equal(fs.readFileSync(path.join(a.app, 'a.txt'), 'utf8'), 'mine');
+  assert.ok(fs.existsSync(path.join(a.app, 'b.txt')));
+  assert.equal(g(a.app, 'stash', 'list'), '');
+  a.push('a.txt');
   assert.equal(await make(a.app).su.check(), 'dirty');
   assert.equal(fs.readFileSync(path.join(a.app, 'a.txt'), 'utf8'), 'mine');
-  g(a.app, 'commit', '-qam', 'local');
-  assert.equal(await make(a.app).su.check(), 'ahead');
 });
 
 test('받을 곳이 없는 폴더는 건드리지 않는다', async () => {

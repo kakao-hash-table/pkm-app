@@ -208,10 +208,14 @@ async function pullMerge(branch){
   }
   await git('commit', '--no-edit');
 }
-async function syncNow(p){
+// 이미 도는 중이면 끝나기를 기다렸다가 한 번 더 — 그 사이 저장한 것도 올라가고, 부른 쪽은 끝난 결과를 받는다(여럿이 불러도 한 번으로 모은다)
+function syncNow(p){
   const s = SYNC[p] || (SYNC[p] = { state:'idle' });
-  if (s.running) return s;
-  s.running = true; s.state = 'syncing';
+  if (s.running) return (s.next ||= s.running.then(() => { s.next = null; return syncNow(p); }));
+  return (s.running = syncOnce(p, s).finally(() => { s.running = null; }));
+}
+async function syncOnce(p, s){
+  s.state = 'syncing';
   const rel = p;   // DATA 기준 경로
   try {
     await inRepo(async () => {
@@ -227,7 +231,7 @@ async function syncNow(p){
     Object.assign(s, { state:'ok', at:new Date().toISOString(), error:null });
   } catch (e) {
     Object.assign(s, { state:'error', at:new Date().toISOString(), error:String(e.stderr || e.message).trim().split('\n').slice(-2).join(' ') });
-  } finally { s.running = false; }
+  }
   return s;
 }
 setInterval(async () => {   // 다른 기기에서 올린 것을 받아 온다

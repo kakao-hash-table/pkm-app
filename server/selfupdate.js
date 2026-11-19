@@ -35,7 +35,7 @@ const MS = Number(process.env.PKM_SELFUPDATE_MS || 30 * 60000);
 const IDLE_MS = 3 * 60000;
 // root: 앱 폴더 · enabled(): 켜져 있는지 · idleSince(): 마지막으로 무언가를 바꾼 요청 시각 · log
 export function createSelfUpdate({ root, enabled, idleSince, log = console.log, exit = code => process.exit(code), git = (...a) => run('git', ['-C', root, ...a], { timeout: 60000, env: { ...process.env, GIT_AUTOPUSH: '0' } }) }){
-  const S = { at: null, state: 'idle', error: null, pulled: 0, commit: null };
+  const S = { at: null, state: 'idle', error: null, pulled: 0, kept: 0, commit: null };
   const out = async (...a) => String((await git(...a)).stdout).trim();
   async function check(){
     if (!enabled()) return (S.state = 'off');
@@ -48,11 +48,19 @@ export function createSelfUpdate({ root, enabled, idleSince, log = console.log, 
       S.at = new Date().toISOString(); S.error = null;
       if (!behind) return (S.state = 'latest');
       if (ahead) return (S.state = 'ahead');
-      if (await out('status', '--porcelain', '--untracked-files=no')) return (S.state = 'dirty');
+      // 고친 파일이 있어도 새 버전이 건드리지 않는 파일뿐이면 잠깐 치워 두고 받은 뒤 다시 얹는다(겹치면 받지 않는다)
+      const mine = (await out('diff', '--name-only', 'HEAD')).split('\n').filter(Boolean);
+      if (mine.length){
+        const theirs = new Set((await out('diff', '--name-only', 'HEAD', '@{u}')).split('\n').filter(Boolean));
+        if (mine.some(f => theirs.has(f))) return (S.state = 'dirty');
+      }
       if (Date.now() - idleSince() < IDLE_MS) return (S.state = 'busy');   // 방금 무언가를 저장했으면 조금 뒤에
-      await git('merge', '--ff-only', '--quiet', '@{u}');
+      if (mine.length) await git('stash', 'push', '--quiet', '-m', 'pkm 자동 업데이트');
+      try { await git('merge', '--ff-only', '--quiet', '@{u}'); }
+      finally { if (mine.length) await git('stash', 'pop', '--quiet'); }
+      S.kept = mine.length;
       S.pulled = behind; S.state = 'pulled';
-      log(`pkm 앱 새 버전을 받았어요 (커밋 ${behind}개)`);
+      log(`pkm 앱 새 버전을 받았어요 (커밋 ${behind}개)${S.kept ? ` · 고친 파일 ${S.kept}개는 다시 얹었어요` : ''}`);
       if (process.env.PKM_CHILD){ exit(RESTART); return S.state; }
       S.state = 'restart';   // 감독 없이 켰으면 다시 켜야 반영된다
     } catch (e) {

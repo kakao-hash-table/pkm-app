@@ -69,3 +69,10 @@ test('앞서 멈춘 rebase가 남아 있으면 되돌리고 다시 동기화한�
   assert.equal(sh(remote, 'show', `main:${memo}`), '이 기기 2');
   assert.equal(sh(remote, 'show', 'main:data/개인/00_인박스/메모 (다른 기기 충돌 사본).md'), '다른 기기 2');
 });
+
+test('동기화를 겹쳐 불러도 둘 다 끝난 결과를 받는다 — 도는 중이면 기다렸다가 한 번 더', async () => {
+  const { syncNowForTest } = await import('../server/index.js?sync');
+  await save('개인', { writes:{ '00_인박스/겹침.md':'---\ntype: inbox\nid: i9\n---\n\n하나\n' } });
+  const [a, b, c] = await Promise.all([syncNowForTest('개인'), syncNowForTest('개인'), syncNowForTest('개인')]);
+  assert.deepEqual([a.state, b.state, c.state], ['ok', 'ok', 'ok']);
+});
