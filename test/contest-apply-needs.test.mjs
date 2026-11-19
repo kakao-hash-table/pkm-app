@@ -113,7 +113,9 @@ test("AI 활용 여부는 AI 안이 있으면 묻지 않고 '활용함'으로, �
   assert.equal(ans['AI 활용 여부'], '활용함', '보기가 있으면 그 보기 값 그대로');
   const ask = need => run('browsed', { cid: 'wevity:8', me: ME, result: { sent: 'no', reason: '칸', proof: '', did: [], need } });
   for (const n of [{ name: 'AI 관련 전공 여부', question: '', options: ['예', '아니오'] }, { name: '인공지능 자격증 보유 여부', question: '', options: ['있음', '없음'] },
-    { name: '생성형 AI 활용 정도', question: '생성형 AI를 썼나요?', options: ['활용하지 않음', '일부 활용', '전면 활용'] }, { name: '사용한 AI 도구명', question: '', options: [] }])
+    { name: '생성형 AI 활용 정도', question: '생성형 AI를 썼나요?', options: ['활용하지 않음', '일부 활용', '전면 활용'] }, { name: '사용한 AI 도구명', question: '', options: [] },
+    { name: 'AI 학습 데이터 활용 여부', question: '', options: ['예', '아니오'] }, { name: '작품 2차 활용 여부', question: '수상작은 주최측 AI 학습 등에 활용될 수 있습니다', options: ['예', '아니오'] },
+    { name: '인공지능 심사 이용 여부', question: '', options: [] }, { name: '사진 사용 여부', question: 'AI 합성 금지', options: [] }])
     assert.match(ask([n]).ask.question, /접수 양식에 넣을 내용 1개/, `${n.name}은 묻는다`);
   assert.match(ask([{ name: 'AI 사용 유무', question: '', options: ['미사용', '사용'] }]).summary, /'AI 사용 유무' 칸은 AI 안이라/);
   assert.equal(JSON.parse(fs.readFileSync(fs.readdirSync(path.join(STORE, '답')).map(f => path.join(STORE, '답', f)).find(f => fs.readFileSync(f, 'utf8').includes('AI 사용 유무')), 'utf8'))['AI 사용 유무'], '사용', "'미사용'을 고르지 않는다");

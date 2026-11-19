@@ -141,3 +141,16 @@ else {
   assert.notEqual(lines[2].split(' ')[1], '-', '되돌린 버전을 다음 서버에 알린다');
   assert.equal(r.status, 0);
 });
+
+test('치운 직후 다른 작업이 보관함에 쌓아도 내 항목을 찾아 다시 얹고, 남의 것은 둔다', async () => {
+  const a = repos(); a.push('b.txt');
+  fs.writeFileSync(path.join(a.app, 'a.txt'), 'mine');
+  const raw = (...x) => Promise.resolve({ stdout: execFileSync('git', ['-C', a.app, ...x], { env, stdio: 'pipe' }) });
+  const su = createSelfUpdate({ root: a.app, enabled: () => true, log: () => {}, exit: () => {},
+    git: async (...x) => { const r = await raw(...x); if (x[0] === 'stash' && x[1] === 'push'){ fs.writeFileSync(path.join(a.app, 'c.txt'), 'other'); execFileSync('git', ['-C', a.app, 'add', 'c.txt'], { env }); execFileSync('git', ['-C', a.app, 'stash', 'push', '-q', '-m', '다른 작업'], { env }); } return r; } });
+  assert.equal(await su.check(), 'restart');
+  assert.equal(fs.readFileSync(path.join(a.app, 'a.txt'), 'utf8'), 'mine');
+  assert.ok(fs.existsSync(path.join(a.app, 'b.txt')));
+  assert.equal(g(a.app, 'stash', 'list').split('\n').length, 1);
+  assert.match(g(a.app, 'stash', 'list'), /다른 작업/);
+});

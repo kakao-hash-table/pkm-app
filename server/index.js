@@ -58,7 +58,7 @@ import * as plugins from './plugins.js';
 import * as textbook from './textbook.js';
 import * as memory from './memory.js';
 import { createRunner, askTitle, readConf, localAI, connectLocalAI, aiChoice, setAIChoice, appUpdateOn, setAppUpdate } from './runner.js';
-import { supervise, watchParent, createSelfUpdate } from './selfupdate.js';
+import { supervise, supervisable, watchParent, createSelfUpdate } from './selfupdate.js';
 import { busy as working } from './inflight.js';
 import { createJobs } from './jobs.js';
 import { createChats } from './chats.js';
@@ -73,7 +73,7 @@ const HOST = process.env.HOST || '127.0.0.1';
 const MD = createRequire(import.meta.url)('../web/js/pkm-md.js');
 const run = promisify(execFile);
 const MAIN = process.argv[1] === fileURLToPath(import.meta.url);
-if (MAIN && !process.env.PKM_CHILD && process.env.PKM_SUPERVISE !== '0') await supervise(fileURLToPath(import.meta.url), { root:ROOT });   // 감독은 서버를 켜고 기다리기만 한다
+if (MAIN && supervisable()) await supervise(fileURLToPath(import.meta.url), { root:ROOT });   // 감독은 서버를 켜고 기다리기만 한다
 const { createGcal } = await import('./gcal.js');
 
 /* ---------- 안전한 경로 ---------- */

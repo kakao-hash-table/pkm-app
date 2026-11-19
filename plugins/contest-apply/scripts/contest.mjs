@@ -441,13 +441,13 @@ function shown(f){
 const ANSWERS = c => path.join(STORE, '답', `${base(c)}.json`);   // 이 공모전에만 쓰는 답(예: AI를 썼나요)
 // 시스템이 아는 답 — 이 공모전의 안을 AI가 만들었으면(c.draft) '작품에 AI를 썼나요' 문항은 묻지 않고 사실대로. 안이 없으면 지금처럼 묻는다.
 // 전공·수상·자격·경력·분야·방안·도구·비율·저작권·동의처럼 다른 것을 묻는 문항은 사람에게. 보기가 있으면 분명한 '예' 보기 하나일 때만 그 값 그대로
-const AI_WORD = /생성형\s*ai|(^|[^a-z])ai([^a-z]|$)|인공\s*지능|챗\s*gpt|chatgpt/i;
-const AI_USED = /(활용|사용|이용)\s*(여부|유무)|썼|쓰셨|사용했|사용하셨|활용했|활용하셨|이용했|이용하셨/;
-const NOT_AI_USE = /전공|수상|자격|경력|보유|분야|방안|서비스|도구|툴|비율|%|저작권|동의|교육|계획|명칭|이름/;
+const AI_IN_NAME = /(생성형\s*ai|(^|[^a-z])ai|인공\s*지능|챗\s*gpt|chatgpt)\s*(를|을)?\s*(활용|사용|이용)\s*(여부|유무|했|하셨|함|정도)?/i;   // 이름에서 AI와 '썼다'가 붙어 있을 때만
+const AI_IN_Q = /(생성형\s*ai|(^|[^a-z])ai|인공\s*지능|챗\s*gpt|chatgpt)\s*(를|을)?\s*(썼|쓰셨|사용했|사용하셨|활용했|활용하셨|이용했|이용하셨)/i;
+const NOT_AI_USE = /전공|수상|자격|경력|보유|분야|방안|서비스|도구|툴|비율|%|저작권|동의|교육|계획|명칭|이름|학습|데이터|2차|심사|개인\s*정보|합성|금지/;
 const YES = /^\s*(예|네|yes|y|활용함|사용함|활용|사용|있음|했음|썼음)\s*$/i;
 function selfAnswer(c, n){
   const name = String(n.name || ''), q = `${name} ${n.question || ''}`;
-  if (!c.draft || !AI_WORD.test(q) || !AI_USED.test(q) || NOT_AI_USE.test(name)) return '';
+  if (!c.draft || !(AI_IN_NAME.test(name) || AI_IN_Q.test(n.question || '')) || NOT_AI_USE.test(q)) return '';
   const opts = (n.options || []).map(String), yes = opts.filter(o => YES.test(o));
   if (opts.length) return yes.length === 1 ? yes[0].trim() : '';
   return /예\s*\/\s*아니/.test(name) ? '예' : '활용함 — 생성형 AI(Claude)로 문구 초안 여러 개를 만들고 그중에서 골라 다듬었어요';

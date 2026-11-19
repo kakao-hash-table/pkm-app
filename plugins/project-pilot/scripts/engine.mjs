@@ -135,7 +135,9 @@ export function sameTask(a, b){
   for (const [k, v] of A) n += Math.min(v, B.get(k) || 0);
   if (2 * n / (x.length + y.length - 2) < 0.7) return false;
   const [s1, l1] = words(a).length <= words(b).length ? [words(a), words(b)] : [words(b), words(a)], L = new Set(l1);
-  return s1.every(w => L.has(w));
+  if (!s1.every(w => L.has(w))) return false;
+  const S1 = new Set(s1);
+  return !l1.some(w => !S1.has(w) && /취소|전에|후에|말고|대신|않|못|금지|승인/.test(w));   // 긴 쪽이 더한 낱말이 뜻을 뒤집거나 조건을 붙이면 다른 일
 }
 
 export function planMarkdown(pr){
