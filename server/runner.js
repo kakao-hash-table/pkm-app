@@ -291,6 +291,7 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
       meta: strs(it.meta, 6), tags: strs(it.tags, 4, 30), at: it.at ? String(it.at) : null, version: it.version != null ? clip(it.version, 100) : null,
       detail: (Array.isArray(it.detail) ? it.detail : []).slice(0, 8).map(d => ({ who: clip(d.who, 120), at: d.at ? String(d.at) : null, text: clip(d.text, 2000), url: /^https?:\/\//.test(String(d.url || '')) ? String(d.url) : '', kind: d.kind ? clip(d.kind, 30) : '' })),
       ...(P.normChart(it.chart) ? { chart: P.normChart(it.chart) } : {}),   // 버튼 없는 목록이 그리는 선 그래프(예: 누적 손익)
+      ...(['up', 'down'].includes(it.tone) ? { tone: it.tone } : {}),   // 손익 색 — up 빨강(이익)·down 파랑(손해)
       vars: Object.fromEntries(Object.entries(it.vars && typeof it.vars === 'object' ? it.vars : {}).slice(0, 20).map(([k, v]) => [clip(k, 40), clip(v, k === 'project' ? 30000 : 6000)])),
       // 정렬 칩이 읽는 값 — 숫자나 ISO 날짜 글자. 모르는 값(null·빈 글)은 화면이 늘 맨 뒤로 둔다
       sort: Object.fromEntries(Object.entries(it.sort && typeof it.sort === 'object' ? it.sort : {}).slice(0, 6).filter(([k]) => /^[a-z_][a-z0-9_]{0,40}$/.test(k))
@@ -663,7 +664,8 @@ export function createRunner({ DATA, listProfiles, onWrite = () => {}, onAsk = (
   const chooseValues = out => (out && Array.isArray(out.findings) ? out.findings : []).map(f => f && f.choose && typeof f.choose === 'object' ? String(f.choose.value ?? '') : '').filter(Boolean);
   const normAsk = a => ({ type: 'choice', question: clip(a.question || '골라 주세요', 200), hint: a.hint ? clip(a.hint, 300) : '',
     choices: (Array.isArray(a.choices) ? a.choices : []).slice(0, 20).map(c => typeof c === 'string' ? { value: c, label: c } : { value: clip(c.value, 500), label: clip(c.label || c.value, 120), hint: c.hint ? clip(c.hint, 120) : '', recommended: c.recommended === true, confirm: c.confirm ? clip(c.confirm, 200) : '' }),
-    free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true, value: a.value ? clip(a.value, 2000) : '' });   // value: 적는 칸에 미리 채울 글(고쳐서 보낸다)   // inline: 목록 줄에서 바로 고르는 버튼으로
+    free: a.free === true, placeholder: a.placeholder ? clip(a.placeholder, 80) : '', inline: a.inline === true, value: a.value ? clip(a.value, 2000) : '',
+    free_label: a.free_label ? clip(a.free_label, 20) : '', free_type: a.free_type === 'number' ? 'number' : '' });   // free_label: 적는 칸 옆 버튼 글자 · free_type number: 숫자 자판   // value: 적는 칸에 미리 채울 글(고쳐서 보낸다)   // inline: 목록 줄에서 바로 고르는 버튼으로
 
   // 멈춰 둔 넘겨받기 — 에이전트가 답을 기다리다 쉬러 갔다(작업은 끝났고 탭과 채운 내용은 남아 있다). 내 확인은 그대로 두고, 답하면 그 대화(session)를 이어 새 작업을 만든다
   function park(run, step, j, my){
