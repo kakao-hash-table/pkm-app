@@ -176,6 +176,21 @@ export function sizeOf({ budget = 0, orderKrw = 0, maxPos = 1, realized = 0, dep
   return { compound: true, krw: Math.max(0, Math.floor(Math.min(equity / maxPos, free) / (1 + fee))), equity, free };
 }
 
+/* 거래들을 '한 번 사고판 것'으로 묶는다(장부 순서 = 시간 순서). 같은 자리(모드·전략·코인)에서 매수가 열고, 더 사기는 합치고, 판 수량이 산 수량에 닿으면 닫는다.
+   앞부분이 잘려 매수 없이 시작하는 매도는 그것만으로 닫힌 묶음. closed: 다 팔았나 */
+export function tripsOf(trades){
+  const open = new Map(), out = [];
+  for (const t of trades){
+    const k = `${t.mode}|${t.sid}|${t.market}`, v = Number(t.volume) || 0;
+    let tr = open.get(k);
+    if (!tr){ tr = { key: k, mode: t.mode, sid: t.sid, name: t.name, market: t.market, buys: [], sells: [], bought: 0, sold: 0, closed: false }; out.push(tr); if (t.side === 'bid') open.set(k, tr); }
+    if (t.side === 'bid'){ tr.buys.push(t); tr.bought += v; }
+    else { tr.sells.push(t); tr.sold += v; if (!tr.buys.length || tr.sold >= tr.bought * (1 - 1e-6)){ tr.closed = true; open.delete(k); } }
+  }
+  return out;
+}
+export const heldText = ms => { const m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  return d ? `${d}일${h % 24 ? ` ${h % 24}시간` : ''}` : h ? `${h}시간${m % 60 && h < 6 ? ` ${m % 60}분` : ''}` : `${m}분`; };
 /* 체결 묶음 → 평균가·수량·금액. fills: [{ price, volume, funds? }] */
 export function fillOf(fills){
   const volume = fills.reduce((a, f) => a + Number(f.volume), 0), funds = fills.reduce((a, f) => a + (f.funds != null ? Number(f.funds) : Number(f.price) * Number(f.volume)), 0);
@@ -207,6 +222,12 @@ export function thin(points, max = 120){
 export const won = n => `${n < 0 ? '-' : ''}${Math.round(Math.abs(n)).toLocaleString('ko-KR')}원`;
 export const signed = n => `${n > 0 ? '+' : n < 0 ? '-' : ''}${Math.round(Math.abs(n)).toLocaleString('ko-KR')}원`;
 export const pct = (n, d = 2) => n == null || !Number.isFinite(n) ? '-' : `${n > 0 ? '+' : ''}${n.toFixed(d)}%`;
+/* 이름 + 을/를 — 받침이 있으면 을. 한글이 아니면(영문 코드) 을 */
+export const eul = w => { const c = String(w).charCodeAt(String(w).length - 1); return `${w}${c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 === 0 ? '를' : '을'}`; };
+/* 평단·수량 — 반올림하지 않고(업비트 앱과 같게) 1,000원 아래 평단은 소수 둘째 자리까지 */
+const trim = (v, d) => Number(v).toLocaleString('ko-KR', { maximumFractionDigits: d });
+export const avgText = p => p >= 1000 ? trim(p, 0) : p >= 1 ? trim(p, 2) : Number(p).toPrecision(4);
+export const qtyText = v => trim(v, v >= 1 ? 2 : 8);
 export const priceText = p => p >= 100 ? Math.round(p).toLocaleString('ko-KR') : p >= 1 ? p.toFixed(2) : p.toPrecision(4);
 export const kst = (t, withDate = true) => { const d = new Date(new Date(t).getTime() + 9 * 3600e3), p = n => String(n).padStart(2, '0'); return `${withDate ? `${d.getUTCMonth() + 1}/${d.getUTCDate()} ` : ''}${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`; };
 export const coinOf = market => String(market).replace(/^KRW-/, '');

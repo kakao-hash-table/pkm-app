@@ -2,7 +2,7 @@
 pkm_plugin: 1
 id: upbit-quant
 name: 업비트 퀀트
-version: 0.1.6
+version: 0.2.0
 author: pkm
 permissions:
   bundled: [scripts/quant.mjs, scripts/engine.mjs, scripts/upbit.mjs, scripts/indicators.mjs, scripts/strategies.mjs]

@@ -193,7 +193,12 @@ test('모의 거래 — 신호 → 사기 → 들고 있는 것 → 매도 신�
   assert.equal(st1.items[0].chart, undefined); assert.equal(st2.items[0].chart.points.length, 2); assert.deepEqual(Object.keys(st2.items[0].chart.points[0]), ['t', 'v']); assert.equal(st2.items[0].chart.unit, '원');
   assert.match(st2.items.find(i => i.id === 'account').title, /계정 정보가 아직 없어요/);
   const tr = await w.run('trades');
-  assert.deepEqual(tr.items.map(i => i.title.split(' ')[0]), ['매도', '매수']);
+  assert.equal(tr.items.length, 1, '사고판 것은 카드 한 장');
+  assert.match(tr.note, /^모의 거래 끝난 것 1번 · 이익 1 · 손해 0 · 합계 \+1,[0-9]{3}원$/);
+  const card = tr.items[0];
+  assert.match(card.title, /^비트코인 \+1,[0-9]{3}원 \(\+1[0-9]\.[0-9]+%\)$/); assert.equal(card.tone, 'up'); assert.deepEqual(card.tags, ['모의', '끝', '이익']);
+  assert.match(card.meta[0], /^매수 \d+\/\d+ \d\d:\d\d · 평단 90\.1원$/); assert.match(card.meta[1], /^매도 \d+\/\d+ \d\d:\d\d · 100\.9원$/); assert.match(card.meta[2], /^10,005원 · /);
+  assert.deepEqual(card.detail.map(d => d.kind), ['사고판 것', '요약']); assert.match(card.detail[0].text, /^삼 .*\n팖 .* · \+1,[0-9]{3}원$/);
   const sg = await w.run('strategies');
   assert.equal(sg.items.length, STRATEGIES.length); assert.deepEqual(sg.items.find(i => i.id === 'disparity').tags.slice(0, 1), ['켜짐']);
   assert.match(sg.items[0].detail[1].text, /앞으로의 수익을 보장하지 않아요/);
@@ -221,7 +226,9 @@ test('실제 거래 — 지정가가 체결되지 않으면 취소하고 시장�
   assert.match(s.verdict.text, /시장가로 체결/);
   assert.equal(M.orders.get('u1').state, 'cancel'); assert.deepEqual(M.posts[1], { market: 'KRW-BTC', side: 'bid', ord_type: 'price', price: '10000', identifier: `${o.pid}m` });
   assert.deepEqual(w.ledger().trades[0].uuids, ['u1', 'u2']); assert.equal(w.ledger().trades[0].how, 'market');
-  assert.deepEqual((await w.run('trades', { live: true })).items[0].tags, ['실제', '시장가 전환']);
+  const open = (await w.run('trades', { live: true })).items[0];
+  assert.deepEqual(open.tags, ['실제', '진행 중', '손해', '시장가 전환'], '아직 들고 있으면 진행 중 카드'); assert.equal(open.tone, 'down'); assert.match(open.meta[1], /^지금 90\.00원 · 들고 있어요$/);
+  assert.equal(open.detail[1].text, '매도 조건이 오면 저절로 팔아요');
 
   w = world(); M.fill = 'partial';
   sig = await w.run('signals', { live: true });
@@ -361,6 +368,67 @@ test('지금 팔기 — 한 번 묻고 시장가로. 전략 켜고 끄기. 연�
   assert.match((await w.run('order', { side: 'bid', sid: 'disparity', market: 'KRW-BTC', bar: 1, api: 'https://example.com' })).error, /업비트가 아닌 주소/);
 });
 
+test('더 사기 — 굴릴 금액을 늘리면 모자란 만큼 더 사서 같은 포지션에 합치고(평균 단가), 팔 때 한꺼번에 판다', async () => {
+  assert.deepEqual([E.avgText(320.95015576), E.avgText(325), E.avgText(123456789.4), E.avgText(0.012345)], ['320.95', '325', '123,456,789', '0.01235']);
+  assert.deepEqual([E.qtyText(6228.3814608), E.qtyText(0.00012345)], ['6,228.38', '0.00012345']);
+  // 거래 묶기 — 사고, 더 사고, 판 수량이 산 수량에 닿으면 닫는다. 다른 자리는 따로, 다시 사면 새 묶음
+  const T = (side, v, k = 'A', extra = {}) => ({ side, volume: v, mode: 'live', sid: 's', market: `KRW-${k}`, ...extra });
+  const trips = E.tripsOf([T('bid', 10), T('bid', 5, 'A', { add: true }), T('bid', 3, 'B'), T('ask', 15), T('bid', 7), T('ask', 1, 'C')]);
+  assert.deepEqual(trips.map(t => [t.market, t.buys.length, t.sells.length, t.closed]), [['KRW-A', 2, 1, true], ['KRW-B', 1, 0, false], ['KRW-A', 1, 0, false], ['KRW-C', 0, 1, true]]);
+  assert.deepEqual([E.heldText(45 * 60000), E.heldText(130 * 60000), E.heldText(22 * 3600000), E.heldText(50 * 3600000)], ['45분', '2시간 10분', '22시간', '2일 2시간']);
+  assert.equal(E.eul('주피터'), '주피터를'); assert.equal(E.eul('비트코인'), '비트코인을'); assert.equal(E.eul('JUP'), 'JUP을');
+  const w = world(), cfg = { live: true, budget: 20000, 'max-positions': 2 };
+  const sig = await w.run('signals', cfg);
+  await w.run('settle', { pid: (await w.run('order', { ...vars(sig.items[0]), ...cfg })).pid, ...cfg });
+  const key = 'live|disparity|KRW-BTC', first = w.ledger().positions[key];
+  assert.ok(Math.abs(first.cost - 10000) < 1);
+  const pv = (await w.run('positions')).items[0].vars, more = { ...pv, ...cfg, budget: 40000 };   // 굴릴 금액 2만 → 4만(한 칸 1만 → 2만)
+
+  const q = await w.run('buy-more', more);
+  assert.equal(q.ask.question, '비트코인을 얼마나 더 살까요?');
+  assert.equal(q.ask.hint, '들어간 돈 10,000원 · 한 칸 20,000원 · 더 넣을 수 있는 돈 29,985원');
+  assert.deepEqual([q.ask.inline, q.ask.free, q.ask.free_type, q.ask.free_label], [true, true, 'number', '금액 확인'], '목록 줄에 적는 칸(숫자 자판)');
+  assert.deepEqual(q.ask.choices.map(c => [c.value, c.label]), [['amt:9995', '모자란 만큼 9,995원'], ['keep', '그만두기']]);
+  const over = await w.run('buy-more', { ...more, answer: '50000' });
+  assert.equal(over.ask.question, q.ask.question, '굴릴 금액을 넘으면 같은 질문을 이유와 함께 다시');
+  assert.match(over.ask.hint, /^굴릴 금액 안에서 더 넣을 수 있는 돈은 29,985원이에요/); assert.equal(over.ask.value, '50000', '적은 값은 칸에 남긴다');
+  assert.match((await w.run('buy-more', { ...more, answer: '3000' })).ask.hint, /5,000원 이상/);
+  const typed = await w.run('buy-more', { ...more, answer: '15,000원' });
+  assert.equal(typed.ask.question, '비트코인 15,000원어치를 더 살까요?');
+  assert.match(typed.ask.hint, /^지금 90\.10원 · 약 166개\n합치면 277개 · 평단 약 90\.1원 · 들어간 돈 25,00[0-9]원\n실제 돈으로 사요/);
+  assert.deepEqual(typed.ask.choices.map(c => c.value), ['buy:15000', 'edit', 'keep']); assert.equal(typed.ask.choices[0].confirm, undefined, '확인 단계가 확인이라 창을 또 띄우지 않는다');
+  assert.equal((await w.run('buy-more', { ...more, answer: 'edit' })).ask.question, q.ask.question, '금액 바꾸기 → 처음 질문');
+  assert.deepEqual((await w.run('buy-more', { ...more, answer: 'amt:9995' })).ask.choices[0].value, 'buy:9995', '모자란 만큼도 확인을 거친다');
+  assert.match((await w.run('buy-more', { ...more, answer: 'buy:99999' })).ask.hint, /더 넣을 수 있는 돈은/, '확인 뒤에도 금액을 다시 본다');
+  assert.equal((await w.run('buy-more', { ...more, answer: 'keep' })).verdict.title, '그대로 뒀어요');
+  assert.equal((await w.run('buy-more', { ...more, live: false })).verdict.title, '더 사지 않았어요', "'실제 돈으로 사기'가 꺼져 있으면 실제로 산 것을 더 사지 않는다");
+  assert.equal(M.posts.length, 1, '확인하기 전에는 주문하지 않는다');
+
+  M.ask = 95;   // 값이 올랐다
+  const r = await w.run('buy-more', { ...more, answer: 'buy:9995' });
+  assert.match(r.verdict.title, /^비트코인 9,995원어치를 더 샀어요$/); assert.match(r.verdict.text, /합쳐서 [0-9.,]+개 · 평단 92\.[0-9]{1,2}원 · 들어간 돈 20,000원/);
+  assert.equal(r.notify.title, '비트코인 추가 매수 체결');
+  assert.deepEqual(M.posts[1], { market: 'KRW-BTC', side: 'bid', ord_type: 'limit', price: '95', volume: String(E.floor8(9995 / 95)), identifier: M.posts[1].identifier });
+  const db = w.ledger(), pos = db.positions[key];
+  assert.deepEqual(Object.keys(db.positions), [key], '포지션은 하나 그대로');
+  assert.equal(pos.volume, E.floor8(first.volume + 9995 / 95)); assert.ok(Math.abs(pos.cost - 20000) < 1); assert.ok(Math.abs(pos.price - (first.price * first.volume + 9995) / pos.volume) < 1e-6);
+  assert.equal(pos.at, first.at, '산 시각은 처음 것'); assert.equal(pos.adds, 1); assert.equal(db.trades[1].add, true);
+  const held = (await w.run('positions')).items[0], avg = E.avgText(pos.price);
+  assert.equal(held.meta[0], `평단 ${avg}원 → 지금 ${E.priceText((95 + M.bid) / 2)}원`, '평단은 반올림하지 않는다(업비트 앱과 같게)'); assert.match(avg, /^92\.\d\d$/);
+  assert.match(held.meta[1], /^216\.\d{1,2}개 · 평가 /); assert.match(held.meta[2], / · 2번 나눠 삼$/);
+  assert.equal(held.detail[0].kind, '산 것'); assert.match(held.detail[0].text, /90\.1원 × 110\.93개 \(9,995원\)\n.*95원 × 105\.21개 \(9,995원\)\n평단 92\.\d\d원 · 수수료 포함 들어간 돈 20,000원$/);
+  const trip = (await w.run('trades')).items[0];
+  assert.match(trip.meta[0], /^매수 .* · 평단 92\.\d\d원 \(2번\)$/, '더 산 것도 같은 카드'); assert.match(trip.detail[0].text, /^삼 .*\n더 삼 .*95원 × 105\.21개/); assert.equal(trip.tags[1], '진행 중');
+  assert.equal((await w.run('buy-more', more)).ask.choices.length, 1, '한 칸을 채웠으면 모자란 만큼은 없다');
+
+  M.bars = recover(); M.ask = 101.1; M.bid = 100.9;
+  assert.match((await w.run('buy-more', more)).verdict.text, /보유 상태가 아니에요/, '곧 팔 것은 더 사지 않는다');
+  const sell = (await w.run('signals', cfg)).items[0];
+  await w.run('settle', { pid: (await w.run('order', { ...vars(sell), ...cfg })).pid, ...cfg });
+  assert.equal(Number(M.posts[2].volume), pos.volume, '합친 수량을 한꺼번에 판다');
+  assert.deepEqual(w.ledger().positions, {}); assert.ok(Math.abs(w.ledger().trades[2].pnl - (pos.volume * 100.9 * 0.9995 - pos.cost)) < 1);
+});
+
 test('굴릴 금액(복리) — (굴릴 금액 + 판 손익) ÷ 칸 수만큼 사고, 수수료까지 합쳐 그 돈을 넘지 않는다. 이익이 나면 다음에 더 많이 산다', async () => {
   // 계산만
   assert.deepEqual(E.sizeOf({ orderKrw: 10000, maxPos: 5 }), { compound: false, krw: 10000, equity: 50000, free: null });
@@ -438,7 +506,7 @@ test('감시 중 — 코인마다 지금 값과 남은 조건(얼마 더 오르�
   const sig = await w.run('signals', A);
   await w.run('settle', { pid: (await w.run('order', { ...vars(sig.items[0]), ...A })).pid });
   r = await w.run('watch', A);
-  assert.match(r.items[0].title, /^비트코인 · 들고 있어요 -0\.[0-9]+%$/); assert.match(r.items[0].meta[0], /90\.10원에 샀어요 · 아래가 되면 팔아요$/);
+  assert.match(r.items[0].title, /^비트코인 · 들고 있어요 -0\.[0-9]+%$/); assert.match(r.items[0].meta[0], /평단 90\.1원 · 아래가 되면 팔아요$/);
   assert.match(r.items[0].meta[1], /^\+[0-9.]+% 오르면 팔아요 \(.*20봉 평균\)$/); assert.deepEqual(r.items[0].chart.lines.map(l => l.label), ['20봉 평균']);
   // 슬리피지로 건너뛴 신호는 그 이유를 보인다
   const w2 = world(); M.ask = 91;

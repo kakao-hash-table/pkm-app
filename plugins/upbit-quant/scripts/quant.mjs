@@ -8,6 +8,7 @@
 //   order --side=bid|ask --sid --market --bar [--mode]   조건을 다시 확인하고 지정가 주문(매수는 매도 1호가, 매도는 매수 1호가) → pid
 //   settle --pid                                        체결 확인. 정한 시간 안에 다 체결되지 않으면 취소하고 시장가로 마저(매수는 허용 슬리피지 안에서만, 매도는 늘)
 //   sell-now --mode --sid --market [--answer=sell]      들고 있는 것을 지금 시장가로 팔기(한 번 묻는다)
+//   buy-more --mode --sid --market [--answer=원|amt:원|buy:원|edit|keep]   들고 있는 것을 더 사서 같은 포지션에 합치기(평균 단가로 함께 팔린다). ① 금액 ② 확인 → 산다
 //   toggle --sid                                        전략 켜고 끄기 · doctor  업비트 연결·권한 확인(실제 주문 없음)
 // 공통 설정: --live=true|false --markets=줄들 --strategies=id,id --budget=2000000(굴릴 금액 — 적으면 복리) --order-krw=10000 --max-positions=5 --slippage=0.5 --wait=20
 // 테스트용: --profile=폴더 --now=ISO --cache=폴더 --api=http://127.0.0.1:포트 --poll=ms
@@ -174,7 +175,8 @@ async function finish(p, { wait, chase }){
           if (rest < E.MIN_ORDER) return null;
           left = true;
           if (!chase){ notes.push('늦게 확인한 주문이라 나머지는 사지 않았어요'); return null; }
-          if (E.overCap(best.ask, p.signal_price, SLIP, tick)){ notes.push(`값이 신호가보다 ${E.pct((best.ask / p.signal_price - 1) * 100)} 올라(${slipText(p.signal_price, tick)}) 나머지는 사지 않았어요`); return null; }
+          const ref = p.signal_price ?? p.ref_price, refName = p.signal_price != null ? '신호가' : '주문할 때 값';
+          if (ref > 0 && E.overCap(best.ask, ref, SLIP, tick)){ notes.push(`값이 ${refName}보다 ${E.pct((best.ask / ref - 1) * 100)} 올라(${slipText(ref, tick)}) 나머지는 사지 않았어요`); return null; }
           return { market: p.market, side: 'bid', ord_type: 'price', price: String(rest), identifier: `${p.pid}m` }; })()
       : (() => { const rest = E.floor8(p.volume - got.volume);
           if (rest <= 0) return null;
@@ -203,7 +205,12 @@ async function finish(p, { wait, chase }){
     const t = { id: p.pid, at: AT, side: p.side, sid: p.sid, name: nameOf(p.sid), market: p.market, mode: p.mode, price: got.price, volume: got.volume, funds: got.funds, fee, how, bar: p.bar,
       ...(p.immediate ? { manual: true } : {}), signal_price: p.signal_price ?? null, slip_pct: p.signal_price ? (got.price / p.signal_price - 1) * 100 : null, why: p.why || '', uuids, notes };
     if (p.side === 'bid'){
-      db.positions[key] = { mode: p.mode, sid: p.sid, market: p.market, interval: entry ? entry.interval : p.interval, volume: got.volume, cost: got.funds + fee, price: got.price, at: AT, bar: p.bar, signal_price: p.signal_price ?? null };
+      const old = p.add ? db.positions[key] : null;
+      if (old){   // 더 사기 — 같은 포지션에 합친다(평균 단가·수량·들어간 돈). 산 시각·신호는 처음 것 그대로(최대 보유는 처음 산 때부터 센다)
+        const volume = E.floor8(old.volume + got.volume);
+        Object.assign(old, { price: (old.price * old.volume + got.funds) / volume, volume, cost: old.cost + got.funds + fee, adds: (old.adds || 0) + 1, added_at: AT });
+        t.add = true; t.after = { volume, price: old.price, cost: old.cost };
+      } else db.positions[key] = { mode: p.mode, sid: p.sid, market: p.market, interval: entry ? entry.interval : p.interval, volume: got.volume, cost: got.funds + fee, price: got.price, at: AT, bar: p.bar, signal_price: p.signal_price ?? null };
     } else {
       const pos = db.positions[key];
       if (pos){
@@ -227,14 +234,14 @@ const HOW = { limit: '지정가로 체결', 'limit+market': '지정가 일부 + 
 // 휴대폰 알림 한 줄 — 무엇을 얼마에 사고팔았는지(팔 때는 손익)
 function noticeOf(r){
   const t = r.trade, buy = t.side === 'bid', tag = t.mode === 'paper' ? '(모의) ' : '';
-  return { title: `${tag}${r.coin} ${buy ? '매수' : '매도'} 체결`, text: [buy ? `${E.won(t.funds)}어치` : t.pnl != null ? `${E.signed(t.pnl)} (${E.pct(t.ret_pct)})` : E.won(t.funds), `평균 ${E.priceText(t.price)}원`, HOW[t.how]].join(' · ') };
+  return { title: `${tag}${r.coin} ${buy ? (t.add ? '추가 매수' : '매수') : '매도'} 체결`, text: [buy ? `${E.won(t.funds)}어치` : t.pnl != null ? `${E.signed(t.pnl)} (${E.pct(t.ret_pct)})` : E.won(t.funds), `평균 ${E.priceText(t.price)}원`, HOW[t.how]].join(' · ') };
 }
 function report(r){
   if (r.none && r.side === 'ask') fail(`아직 팔지 못했어요 — ${r.reason}`);   // 멈춘 것으로 보이게(다음 봉이 닫히면 다시 판다)
   if (r.none) return { summary: r.reason, verdict: { tone: 'ok', title: '사지 않았어요', text: r.reason }, ...REFRESH };
   const t = r.trade, buy = t.side === 'bid', tag = t.mode === 'paper' ? '(모의) ' : '';
-  const title = buy ? `${tag}${r.coin} ${E.won(t.funds)}어치를 샀어요` : `${tag}${r.coin}을 팔았어요 · ${t.pnl != null ? `${E.signed(t.pnl)} (${E.pct(t.ret_pct)})` : E.won(t.funds)}`;
-  const text = [`평균 ${E.priceText(t.price)}원 × ${dec(t.volume)}개`, HOW[t.how], `수수료 ${E.won(t.fee)}`, t.slip_pct != null ? `신호가 대비 ${E.pct(t.slip_pct)}` : '', ...t.notes].filter(Boolean).join(' · ');
+  const title = buy ? `${tag}${r.coin} ${E.won(t.funds)}어치를 ${t.add ? '더 ' : ''}샀어요` : `${tag}${E.eul(r.coin)} 팔았어요 · ${t.pnl != null ? `${E.signed(t.pnl)} (${E.pct(t.ret_pct)})` : E.won(t.funds)}`;
+  const text = [`평균 ${E.priceText(t.price)}원 × ${dec(t.volume)}개`, t.after ? `합쳐서 ${E.qtyText(t.after.volume)}개 · 평단 ${E.avgText(t.after.price)}원 · 들어간 돈 ${E.won(t.after.cost)}` : '', HOW[t.how], `수수료 ${E.won(t.fee)}`, t.slip_pct != null ? `신호가 대비 ${E.pct(t.slip_pct)}` : '', ...t.notes].filter(Boolean).join(' · ');
   return { summary: title, verdict: { tone: 'ok', title, text }, outcome: { title: buy ? '샀어요' : '팔았어요', text: '' }, ...REFRESH, notify: noticeOf(r),
     findings: t.uuids.map(u => ({ where: `주문 ${u}`, title: '업비트 주문 번호', text: '업비트 앱의 거래 내역에서 같은 주문을 볼 수 있어요' })) };
 }
@@ -325,25 +332,46 @@ async function positions(){
   const db = load(), list = Object.values(db.positions), cur = await priceMap(list.map(p => p.market)), items = [];
   for (const p of list.sort((a, b) => String(b.at).localeCompare(String(a.at)))){
     const c = cur[p.market], value = c != null ? c * p.volume : null, pnl = value != null ? value * (1 - FEE) - p.cost : null;
-    items.push({ id: keyOf(p.mode, p.sid, p.market), title: `${await coinName(p.market)} ${pnl != null ? `${E.signed(pnl)} (${E.pct(pnl / p.cost * 100)})` : ''}`.trim(), tags: [MODE_LABEL[p.mode], ...(p.stuck ? ['직접 정리 필요'] : [])],
-      meta: [short(nameOf(p.sid)), `${E.priceText(p.price)}원에 삼${c != null ? ` → 지금 ${E.priceText(c)}원` : ''}`, value != null ? `평가 ${E.won(value)}` : '', `${E.kst(p.at)}부터`].filter(Boolean),
-      detail: p.stuck ? [{ kind: '알림', text: '평가액이 최소 주문 금액(5,000원)보다 적어 자동으로 팔 수 없어요. 업비트에서 직접 정리해 주세요' }] : [],
+    // 나눠 샀으면 산 것마다(이 포지션을 연 뒤의 매수) — 평단이 어떻게 나왔는지 보이게
+    const buys = p.adds ? db.trades.filter(t => t.side === 'bid' && t.mode === p.mode && t.sid === p.sid && t.market === p.market && t.at >= p.at) : [];
+    items.push({ id: keyOf(p.mode, p.sid, p.market), tone: pnl > 0 ? 'up' : pnl < 0 ? 'down' : '', title: `${await coinName(p.market)} ${pnl != null ? `${E.signed(pnl)} (${E.pct(pnl / p.cost * 100)})` : ''}`.trim(), tags: [MODE_LABEL[p.mode], ...(p.stuck ? ['직접 정리 필요'] : [])],
+      meta: [`평단 ${E.avgText(p.price)}원${c != null ? ` → 지금 ${E.priceText(c)}원` : ''}`, `${E.qtyText(p.volume)}개${value != null ? ` · 평가 ${E.won(value)}` : ''}`, `${E.kst(p.at)}부터${p.adds ? ` · ${p.adds + 1}번 나눠 삼` : ''}`, short(nameOf(p.sid))],
+      detail: [...(p.stuck ? [{ kind: '알림', text: '평가액이 최소 주문 금액(5,000원)보다 적어 자동으로 팔 수 없어요. 업비트에서 직접 정리해 주세요' }] : []),
+        ...(buys.length > 1 ? [{ kind: '산 것', text: `${buys.map(t => `${E.kst(t.at)} ${E.avgText(t.price)}원 × ${E.qtyText(t.volume)}개 (${E.won(t.funds)})`).join('\n')}\n평단 ${E.avgText(p.price)}원 · 수수료 포함 들어간 돈 ${E.won(p.cost)}` }] : [])],
       at: p.at, vars: { mode: p.mode, sid: p.sid, market: p.market } });
   }
   return { items };
 }
+/* 거래 내역 — 한 번 사고판 것을 카드 한 장으로(산 것·판 것을 합쳐). 아직 들고 있는 것은 '진행 중'으로 맨 위에.
+   tone: up(이익, 빨강)·down(손해, 파랑) — 색만으로 가르지 않게 제목의 부호와 '이익'·'손해' 배지도 붙인다 */
 async function trades(){
-  const db = load(), rows = [];
-  for (const t of db.trades.slice(-150)){
-    const buy = t.side === 'bid';
-    rows.push({ at: t.at, item: { id: `t-${t.id}`, title: `${buy ? '매수' : '매도'} ${E.coinOf(t.market)} ${E.won(t.funds)}${!buy && t.pnl != null ? ` · ${E.signed(t.pnl)} (${E.pct(t.ret_pct)})` : ''}`,
-      tags: [MODE_LABEL[t.mode], ...(t.how === 'limit+market' || (t.how === 'market' && !t.manual) ? ['시장가 전환'] : [])],
-      meta: [E.kst(t.at), `${E.priceText(t.price)}원 × ${dec(t.volume)}`, short(t.name || t.sid, 22), `수수료 ${E.won(t.fee)}`], at: t.at,
-      detail: [{ kind: '체결', text: [HOW[t.how], t.slip_pct != null ? `신호가 대비 ${E.pct(t.slip_pct)}` : '', t.why, ...(t.notes || []), (t.uuids || []).length ? `주문 ${t.uuids.join(', ')}` : ''].filter(Boolean).join(' · ') }] } });
+  const db = load(), trips = E.tripsOf(db.trades.slice(-600)), cur = await priceMap(trips.filter(t => !t.closed).map(t => t.market)), rows = [];
+  const sum = (a, f) => a.reduce((n, t) => n + f(t), 0);
+  for (const tr of trips){
+    const pos = !tr.closed && db.positions[tr.key], coin = await coinName(tr.market), b0 = tr.buys[0], bN = tr.buys[tr.buys.length - 1], sN = tr.sells[tr.sells.length - 1];
+    const cost = sum(tr.buys, t => t.funds + (t.fee || 0)), avgBuy = tr.bought > 0 ? sum(tr.buys, t => t.funds) / tr.bought : null, avgSell = tr.sold > 0 ? sum(tr.sells, t => t.funds) / tr.sold : null;
+    const c = pos ? cur[tr.market] : null;
+    const pnl = pos ? (c != null ? c * pos.volume * (1 - FEE) - pos.cost + sum(tr.sells, t => t.pnl || 0) : null) : tr.sells.some(t => t.pnl != null) ? sum(tr.sells, t => t.pnl || 0) : null;
+    const ret = pnl != null && cost > 0 ? pnl / cost * 100 : null, state = pos ? '진행 중' : tr.closed ? '끝' : '장부에서 정리';
+    const word = pnl == null ? '' : pnl > 0 ? '이익' : pnl < 0 ? '손해' : '본전';
+    const switched = [...tr.buys, ...tr.sells].some(t => t.how === 'limit+market' || (t.how === 'market' && !t.manual));
+    const fill = t => `${t.side === 'bid' ? (t.add ? '더 삼' : '삼') : '팖'} ${E.kst(t.at)} ${E.avgText(t.price)}원 × ${E.qtyText(t.volume)}개 (${E.won(t.funds)}) · ${HOW[t.how] || t.how}${t.side === 'ask' && t.pnl != null ? ` · ${E.signed(t.pnl)}` : ''}`;
+    const end = pos ? (pos.stuck ? '평가액이 최소 주문 금액보다 적어 업비트에서 직접 정리해야 해요' : '매도 조건이 오면 저절로 팔아요')
+      : sN ? `판 이유: ${sN.manual ? '직접 지금 팔기' : sN.why && sN.why !== 'signal' ? sN.why : '매도 조건'}` : '업비트에 코인이 없어 장부에서만 정리했어요';
+    rows.push({ at: pos ? '9' : (sN || bN).at, item: { id: `trip-${(b0 || sN).id}`, tone: pnl > 0 ? 'up' : pnl < 0 ? 'down' : '',
+      title: `${coin} ${pnl != null ? `${E.signed(pnl)} (${E.pct(ret)})` : ''}`.trim(),
+      tags: [MODE_LABEL[tr.mode], state, ...(word ? [word] : []), ...(switched ? ['시장가 전환'] : [])],
+      meta: [b0 ? `매수 ${E.kst(b0.at)} · 평단 ${E.avgText(avgBuy)}원${tr.buys.length > 1 ? ` (${tr.buys.length}번)` : ''}` : '매수 기록 없음',
+        pos ? (c != null ? `지금 ${E.priceText(c)}원 · 들고 있어요` : '들고 있어요') : sN ? `매도 ${E.kst(sN.at)} · ${E.avgText(avgSell)}원${tr.sells.length > 1 ? ` (${tr.sells.length}번)` : ''}` : '팔지 않고 정리',
+        `${E.won(cost)}${b0 && (sN || pos) ? ` · ${E.heldText((pos ? NOW : Date.parse(sN.at)) - Date.parse(b0.at))}` : ''}`, short(tr.name || nameOf(tr.sid), 22)],
+      at: (sN || bN).at, detail: [{ kind: '사고판 것', text: [...tr.buys, ...tr.sells].sort((x, y) => String(x.at).localeCompare(String(y.at))).map(fill).join('\n') }, { kind: '요약', text: end }] } });
   }
   for (const s of db.skipped.slice(-50)) rows.push({ at: s.at, item: { id: `s-${s.at}-${s.sid}-${s.market}`, title: `${s.side === 'bid' ? '사지 않음' : '팔지 못함'} ${E.coinOf(s.market)}`, tags: [MODE_LABEL[s.mode], '건너뜀'], meta: [E.kst(s.at), short(s.name || s.sid, 22)], at: s.at, detail: [{ kind: '이유', text: s.reason }] } });
-  rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
-  return { items: rows.slice(0, 150).map(r => r.item), note: db.trades.length ? `거래 ${db.trades.length}건` : '' };
+  rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));   // 진행 중('9')이 맨 위, 나머지는 최근 것부터
+  // 위 한 줄 — 끝난 것의 이익·손해 횟수와 합계(지금 모드만, 진행 중은 빼고)
+  const done = trips.filter(t => t.closed && t.mode === MODE && t.sells.some(x => x.pnl != null)).map(t => sum(t.sells, x => x.pnl || 0));
+  const note = done.length ? `${MODE_LABEL[MODE]} 거래 끝난 것 ${done.length}번 · 이익 ${done.filter(v => v > 0).length} · 손해 ${done.filter(v => v < 0).length} · 합계 ${E.signed(sum(done, v => v))}` : '';
+  return { items: rows.slice(0, 150).map(r => r.item), note };
 }
 const VERDICT = { pass: '검증 통과', partial: '검증 부분 통과', added: '직접 고른 전략' };
 function strategies(){
@@ -384,7 +412,7 @@ async function watch(){
       const how = n <= 1 ? '아래가 되면' : w.need === 'all' || (w.wait.length === 1 && w.wait[0].logic === 'all') ? '아래가 모두 되면' : w.wait.every(p => p.conds.length <= 1 || p.logic === 'any') ? '아래 중 하나가 되면' : '아래 조건이 맞으면';
       const cur = `지금 ${E.priceText(w.close)}원`;
       const pnl = pos ? (w.close * pos.volume * (1 - FEE) - pos.cost) / pos.cost * 100 : null;
-      const head = state === 'own' ? `${cur} · ${E.priceText(pos.price)}원에 샀어요 · ${how} ${verb}`
+      const head = state === 'own' ? `${cur} · 평단 ${E.avgText(pos.price)}원 · ${how} ${verb}`
         : state === 'missed' ? `${cur} · ${how} ${verb}. 그 뒤 새 신호부터 사요` : state === 'fresh' ? `${cur} · 위 '신호' 목록에 올라왔어요. 자동 시작이 켜져 있으면 곧 주문해요` : `${cur} · ${how} ${verb}`;
       // 지난 신호를 사지 않은 이유 — 건너뛴 기록이 있으면 그 이유, 없으면 그때 주문 단계가 돌지 않은 것
       const why = state === 'missed' ? ((db.skipped.find(s => s.sid === sid && s.market === market && s.bar === w.since && s.mode === MODE) || {}).reason || '그때 자동 시작이 꺼져 있었거나 이 컴퓨터가 확인하지 못했어요') : '';
@@ -496,13 +524,60 @@ async function sellNow(){
   if (args.answer !== 'sell'){
     if (args.answer === 'keep') return { summary: '그대로 뒀어요', verdict: { tone: 'ok', title: '그대로 뒀어요', text: '매도 조건이 오면 팔아요' } };
     const cur = (await priceMap([market]))[market], pnl = cur != null ? cur * pos.volume * (1 - FEE) - pos.cost : null;
-    return { summary: '팔지 확인', ask: { question: `${coin}을 지금 시장가로 팔까요?${pnl != null ? ` 지금 팔면 약 ${E.signed(pnl)} (${E.pct(pnl / pos.cost * 100)})` : ''}`, inline: true,
+    return { summary: '팔지 확인', ask: { question: `${E.eul(coin)} 지금 시장가로 팔까요?${pnl != null ? ` 지금 팔면 약 ${E.signed(pnl)} (${E.pct(pnl / pos.cost * 100)})` : ''}`, inline: true,
       choices: [{ value: 'sell', label: '지금 팔기', confirm: `${coin} ${dec(pos.volume)}개를 ${pos.mode === 'live' ? '실제로 ' : '모의로 '}시장가에 팔아요. 되돌릴 수 없어요` }, { value: 'keep', label: '그대로 두기' }] } };
   }
   const plan = await sellPlan(pos, { side: 'ask', sid, market, mode, bar: Math.floor(NOW_SEC / 60) * 60 }, '직접 지금 팔기'); if (plan.done) return plan.done;
   const placed = await place({ ...plan, immediate: true }, coin);
   const r = await finish(load().pending[placed.pid], { wait: 0, chase: false });
   r.coin = coin;
+  return report(r);
+}
+/* 더 사기 — 들고 있는 것에 금액을 더 넣는다. 고를 금액: 한 칸(굴릴 금액 ÷ 칸 수, 또는 한 번에 살 금액)에 모자란 만큼, 또는 직접 적은 금액.
+   굴릴 금액을 적었으면 남은 돈(굴리는 돈 − 들어간 돈)을 넘지 않는다. 전략이 지금 '보유'일 때만 산다(곧 팔 것을 더 사지 않게) */
+async function buyMore(){
+  const mode = args.mode, sid = String(args.sid || ''), market = String(args.market || ''), key = keyOf(mode, sid, market), entry = REG.get(sid);
+  if (!['live', 'paper'].includes(mode) || !/^KRW-[A-Z0-9]{1,15}$/.test(market) || !sid) fail('더 살 항목을 읽지 못했어요');
+  const stop = (title, text) => ({ summary: title, verdict: { tone: 'ok', title, text } });
+  if (args.answer === 'keep') return stop('그대로 뒀어요', '더 사지 않았어요');
+  await reconcile(key);
+  const db = load(), pos = db.positions[key], coin = await coinName(market);
+  if (!pos) return stop('더 살 것이 없어요', '이미 팔렸어요');
+  if (mode !== MODE) return stop('더 사지 않았어요', mode === 'live' ? "'실제 돈으로 사기'가 꺼져 있어요. 실제로 산 것을 더 사려면 설정에서 켜 주세요" : "'실제 돈으로 사기'가 켜져 있어요. 모의로 산 것은 더 살 수 없어요");
+  if (!entry) return stop('더 사지 않았어요', '이 전략이 등록부에서 빠졌어요');
+  if (pos.stuck) return stop('더 사지 않았어요', '업비트에서 직접 정리해야 하는 것이에요');
+  const d = E.desired(await barsOf(market, entry.interval), entry);
+  if (!d.ready || !d.hold) return stop('더 사지 않았어요', '전략이 지금 보유 상태가 아니에요 — 곧 팔 수 있어서 더 사지 않아요');
+  const size = sizing(db, mode);
+  const gap = Math.floor(Math.max(0, (size.compound ? Math.min(size.equity / MAX_POS - pos.cost, size.free) : ORDER_KRW - pos.cost)) / (1 + FEE));
+  const most = size.compound ? Math.floor(size.free / (1 + FEE)) : Infinity;   // 굴릴 금액 안에서 더 넣을 수 있는 돈
+  const { ask } = await bestOf(market), real = mode === 'live', ans = String(args.answer || '');
+  const slot = size.compound ? `한 칸 ${E.won(size.equity / MAX_POS)}` : `한 번에 살 금액 ${E.won(ORDER_KRW)}`;
+  // ① 금액 — 적는 칸 + 모자란 만큼. 잘못 적으면 같은 질문을 이유와 함께 다시
+  const amountAsk = (warn = '', value = '') => ({ summary: '얼마나 더 살지', ask: { question: `${E.eul(coin)} 얼마나 더 살까요?`, inline: true, free: true, free_type: 'number', free_label: '금액 확인', placeholder: '금액(원)', value,
+    hint: [warn, `들어간 돈 ${E.won(pos.cost)} · ${slot}${size.compound ? ` · 더 넣을 수 있는 돈 ${E.won(most)}` : ''}`].filter(Boolean).join('\n'),
+    choices: [...(gap >= E.MIN_ORDER ? [{ value: `amt:${gap}`, label: `모자란 만큼 ${E.won(gap)}` }] : []), { value: 'keep', label: '그만두기' }] } });
+  const check = krw => krw < E.MIN_ORDER ? '5,000원 이상 적어 주세요(업비트 최소 주문 금액)' : krw > most ? `굴릴 금액 안에서 더 넣을 수 있는 돈은 ${E.won(most)}이에요. 더 넣으려면 설정에서 굴릴 금액을 늘려 주세요` : '';
+  if (!ans || ans === 'edit') return amountAsk();
+  if (!ans.startsWith('buy:')){
+    const raw = ans.startsWith('amt:') ? ans.slice(4) : ans, krw = Math.floor(num(raw, 0, 0, 1e10)), bad = check(krw);
+    if (bad) return amountAsk(bad, raw);
+    // ② 확인 — 무엇을 얼마에 몇 개, 합치면 어떻게 되는지 보이고 한 번에 산다
+    const vol = krw / ask, total = pos.volume + vol, avg = (pos.price * pos.volume + krw) / total;
+    return { summary: '더 살지 확인', ask: { question: `${coin} ${E.won(krw)}어치를 더 살까요?`, inline: true,
+      hint: `지금 ${E.priceText(ask)}원 · 약 ${E.priceText(vol)}개\n합치면 ${E.priceText(total)}개 · 평단 약 ${E.avgText(avg)}원 · 들어간 돈 ${E.won(pos.cost + krw * (1 + FEE))}\n${real ? '실제 돈으로' : '모의로'} 사요. 매도 1호가 지정가로 넣고, ${WAIT}초 안에 다 안 되면 나머지는 시장가로 사요`,
+      choices: [{ value: `buy:${krw}`, label: `${E.won(krw)} 더 사기`, recommended: true }, { value: 'edit', label: '금액 바꾸기' }, { value: 'keep', label: '그만두기' }] } };
+  }
+  const krw = Math.floor(num(ans.slice(4), 0, 0, 1e10)), bad = check(krw);
+  if (bad) return amountAsk(bad, String(krw));
+  if (real){
+    const have = Number(((await up.accounts()).find(a => a.currency === 'KRW') || {}).balance || 0), can = Math.floor(have / (1 + FEE));
+    if (can < krw) return stop('더 사지 않았어요', `원화가 모자라요(주문 가능 ${E.won(have)}, 필요 ${E.won(krw * (1 + FEE))})`);
+  }
+  const placed = await place({ side: 'bid', sid, market, mode, bar: Math.floor(NOW_SEC / 60) * 60, price: ask, volume: E.floor8(krw / ask), krw, signal_price: null, ref_price: ask, why: '직접 더 사기', interval: entry.interval, add: true }, coin);
+  if (!placed.pid) return placed;
+  const r = await finish(load().pending[placed.pid], { wait: WAIT, chase: true });
+  if (r.trade) r.coin = coin;
   return report(r);
 }
 function toggle(){
@@ -531,7 +606,7 @@ async function doctor(){
   return { summary: title, verdict: { tone: bad ? 'bad' : 'ok', title, text: LIVE ? "'실제 돈으로 사기'가 켜져 있어요" : "지금은 모의 거래예요. 실제로 사려면 설정에서 '실제 돈으로 사기'를 켜요" }, findings: finds };
 }
 
-const CMD = { signals, watch, status, positions, trades, strategies, account, order, settle, 'sell-now': sellNow, toggle, doctor };
+const CMD = { signals, watch, status, positions, trades, strategies, account, order, settle, 'sell-now': sellNow, 'buy-more': buyMore, toggle, doctor };
 async function main(){
   if (!fs.existsSync(path.join(profile, '_설정.md'))) return { error: `프로필 폴더를 찾지 못했어요: ${profile}` };
   const f = CMD[process.argv[2]];
@@ -543,7 +618,7 @@ if (process.argv[1] && real(process.argv[1]) === real(fileURLToPath(import.meta.
   let r, code = 0;
   try { r = await main(); if (r && r.error) code = 1; } catch (e) { code = 1; r = { error: e.user ? e.message : `처리하다 문제가 생겼어요(${e.message}). 이 단계를 다시 해 주세요` }; }
   // 주문·체결 단계가 멈추면 알린다 — 돈이 걸린 일이 조용히 멈춰 있지 않게
-  if (r.error && ['order', 'settle', 'sell-now'].includes(process.argv[2])) r.notify = { title: [E.coinOf(args.market || ''), { bid: '매수', ask: '매도' }[args.side] || '', '주문이 멈췄어요'].filter(Boolean).join(' '), text: r.error };
+  if (r.error && ['order', 'settle', 'sell-now', 'buy-more'].includes(process.argv[2])) r.notify = { title: [E.coinOf(args.market || ''), { bid: '매수', ask: '매도' }[args.side] || { 'sell-now': '매도', 'buy-more': '추가 매수' }[process.argv[2]] || '', '주문이 멈췄어요'].filter(Boolean).join(' '), text: r.error };
   process.stdout.write(JSON.stringify(r) + '\n');
   process.exitCode = code;
 }

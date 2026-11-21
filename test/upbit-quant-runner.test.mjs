@@ -114,7 +114,7 @@ test('처음 본 신호는 자동으로 사지 않고, 자동 시작을 켠 뒤 
   assert.ok(order.includes('--markets=KRW-BTC') && order.includes('--strategies=disparity') && order.includes('--live=false') && order.includes('--order-krw=10000'));
   // 거래 뒤에는 목록을 바로 새로 가져온다(다음 주기를 기다리지 않는다)
   st = await waitFor(s => (s.feeds['거래 내역'].items || []).length && !s.feeds['신호'].items.length, '거래 뒤 목록');
-  assert.match(st.feeds['거래 내역'].items[0].title, /^매수 BTC /);
+  assert.match(st.feeds['거래 내역'].items[0].title, /^비트코인 -/); assert.equal(st.feeds['거래 내역'].items[0].tone, 'down', '손익 색(tone)이 실행기를 거쳐도 남는다');
   assert.match(st.feeds['들고 있는 것'].items[0].title, /^비트코인 /);
   assert.equal(st.feeds['신호'].items.length, 0);
 });
